@@ -1,95 +1,63 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import ChatLayout from './pages/chat';
-import ChatPage from './pages/chat/chats';
-import ContactsPage from './pages/chat/contacts';
-import SettingsLayout from './pages/chat/settings';
-import SettingsIndex from './pages/chat/settings/default';
-import AppearancePage from './pages/chat/settings/appearance';
-import NotificationsPage from './pages/chat/settings/notifications';
-import PrivacyPage from './pages/chat/settings/privacy';
-import ChatSettingsPage from './pages/chat/settings/chat';
-import AccountPage from './pages/chat/settings/account';
-import StoragePage from './pages/chat/settings/storage';
-import HelpPage from './pages/chat/settings/help';
-import AboutPage from './pages/chat/settings/about';
-import OllamaPage from './pages/chat/settings/ollama';
-import CreateContactPage from './pages/chat-contacts/create';
+import GuiChatLayout from './pages/guichat';
+import GuiChatChats from './pages/guichat/chats';
+import GuiChatContacts from './pages/guichat/contacts';
+import GuiChatChat from './pages/chat';
+import GuiChatNewChat from './pages/new-chat';
+import GuiChatCreateFriend from './pages/create-friend';
+import GuiChatContactDetail from './pages/contact-detail';
 import NotFoundPage from './pages/not-found';
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <Navigate to="/chat" replace />,
-  },
-  {
-    path: '/chat-contacts/create',
-    element: <CreateContactPage />,
-  },
-  {
-    path: '/chat',
-    element: <ChatLayout />,
+    // guichat主路由，包含底部导航栏和子路由
+    path: '/guichat',
+    element: <GuiChatLayout />,
     children: [
       {
+        // 默认显示聊天列表页
         index: true,
-        element: <Navigate to="/chat/chats" replace />,
+        element: <GuiChatChats />,
       },
       {
+        // 聊天列表页，显示所有聊天会话
         path: 'chats',
-        element: <ChatPage />,
+        element: <GuiChatChats />,
       },
       {
+        // 联系人列表页，显示所有联系人
         path: 'contacts',
-        element: <ContactsPage />,
-      },
-      {
-        path: 'settings',
-        element: <SettingsLayout />,
-        children: [
-          {
-            index: true,
-            element: <SettingsIndex />,
-          },
-          {
-            path: 'appearance',
-            element: <AppearancePage />,
-          },
-          {
-            path: 'notifications',
-            element: <NotificationsPage />,
-          },
-          {
-            path: 'privacy',
-            element: <PrivacyPage />,
-          },
-          {
-            path: 'chat',
-            element: <ChatSettingsPage />,
-          },
-          {
-            path: 'account',
-            element: <AccountPage />,
-          },
-          {
-            path: 'storage',
-            element: <StoragePage />,
-          },
-          {
-            path: 'help',
-            element: <HelpPage />,
-          },
-          {
-            path: 'about',
-            element: <AboutPage />,
-          },
-          {
-            path: 'ollama',
-            element: <OllamaPage />,
-          },
-        ],
+        element: <GuiChatContacts />,
       },
     ],
   },
   {
+    // 聊天详情页，显示与特定联系人的聊天记录
+    path: '/chat/:chatId',
+    element: <GuiChatChat />,
+  },
+  {
+    // 新建聊天页，用于选择联系人开始新聊天
+    path: '/new-chat',
+    element: <GuiChatNewChat />,
+  },
+  {
+    // 创建AI朋友页，用于创建新的AI联系人
+    path: '/create-friend',
+    element: <GuiChatCreateFriend />,
+  },
+  {
+    // 联系人详情页，显示联系人资料
+    path: '/contact/:contactId',
+    element: <GuiChatContactDetail />,
+  },
+  {
+    // 根路径重定向到/guichat
+    path: '/',
+    element: <Navigate to="/guichat" replace />,
+  },
+  {
+    // 处理所有未匹配的路径，重定向到主布局
     path: '*',
     element: <NotFoundPage />,
   },

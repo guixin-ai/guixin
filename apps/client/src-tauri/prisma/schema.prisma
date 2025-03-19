@@ -1,0 +1,230 @@
+// 这是Prisma的数据库模式文件 - 仅供参考
+// 实际项目使用的是Diesel ORM，这个文件只是为了提供更直观的数据库结构视图
+// 更多信息请参考: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  // 注意：这个生成器配置仅供参考，实际项目中不会使用
+}
+
+datasource db {
+  provider = "sqlite"
+  // 这个路径仅供参考，实际数据库路径由应用程序代码决定
+  url      = "file:./database.sqlite"
+}
+
+// 用户模型 - 可以是真实用户或AI用户
+model User {
+  id           String       @id @default(uuid())
+  name         String       // 用户名称
+  email        String?      @unique // 用户邮箱（可选）
+  avatarUrl    String?      @map("avatar_url") // 头像URL
+  description  String?      // 用户描述
+  isAI         Boolean      @default(false) @map("is_ai") // 是否为AI用户
+  cloudId      String?      @map("cloud_id") // 云端用户ID（用于同步）
+  
+  syncEnabled  Boolean      @default(false) @map("sync_enabled") // 是否启用同步
+  lastSyncTime DateTime?    @map("last_sync_time") // 最后同步时间
+  theme        String       @default("light") // 主题设置
+  language     String       @default("zh-CN") // 语言设置
+  fontSize     Int          @default(14) @map("font_size") // 字体大小
+  customSettings String?     @default("{}") @map("custom_settings") // 其他自定义设置(JSON)
+  
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  ownedContacts Contact[]    // 用户拥有的联系人
+  agentConfig  Agent?       // AI用户的配置（如果是AI用户）
+  sentMessages Message[]    // 发送的消息
+  participatedChats ChatParticipant[] // 参与的聊天
+  contactLinks ContactUserLink[] // 作为联系人的链接
+  messageReceipts MessageReceipt[] // 消息接收记录
+
+  @@map("users")
+}
+
+// 联系人分组模型
+model ContactGroup {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  
+  // 关系字段
+  contacts    Contact[]
+
+  @@map("contact_groups")
+}
+
+// Agent模型 - 包含AI模型的配置信息
+model Agent {
+  id           String       @id @default(uuid())
+  name         String
+  modelName    String       @map("model_name")      // 模型名称
+  systemPrompt String       @map("system_prompt")   // 系统提示词
+  temperature  Float        // 温度参数
+  maxTokens    Int?         @map("max_tokens")      // 最大生成长度
+  topP         Float?       @map("top_p")           // Top P参数
+  avatarUrl    String?      @map("avatar_url")      // 头像URL
+  description  String?      // 描述
+  isStreaming  Boolean      @default(true) @map("is_streaming") // 是否使用流式输出
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  user         User?        @relation(fields: [userId], references: [id]) // 关联的AI用户
+  userId       String?      @unique @map("user_id") // AI用户ID，一对一关系需要唯一约束
+
+  @@map("agents")
+}
+
+// 联系人模型
+model Contact {
+  id           String       @id @default(uuid())
+  name         String       // 联系人显示名称
+  description  String?      // 联系人描述
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  group        ContactGroup @relation(fields: [groupId], references: [id])
+  groupId      String       @map("group_id")
+  
+  // 拥有此联系人的用户
+  owner        User         @relation(fields: [ownerId], references: [id])
+  ownerId      String       @map("owner_id") // 拥有此联系人的用户ID
+  
+  // 联系人用户链接
+  userLink     ContactUserLink @relation(fields: [userLinkId], references: [id])
+  userLinkId   String       @map("user_link_id")
+
+  @@map("contacts")
+}
+
+// 联系人用户链接 - 中间表，处理联系人与用户的关系
+model ContactUserLink {
+  id           String       @id @default(uuid())
+  createdAt    DateTime     @default(now()) @map("created_at")
+  
+  // 关系字段
+  user         User         @relation(fields: [userId], references: [id])
+  userId       String       @map("user_id") // 联系人对应的用户ID
+  
+  // 反向关系
+  contacts     Contact[]    // 使用此链接的联系人
+
+  @@map("contact_user_links")
+}
+
+// 聊天模型 - 代表一个聊天会话
+model Chat {
+  id                   String       @id @default(uuid())
+  title                String       // 聊天标题
+  type                 String       @default("individual") // 聊天类型：individual, group
+  lastMessageId        String?      @map("last_message_id") // 最后一条消息ID
+  lastMessageContent   String?      @map("last_message_content") // 最后一条消息内容
+  lastMessageTime      DateTime?    @map("last_message_time") // 最后一条消息时间
+  lastMessageSenderId  String?      @map("last_message_sender_id") // 最后一条消息发送者ID
+  lastMessageSenderName String?     @map("last_message_sender_name") // 最后一条消息发送者名称
+  lastMessageType      String?      @map("last_message_type") // 最后一条消息类型(text, image等)
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  participants         ChatParticipant[] // 聊天参与者
+  conversation         Conversation?  // 关联的会话
+  
+  @@map("chats")
+}
+
+// 聊天参与者模型 - 多对多关系表
+model ChatParticipant {
+  id                String       @id @default(uuid())
+  joinedAt          DateTime     @default(now()) @map("joined_at")
+  role              String       @default("member") // 角色：owner, member
+  unreadCount       Int          @default(0) @map("unread_count") // 未读消息计数
+  lastReadMessageId String?      @map("last_read_message_id") // 最后读取的消息ID
+  
+  // 关系字段
+  chat              Chat         @relation(fields: [chatId], references: [id])
+  chatId            String       @map("chat_id")
+  
+  user              User         @relation(fields: [userId], references: [id])
+  userId            String       @map("user_id")
+  
+  @@unique([chatId, userId]) // 确保一个用户在一个聊天中只有一个参与记录
+  @@map("chat_participants")
+}
+
+// 会话模型 - 包含消息历史
+model Conversation {
+  id           String       @id @default(uuid())
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  chat         Chat         @relation(fields: [chatId], references: [id])
+  chatId       String       @unique @map("chat_id") // 一对一关系
+  messages     Message[]    // 会话中的消息
+  
+  @@map("conversations")
+}
+
+// 消息模型
+model Message {
+  id           String       @id @default(uuid())
+  content      String       // 消息内容
+  contentType  String       @default("text") @map("content_type") // 内容类型：text, image, file
+  status       String       @default("sent") // 状态：sending, sent, delivered, read, failed
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String     @map("conversation_id")
+  
+  sender       User         @relation(fields: [senderId], references: [id])
+  senderId     String       @map("sender_id")
+  
+  // 新增关系字段
+  attachments  Attachment[] // 消息附件
+  receipts     MessageReceipt[] // 消息接收记录
+
+  @@map("messages")
+}
+
+// 消息接收记录 - 中间表，处理消息与接收者的关系
+model MessageReceipt {
+  id           String       @id @default(uuid())
+  status       String       @default("delivered") // 状态：delivered, read
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  message      Message      @relation(fields: [messageId], references: [id])
+  messageId    String       @map("message_id")
+  
+  receiver     User         @relation(fields: [receiverId], references: [id])
+  receiverId   String       @map("receiver_id")
+  
+  @@unique([messageId, receiverId]) // 确保一条消息对一个接收者只有一条记录
+  @@map("message_receipts")
+}
+
+// 附件模型
+model Attachment {
+  id           String       @id @default(uuid())
+  fileName     String       @map("file_name")      // 文件名
+  fileType     String       @map("file_type")      // 文件类型 (MIME类型)
+  fileSize     Int          @map("file_size")      // 文件大小 (字节)
+  filePath     String       @map("file_path")      // 文件路径
+  thumbnailPath String?     @map("thumbnail_path") // 缩略图路径 (可选)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  message      Message      @relation(fields: [messageId], references: [id])
+  messageId    String       @map("message_id")
+
+  @@map("attachments")
+}

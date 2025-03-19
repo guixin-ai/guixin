@@ -1,0 +1,17 @@
+# 允许或禁用特定的 lint
+# allow = ["clippy::too_many_arguments"]
+# warn = ["clippy::pedantic"]
+# deny = ["clippy::correctness"]
+
+# 设置阈值
+# 太多函数参数的阈值
+too-many-arguments-threshold = 8
+# 太复杂函数的阈值（循环、判断等嵌套层级）
+cognitive-complexity-threshold = 25
+# 太大结构体的阈值（字段数量）
+type-complexity-threshold = 250
+# 太长函数的阈值（代码行数）
+too-many-lines-threshold = 150
+
+# 其他设置
+enum-variant-size-threshold = 200 

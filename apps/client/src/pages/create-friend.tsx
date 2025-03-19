@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useChatStore } from '@/models/chat.model';
+import { useContactStore } from '@/models/contact.model';
 
 // 表单字段验证模式
 const formSchema = z.object({
@@ -24,8 +26,46 @@ const formSchema = z.object({
 // 表单字段类型
 type FormValues = z.infer<typeof formSchema>;
 
+// 简单的中文转拼音首字母函数
+const getFirstPinyin = (name: string): string => {
+  // 简化处理，实际应该使用完整的中文转拼音库
+  const pinyinMap: Record<string, string> = {
+    '阿': 'a', '爱': 'a', '安': 'a',
+    '白': 'b', '百': 'b', '班': 'b', '爸': 'b',
+    '成': 'c', '陈': 'c', '程': 'c',
+    '大': 'd', '杜': 'd', '东': 'd',
+    '而': 'e', '二': 'e',
+    '发': 'f', '方': 'f',
+    '高': 'g', '工': 'g',
+    '好': 'h', '黄': 'h',
+    '就': 'j', '见': 'j',
+    '开': 'k', '看': 'k',
+    '来': 'l', '老': 'l', '李': 'l',
+    '马': 'm', '没': 'm',
+    '你': 'n', '年': 'n',
+    '哦': 'o',
+    '朋': 'p', '平': 'p',
+    '去': 'q', '钱': 'q',
+    '人': 'r', '日': 'r',
+    '是': 's', '时': 's',
+    '他': 't', '天': 't',
+    '我': 'w', '王': 'w',
+    '向': 'x', '小': 'x',
+    '一': 'y', '有': 'y',
+    '在': 'z', '张': 'z', '周': 'z',
+  };
+  
+  // 获取第一个字符
+  const firstChar = name.charAt(0);
+  
+  // 返回对应的拼音首字母，如果没有对应的则返回字符本身
+  return pinyinMap[firstChar] || firstChar;
+};
+
 const CreateFriendPage = () => {
   const navigate = useNavigate();
+  const { addChat } = useChatStore();
+  const { addContact } = useContactStore();
   
   // 初始化表单
   const form = useForm<FormValues>({
@@ -47,11 +87,30 @@ const CreateFriendPage = () => {
       // 模拟API请求
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // 创建成功后生成新的聊天ID
-      const newChatId = `ai-${Date.now()}`;
+      // 创建新的ID
+      const newId = `ai-${Date.now()}`;
+      const avatarChar = values.name.charAt(0);
+      const pinyinFirstLetter = getFirstPinyin(values.name);
+      
+      // 添加到聊天列表
+      addChat({
+        id: newId,
+        name: values.name,
+        avatar: avatarChar,
+        lastMessage: '你好，我是你创建的AI朋友',
+        timestamp: '刚刚',
+      });
+      
+      // 添加到联系人列表
+      addContact({
+        id: newId,
+        name: values.name,
+        avatar: avatarChar,
+        pinyin: pinyinFirstLetter + values.name, // 确保排序正确
+      });
       
       // 跳转到聊天页面
-      navigate(`/guichat/chat/${newChatId}`);
+      navigate('/guichat/chats');
     } catch (error) {
       console.error('创建朋友失败:', error);
     }

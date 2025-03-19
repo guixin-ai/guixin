@@ -8,99 +8,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-
-// 聊天项类型
-interface ChatItem {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  timestamp: string;
-  unread?: number;
-}
-
-// 示例数据
-const initialChats: ChatItem[] = [
-  {
-    id: '1',
-    name: '文件传输助手',
-    avatar: '文',
-    lastMessage: '[图片]',
-    timestamp: '星期二',
-  },
-  {
-    id: '2',
-    name: '老婆',
-    avatar: '老',
-    lastMessage: '晚安宝宝',
-    timestamp: '昨天',
-    unread: 1,
-  },
-  {
-    id: '3',
-    name: '张薇张薇',
-    avatar: '张',
-    lastMessage: '周末一起打球？',
-    timestamp: '昨天',
-  },
-  {
-    id: '4',
-    name: '于雯雯医生',
-    avatar: '于',
-    lastMessage: '好的，请按时服药',
-    timestamp: '昨天',
-  },
-  {
-    id: '5',
-    name: '柒公子 顺丰快递 收件',
-    avatar: '柒',
-    lastMessage: '您的快递已经送达前台',
-    timestamp: '昨天',
-  },
-  {
-    id: '6',
-    name: '订阅号',
-    avatar: '订',
-    lastMessage: '南京本地宝: 好消息！江苏新增5家国家级旅游度假区',
-    timestamp: '昨天',
-    unread: 3,
-  },
-  {
-    id: '7',
-    name: '大疆',
-    avatar: 'D',
-    lastMessage: '新品发布会邀请',
-    timestamp: '昨天',
-  },
-  {
-    id: '8',
-    name: '扣子Coze',
-    avatar: '扣',
-    lastMessage: '有什么可以帮到您？',
-    timestamp: '星期二',
-  },
-  {
-    id: '9',
-    name: '携程旅行网',
-    avatar: '携',
-    lastMessage: '最后一天，超爆全返场！限时优惠！',
-    timestamp: '星期二',
-  },
-];
+import { useChatStore, ChatItem } from '../../models/chat.model';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
-  const [chats] = useState<ChatItem[]>(initialChats);
+  const { chats, fetchAllChats, searchChats, setCurrentChat } = useChatStore();
   const [searchQuery, setSearchQuery] = useState('');
 
+  // 组件加载时获取聊天列表
+  useEffect(() => {
+    fetchAllChats();
+  }, [fetchAllChats]);
+
   // 过滤后的聊天列表
-  const filteredChats = chats.filter(chat => 
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredChats = searchQuery 
+    ? searchChats(searchQuery)
+    : chats;
 
   // 打开聊天详情
   const handleChatClick = (chatId: string) => {
-    navigate(`/chat/${chatId}`);
+    setCurrentChat(chatId);
+    navigate(`/guichat/chat/${chatId}`);
   };
 
   // 新建聊天

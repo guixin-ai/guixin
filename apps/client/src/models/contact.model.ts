@@ -30,6 +30,7 @@ export interface ContactState {
   getContacts: () => Promise<Contact[]>;
   getContactDetail: (id: string) => Promise<ContactDetail | null>;
   getContactById: (id: string) => Promise<Contact | null>;
+  updateContactDetail: (id: string, updates: Partial<ContactDetail>) => Promise<ContactDetail | null>;
 
   // 初始化方法
   initializeList: () => Promise<void>;
@@ -235,6 +236,44 @@ export const useContactStore = create(
           console.error(`初始化联系人 ${id} 的详情失败:`, error);
           // 抛出自定义异常
           throw new ContactDetailInitFailedException(id, error);
+        }
+      },
+
+      // 更新联系人详情
+      updateContactDetail: async (id: string, updates: Partial<ContactDetail>) => {
+        try {
+          // 获取当前联系人详情
+          const currentDetail = get().contactDetails[id];
+          if (!currentDetail) {
+            throw new ContactNotFoundException(id);
+          }
+          
+          // 在真实应用中，这里应该调用服务端API更新联系人信息
+          // const response = await contactService.updateContactDetail(id, updates);
+          
+          // 暂时只在本地状态更新
+          const updatedDetail = {
+            ...currentDetail,
+            ...updates
+          };
+          
+          // 更新状态
+          set(state => {
+            state.contactDetails[id] = updatedDetail;
+            
+            // 如果更新了名称，同时更新联系人列表中的名称
+            if (updates.name) {
+              const contactIndex = state.contacts.findIndex(c => c.id === id);
+              if (contactIndex !== -1) {
+                state.contacts[contactIndex].name = updates.name;
+              }
+            }
+          });
+          
+          return get().contactDetails[id];
+        } catch (error) {
+          console.error('更新联系人详情失败:', error);
+          return null;
         }
       }
     })),

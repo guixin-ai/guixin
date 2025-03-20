@@ -16,9 +16,11 @@ interface ChatInfoPageProps {
   chatId: string;
   // 添加成员回调
   onAddMember?: () => void;
+  // 添加创建朋友回调
+  onCreateFriend?: () => void;
 }
 
-const ChatInfoPage = ({ onBack, chatId, onAddMember }: ChatInfoPageProps) => {
+const ChatInfoPage = ({ onBack, chatId, onAddMember, onCreateFriend }: ChatInfoPageProps) => {
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +68,12 @@ const ChatInfoPage = ({ onBack, chatId, onAddMember }: ChatInfoPageProps) => {
     }
   };
 
+  const handleCreateFriend = () => {
+    if (onCreateFriend) {
+      onCreateFriend();
+    }
+  };
+
   return (
     <DelayedLoading loading={loading}>
       <div className="flex flex-col h-screen bg-gray-900 text-white">
@@ -87,7 +95,7 @@ const ChatInfoPage = ({ onBack, chatId, onAddMember }: ChatInfoPageProps) => {
           <div className="mb-4">
             <h4 className="text-gray-400 text-sm mb-4">聊天成员</h4>
             <div className="flex flex-wrap gap-4">
-              {chatDetail?.members?.map((member, index) => (
+              {chatDetail?.members?.map((member) => (
                 <div key={member.id} className="flex flex-col items-center">
                   <div className="w-14 h-14 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold mb-1">
                     {member.avatar}

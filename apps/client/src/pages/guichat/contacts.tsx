@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Search, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useContactStore } from '../../models/contact.model';
-import { Contact, ContactGroup } from '../../types/contact';
+import { Contact, ContactGroup, ContactDetail } from '../../types/contact';
 import DelayedLoading from '../../components/delayed-loading';
+import ContactDetailComponent from '../../components/contact-detail';
 import { useShallow } from 'zustand/react/shallow';
 
 // 按拼音首字母分组联系人的函数
@@ -46,6 +47,9 @@ const ContactsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 新增两个状态，用于控制联系人详情的显示
+  const [showContactDetail, setShowContactDetail] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
 
   // 初始化联系人数据
   useEffect(() => {
@@ -84,9 +88,16 @@ const ContactsPage = () => {
       .filter((group: ContactGroup) => group.contacts.length > 0);
   }, [groupsData, searchQuery]);
 
-  // 导航到联系人详情
+  // 导航到联系人详情 - 修改此方法
   const goToContactDetail = (contactId: string) => {
-    navigate(`/contact/${contactId}`);
+    setSelectedContactId(contactId);
+    setShowContactDetail(true);
+  };
+
+  // 关闭联系人详情
+  const handleCloseContactDetail = () => {
+    setShowContactDetail(false);
+    setSelectedContactId(null);
   };
 
   // 打开/关闭下拉菜单
@@ -229,6 +240,14 @@ const ContactsPage = () => {
             </a>
           ))}
         </div>
+
+        {/* 联系人详情组件 - 条件渲染 */}
+        {showContactDetail && selectedContactId && (
+          <ContactDetailComponent
+            contactId={selectedContactId}
+            onBack={handleCloseContactDetail}
+          />
+        )}
       </div>
     </DelayedLoading>
   );

@@ -12,6 +12,7 @@ import { useChatStore } from '../../models/chat.model';
 import { ChatListInitFailedException } from '@/errors/chat.errors';
 import DelayedLoading from '../../components/delayed-loading';
 import NewChat from '../../components/new-chat';
+import CreateFriend from '../../components/create-friend';
 import { useShallow } from 'zustand/react/shallow';
 
 const ChatsPage = () => {
@@ -27,6 +28,7 @@ const ChatsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showCreateFriend, setShowCreateFriend] = useState(false);
 
   // 初始化聊天数据
   useEffect(() => {
@@ -62,7 +64,7 @@ const ChatsPage = () => {
 
   // 创造朋友
   const handleCreateFriend = () => {
-    navigate('/create-friend');
+    setShowCreateFriend(true);
   };
 
   // 处理聊天创建
@@ -73,9 +75,19 @@ const ChatsPage = () => {
     setShowNewChat(false);
   };
 
+  // 处理朋友创建完成
+  const handleFriendCreated = () => {
+    setShowCreateFriend(false);
+  };
+
   // 关闭新建聊天页面
   const handleCloseNewChat = () => {
     setShowNewChat(false);
+  };
+
+  // 关闭创建朋友页面
+  const handleCloseCreateFriend = () => {
+    setShowCreateFriend(false);
   };
 
   return (
@@ -170,6 +182,14 @@ const ChatsPage = () => {
           <NewChat
             onBack={handleCloseNewChat}
             onComplete={handleChatCreated}
+          />
+        )}
+
+        {/* 创造朋友组件 - 条件渲染 */}
+        {showCreateFriend && (
+          <CreateFriend
+            onBack={handleCloseCreateFriend}
+            onComplete={handleFriendCreated}
           />
         )}
       </div>

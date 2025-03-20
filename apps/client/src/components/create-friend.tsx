@@ -1,8 +1,7 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -16,6 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useChatStore } from '@/models/chat.model';
 import { useContactStore } from '@/models/contact.model';
+
+// 组件Props类型
+interface CreateFriendProps {
+  onBack: () => void;
+  onComplete?: () => void;
+}
 
 // 表单字段验证模式
 const formSchema = z.object({
@@ -91,8 +96,7 @@ const getFirstPinyin = (name: string): string => {
   return pinyinMap[firstChar] || firstChar;
 };
 
-const CreateFriendPage = () => {
-  const navigate = useNavigate();
+const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
   const { addChat } = useChatStore();
   const { addContact } = useContactStore();
 
@@ -104,11 +108,6 @@ const CreateFriendPage = () => {
       description: '',
     },
   });
-
-  // 返回上一页
-  const handleBack = () => {
-    navigate(-1);
-  };
 
   // 处理提交
   const onSubmit = async (values: FormValues) => {
@@ -135,22 +134,26 @@ const CreateFriendPage = () => {
         pinyin: pinyinFirstLetter + values.name, // 确保排序正确
       });
 
-      // 返回上一页
-      navigate(-1);
+      // 调用完成回调
+      if (onComplete) {
+        onComplete();
+      } else {
+        onBack();
+      }
     } catch (error) {
       console.error('创建朋友失败:', error);
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 absolute inset-0 z-10">
       {/* 头部 */}
       <div className="flex items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <Button
           variant="ghost"
           size="icon"
           className="text-gray-600 dark:text-gray-300 mr-2"
-          onClick={handleBack}
+          onClick={onBack}
         >
           <ArrowLeft size={20} />
         </Button>
@@ -215,4 +218,4 @@ const CreateFriendPage = () => {
   );
 };
 
-export default CreateFriendPage;
+export default CreateFriend; 

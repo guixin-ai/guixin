@@ -19,26 +19,91 @@ import {
   ChatMessagesInitFailedException,
 } from '@/errors/chat.errors';
 import DelayedLoading from '../components/delayed-loading';
+import {
+  VirtuosoMessage,
+  VirtuosoMessageListMethods,
+} from '../components/lib/virtuoso-message/virtuoso-message';
+import { 
+  ollamaService, 
+  OllamaChatResponse, 
+  OllamaMessage,
+  ChatStreamOptions
+} from '../services/ollama.service';
+import {
+  OllamaBaseError,
+  OllamaConnectionError,
+  OllamaStreamAbortedError,
+  OllamaServiceUnavailableError,
+  OllamaModelNotFoundError,
+  OllamaModelLoadError
+} from '@/errors/ollama.errors';
 
 // 联系人类型
 interface Contact {
   id: string;
   name: string;
   avatar: string;
+  isAI?: boolean;
+}
+
+// 虚拟消息类型
+interface VirtuosoMessageItem {
+  key: string;
+  content: string;
+  isSelf: boolean;
+  timestamp: string;
+  isStreaming?: boolean;
+}
+
+// 随机短语，用于模拟打字效果
+const randomPhrases = [
+  '我理解你的问题，',
+  '让我思考一下，',
+  '根据我的分析，',
+  '这是一个很好的问题，',
+  '从技术角度来看，',
+  '考虑到你的需求，',
+  '基于最佳实践，',
+  '我认为这个想法不错，',
+  '你提到的内容很有趣，',
+  '这个问题有几个方面需要考虑，',
+];
+
+// 获取随机短语
+function getRandomPhrase() {
+  return randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
 }
 
 const ChatPage = () => {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoMessageListMethods<VirtuosoMessageItem>>(null);
   const [inputValue, setInputValue] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isAIResponding, setIsAIResponding] = useState(false);
+  const [isMessagesInitialized, setIsMessagesInitialized] = useState(false);
+  const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
+
+  // 添加AbortController引用
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // 添加输入框引用，用于保持焦点
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // 使用聊天模型的状态和方法
-  const { initialize, fetchChatById, initializeChatMessages, addChatMessage } = useChat();
+  const { initialize, fetchChatById, initializeChatMessages, addChatMessage, getChatMessages } =
+    useChat();
+
+  // 转换ChatMessage为VirtuosoMessageItem
+  const convertToVirtuosoMessage = (message: ChatMessage): VirtuosoMessageItem => {
+    return {
+      key: message.id,
+      content: message.content,
+      isSelf: message.isSelf,
+      timestamp: message.timestamp,
+    };
+  };
 
   // 加载聊天数据
   useEffect(() => {
@@ -46,6 +111,7 @@ const ChatPage = () => {
 
     const loadChatData = async () => {
       setLoading(true);
+      setIsMessagesInitialized(false);
 
       try {
         // 初始化聊天列表并直接获取列表数据
@@ -59,16 +125,23 @@ const ChatPage = () => {
           throw new ChatNotFoundException(chatId);
         }
 
-        // 设置联系人信息
+        // 设置联系人信息（添加isAI标记）
         setContact({
           id: chatInfo.id,
           name: chatInfo.name,
           avatar: chatInfo.avatar,
+          isAI: true, // 假设所有聊天都是AI
         });
 
-        // 初始化并获取聊天消息
-        const chatMessages = await initializeChatMessages(chatId);
-        setMessages(chatMessages);
+        // 初始化聊天消息
+        await initializeChatMessages(chatId);
+
+        // 获取聊天记录并转换为VirtuosoMessageItem
+        const chatMessages = await getChatMessages(chatId);
+        const virtuosoMessages = chatMessages.map(convertToVirtuosoMessage);
+        setInitialMessages(virtuosoMessages);
+
+        setIsMessagesInitialized(true);
       } catch (error) {
         // 处理不同类型的错误
         if (error instanceof ChatNotFoundException) {
@@ -86,60 +159,223 @@ const ChatPage = () => {
     };
 
     loadChatData();
-  }, [chatId, initialize, fetchChatById, initializeChatMessages]);
-
-  // 自动滚动到最新消息
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [chatId, initialize, fetchChatById, initializeChatMessages, getChatMessages]);
 
   // 返回聊天列表
   const handleBack = () => {
     if (showChatInfo) {
       setShowChatInfo(false);
     } else {
-      navigate('/guichat/chats');
+      navigate('/chats');
+    }
+  };
+
+  // 取消当前正在进行的生成
+  const cancelCurrentGeneration = () => {
+    if (abortControllerRef.current) {
+      console.log('取消当前生成...');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
+  // 使用Ollama生成AI回复
+  const generateAIResponse = async (responseId: string, userMessage: string) => {
+    setIsAIResponding(true);
+
+    // 创建初始空回复
+    const aiMessage: VirtuosoMessageItem = {
+      key: responseId,
+      content: '',
+      isSelf: false,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isStreaming: true,
+    };
+
+    // 直接添加到UI组件
+    if (virtuosoRef.current && isMessagesInitialized) {
+      virtuosoRef.current.data.append([aiMessage]);
+    }
+
+    try {
+      // 使用本地Ollama模型 - 这里使用gemma3模型
+      const MODEL_NAME = 'gemma3:1b';
+
+      // 准备聊天历史
+      let chatHistory: OllamaMessage[] = [];
+
+      // 如果有初始消息，构建聊天历史
+      if (initialMessages.length > 0) {
+        chatHistory = initialMessages.map(msg => ({
+          role: msg.isSelf ? 'user' : 'assistant',
+          content: msg.content,
+        }));
+      }
+
+      // 添加当前用户消息
+      chatHistory.push({
+        role: 'user',
+        content: userMessage,
+      });
+
+      // 创建新的AbortController
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
+      // 使用服务层提供的可中断流方法
+      await ollamaService.chatStream(
+        {
+          model: MODEL_NAME,
+          messages: chatHistory,
+          stream: true,
+          options: {
+            temperature: 0.7,
+            top_p: 0.9,
+          },
+        },
+        { signal }, // 传入AbortSignal
+        (chunk: OllamaChatResponse) => {
+          // 处理每个响应块
+          if (chunk.message?.content && typeof chunk.message.content === 'string') {
+            // 更新UI显示
+            if (virtuosoRef.current && isMessagesInitialized) {
+              virtuosoRef.current.data.map(msg => {
+                if (msg.key === responseId) {
+                  return {
+                    ...msg,
+                    content: msg.content + chunk.message.content,
+                  };
+                }
+                return msg;
+              }, 'smooth');
+            }
+          }
+        },
+        (fullResponse: OllamaMessage) => {
+          // 完成时处理
+          if (virtuosoRef.current && isMessagesInitialized) {
+            virtuosoRef.current.data.map(msg => {
+              if (msg.key === responseId) {
+                return {
+                  ...msg,
+                  content: fullResponse.content as string,
+                  isStreaming: false,
+                };
+              }
+              return msg;
+            });
+          }
+
+          setIsAIResponding(false);
+          // 清除当前的AbortController
+          abortControllerRef.current = null;
+        }
+      );
+    } catch (error: any) {
+      // 使用新的异常类型进行处理
+      let errorMessage = '抱歉，我暂时无法回答您的问题。';
+      let isAborted = false;
+
+      if (error instanceof OllamaStreamAbortedError) {
+        // 流被用户中断
+        isAborted = true;
+        errorMessage = '(已中断)';
+      } else if (error instanceof OllamaModelNotFoundError) {
+        // 模型不存在
+        errorMessage = `抱歉，所需的模型 ${error.modelName} 不存在。请确保该模型已安装。`;
+      } else if (error instanceof OllamaModelLoadError) {
+        // 模型加载失败
+        errorMessage = `抱歉，模型 ${error.modelName} 加载失败。请检查模型是否损坏或重新安装。`;
+      } else if (error instanceof OllamaServiceUnavailableError) {
+        // 服务不可用
+        errorMessage = '抱歉，Ollama服务不可用。请确保Ollama服务已启动并正常运行。';
+      } else if (error instanceof OllamaConnectionError) {
+        // 连接错误
+        errorMessage = '抱歉，连接到Ollama服务失败。请检查网络连接和服务状态。';
+      } else if (error instanceof OllamaBaseError) {
+        // 其他Ollama错误
+        errorMessage = `抱歉，Ollama服务出现错误: ${error.message}`;
+      } else {
+        // 未知错误
+        console.error('调用Ollama服务失败:', error);
+        errorMessage = '抱歉，我暂时无法回答您的问题。请检查Ollama服务是否正常运行。';
+      }
+
+      // 更新UI显示错误信息
+      if (virtuosoRef.current && isMessagesInitialized) {
+        virtuosoRef.current.data.map(msg => {
+          if (msg.key === responseId) {
+            return {
+              ...msg,
+              content: isAborted ? msg.content + errorMessage : errorMessage,
+              isStreaming: false,
+            };
+          }
+          return msg;
+        });
+      }
+
+      setIsAIResponding(false);
+      abortControllerRef.current = null;
     }
   };
 
   // 发送消息
   const handleSend = () => {
-    if (!inputValue.trim() || !chatId) return;
+    // 如果没有输入内容或没有聊天ID，或者AI正在响应，则不发送消息
+    if (!inputValue.trim() || !chatId || isAIResponding) return;
 
-    const newMessage: ChatMessage = {
-      id: `${Date.now()}`,
+    const userMessageId = `user-${Date.now()}`;
+    const aiResponseId = `ai-${Date.now()}`;
+
+    // 创建用户消息
+    const userMessage: VirtuosoMessageItem = {
+      key: userMessageId,
       content: inputValue,
       isSelf: true,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // 添加消息到模型缓存
-    addChatMessage(chatId, newMessage);
-    // 更新本地状态
-    setMessages([...messages, newMessage]);
+    // 直接添加到UI，优先响应界面变化
+    if (virtuosoRef.current && isMessagesInitialized) {
+      virtuosoRef.current.data.append([userMessage], ({ scrollInProgress, atBottom }) => {
+        return {
+          index: 'LAST',
+          align: 'start',
+          behavior: atBottom || scrollInProgress ? 'smooth' : 'auto',
+        };
+      });
+    } else {
+      // 如果组件未初始化，初始化组件并显示消息
+      setInitialMessages([userMessage]);
+      setIsMessagesInitialized(true);
+    }
+
+    // 保存用户输入，然后清空输入框
+    const currentInput = inputValue;
     setInputValue('');
 
-    // 模拟对方回复
+    // 延迟1秒后开始生成AI回复
     setTimeout(() => {
-      const replyMessage: ChatMessage = {
-        id: `${Date.now() + 1}`,
-        content: '好的，我知道了',
-        isSelf: false,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      // 添加回复消息到模型缓存
-      addChatMessage(chatId, replyMessage);
-      // 更新本地状态
-      setMessages(prevMessages => [...prevMessages, replyMessage]);
+      generateAIResponse(aiResponseId, currentInput);
     }, 1000);
+
+    // 保持输入框焦点
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   // 按回车发送消息
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
+      e.preventDefault(); // 阻止默认行为，防止输入框换行
+      
+      // 只有在AI没有响应时才发送消息
+      if (!isAIResponding) {
+        handleSend();
+      }
+      // 如果AI正在响应，不做任何操作，但保持焦点在输入框上
     }
   };
 
@@ -148,38 +384,46 @@ const ChatPage = () => {
     setShowChatInfo(true);
   };
 
-  // 加载状态UI组件
-  const loadingComponent = (
-    <div className="flex h-screen items-center justify-center bg-white dark:bg-black">
-      <div className="flex flex-col items-center">
-        <div className="w-8 h-8 border-2 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
-        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">加载中...</p>
+  // 消息项渲染组件 - 使用Gemini风格
+  const MessageItemContent = ({ data }: { data: VirtuosoMessageItem }) => {
+    const ownMessage = data.isSelf;
+
+    return (
+      <div className="py-4">
+        <div className={`flex ${ownMessage ? 'justify-end' : 'justify-start'}`}>
+          {/* 对方消息 */}
+          {!data.isSelf && contact && (
+            <div className="flex items-start max-w-[80%]">
+              <div className="w-8 h-8 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold text-xs mr-2 mt-1">
+                {contact.avatar}
+              </div>
+              <div>
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-gray-800 dark:text-white">
+                  {data.content}
+                  {data.isStreaming && (
+                    <span className="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse"></span>
+                  )}
+                </div>
+                <div className="text-left mt-1">
+                  <span className="text-xs text-gray-500">{data.timestamp}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 自己的消息 */}
+          {data.isSelf && (
+            <div className="max-w-[80%]">
+              <div className="bg-blue-600 rounded-lg p-3 text-white">{data.content}</div>
+              <div className="flex justify-end items-center mt-1">
+                <span className="text-xs text-gray-500">{data.timestamp}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
-
-  // 按时间分组消息
-  const groupMessagesByDate = () => {
-    const groups: { date: string; messages: ChatMessage[] }[] = [];
-    let currentDate = '';
-
-    messages.forEach(message => {
-      // 在实际应用中应根据消息的实际时间戳计算日期
-      // 这里简化为使用当前日期
-      const today = new Date().toLocaleDateString();
-
-      if (currentDate !== today) {
-        currentDate = today;
-        groups.push({ date: '今天', messages: [message] });
-      } else {
-        groups[groups.length - 1].messages.push(message);
-      }
-    });
-
-    return groups;
+    );
   };
-
-  const messageGroups = groupMessagesByDate();
 
   // 聊天信息设置页面
   if (showChatInfo) {
@@ -205,6 +449,7 @@ const ChatPage = () => {
               {contact?.avatar}
             </div>
             <h3 className="text-lg font-medium">{contact?.name}</h3>
+            {contact?.isAI && <div className="text-xs text-green-400 mt-1">AI助手</div>}
           </div>
 
           {/* 添加聊天成员 */}
@@ -308,7 +553,10 @@ const ChatPage = () => {
             </Button>
 
             <div className="flex-1 text-center">
-              <h2 className="font-medium text-gray-800 dark:text-white">{contact.name}</h2>
+              <h2 className="font-medium text-gray-800 dark:text-white">
+                {contact.name}
+                {contact.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
+              </h2>
             </div>
 
             <Button
@@ -321,78 +569,46 @@ const ChatPage = () => {
             </Button>
           </div>
 
-          {/* 消息区域 */}
-          <div className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-900">
-            {messageGroups.map((group, groupIndex) => (
-              <div key={groupIndex} className="px-4">
-                {/* 日期分隔线 */}
-                <div className="flex justify-center my-4">
-                  <div className="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full text-xs text-gray-500 dark:text-gray-400">
-                    {group.date}
-                  </div>
-                </div>
-
-                {/* 消息列表 */}
-                {group.messages.map(message => (
-                  <div
-                    key={message.id}
-                    className={`flex mb-4 ${message.isSelf ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {/* 对方消息 */}
-                    {!message.isSelf && (
-                      <div className="flex items-end max-w-[70%]">
-                        <div className="w-8 h-8 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold text-xs mr-2">
-                          {contact.avatar}
-                        </div>
-                        <div>
-                          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-gray-800 dark:text-white">
-                            {message.content}
-                          </div>
-                          <div className="text-left mt-1">
-                            <span className="text-xs text-gray-500">{message.timestamp}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 自己的消息 */}
-                    {message.isSelf && (
-                      <div className="max-w-[70%]">
-                        <div className="bg-green-500 rounded-lg p-3 text-white">
-                          {message.content}
-                        </div>
-                        <div className="flex justify-end items-center mt-1">
-                          <span className="text-xs text-gray-500">{message.timestamp}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ))}
-            <div ref={messagesEndRef} className="h-4" />
-          </div>
+          {/* 消息区域 - 使用VirtuosoMessage组件 */}
+          {isMessagesInitialized ? (
+            <VirtuosoMessage<VirtuosoMessageItem, null>
+              ref={virtuosoRef}
+              className="flex-1 bg-gray-100 dark:bg-gray-900"
+              computeItemKey={({ data }) => data.key}
+              ItemContent={MessageItemContent}
+              initialData={initialMessages}
+            />
+          ) : (
+            <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>
+          )}
 
           {/* 输入区域 */}
           <div className="p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1">
-              <Button variant="ghost" size="icon" className="text-gray-500">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-gray-500"
+                disabled={isAIResponding}
+              >
                 <Smile size={20} />
               </Button>
 
               <div className="flex-1 mx-1">
                 <input
+                  ref={inputRef}
                   type="text"
                   className="w-full p-2 bg-transparent text-gray-800 dark:text-white focus:outline-none"
-                  placeholder="输入消息..."
+                  placeholder={isAIResponding ? 'AI正在回复中...' : '输入消息...'}
                   value={inputValue}
                   onChange={e => setInputValue(e.target.value)}
                   onKeyDown={handleKeyPress}
+                  disabled={false}
                 />
               </div>
 
               <div className="flex items-center">
-                {!inputValue.trim() && (
+                {!inputValue.trim() && !isAIResponding && (
                   <>
                     <Button variant="ghost" size="icon" className="text-gray-500">
                       <Paperclip size={20} />
@@ -404,7 +620,7 @@ const ChatPage = () => {
                   </>
                 )}
 
-                {inputValue.trim() && (
+                {inputValue.trim() && !isAIResponding && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -413,6 +629,30 @@ const ChatPage = () => {
                   >
                     <Send size={18} />
                   </Button>
+                )}
+
+                {isAIResponding && (
+                  <div className="flex items-center">
+                    <div className="text-gray-500 text-xs mr-2 flex items-center">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                      <div
+                        className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
+                        style={{ animationDelay: '0.2s' }}
+                      ></div>
+                      <div
+                        className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                        style={{ animationDelay: '0.4s' }}
+                      ></div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 text-xs ml-1"
+                      onClick={cancelCurrentGeneration}
+                    >
+                      终止生成
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>

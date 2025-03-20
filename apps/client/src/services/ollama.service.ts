@@ -3,6 +3,20 @@
  * 使用 fetch 直接调用 Ollama API
  */
 
+import {
+  OllamaApiError,
+  OllamaBaseError,
+  OllamaConnectionError,
+  OllamaModelLoadError,
+  OllamaModelNotFoundError,
+  OllamaResponseParseError,
+  OllamaServiceUnavailableError,
+  OllamaStreamAbortedError,
+  OllamaTimeoutError,
+  OllamaChatStreamError,
+  OllamaUnknownError
+} from '@/errors/ollama.errors';
+
 // Ollama API 基础 URL
 const OLLAMA_API_BASE_URL = 'http://localhost:11434/api';
 
@@ -233,60 +247,75 @@ export interface OllamaVersionResponse {
   version: string;
 }
 
-// Ollama API 错误类
-export class OllamaError extends Error {
-  status: number;
-  endpoint: string;
-  details: string;
-
-  constructor(status: number, endpoint: string, message: string) {
-    super(`Ollama API 错误 [${endpoint}]: ${message}`);
-    this.name = 'OllamaError';
-    this.status = status;
-    this.endpoint = endpoint;
-    this.details = message;
-  }
+// 添加可取消的聊天流方法
+export interface ChatStreamOptions {
+  signal?: AbortSignal;
 }
 
 /**
- * 泛型 JSON 请求函数
- * @param url 请求 URL
- * @param options fetch 选项
- * @returns 解析后的 JSON 数据，类型为 T
+ * 辅助函数：解析响应错误
+ * @param response HTTP响应对象
+ * @param endpoint API端点
+ * @param modelName 可选的模型名称，用于特定错误
+ * @returns 解析后的错误文本和消息
+ * @throws 抛出适当的异常
  */
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const endpoint = url.replace(OLLAMA_API_BASE_URL, '');
+async function parseResponseError(response: Response, endpoint: string, modelName?: string): Promise<never> {
+  const errorText = await response.text();
+  let errorMessage = `状态码: ${response.status}`;
 
   try {
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
-      }
-
-      throw new OllamaError(response.status, endpoint, errorMessage);
+    // 尝试解析错误响应为JSON
+    const errorJson = JSON.parse(errorText);
+    if (errorJson.error) {
+      errorMessage = errorJson.error;
     }
-
-    return response.json() as Promise<T>;
-  } catch (error) {
-    if (error instanceof OllamaError) {
-      throw error;
-    }
-
-    // 网络错误或其他非HTTP错误
-    throw new OllamaError(0, endpoint, error instanceof Error ? error.message : String(error));
+  } catch {
+    // 如果不是JSON，使用原始错误文本
+    errorMessage = `${errorMessage}, ${errorText}`;
   }
+
+  // 根据状态码和错误信息选择合适的异常类型
+  if (response.status === 404) {
+    if (modelName) {
+      throw new OllamaModelNotFoundError(modelName, response.status, errorMessage, errorText);
+    }
+  } else if (response.status === 500 && errorMessage.includes("failed to load model")) {
+    if (modelName) {
+      throw new OllamaModelLoadError(modelName, response.status, errorMessage, errorText);
+    }
+  }
+
+  // 默认API错误
+  throw new OllamaApiError(response.status, endpoint, errorMessage, errorText);
+}
+
+/**
+ * 辅助函数：处理公共错误逻辑
+ * @param error 捕获到的错误
+ * @throws 转换后的异常
+ */
+function handleCommonErrors(error: unknown): never {
+  // 如果是已知的Ollama异常，直接抛出
+  if (error instanceof OllamaBaseError) {
+    throw error;
+  }
+  
+  // 网络错误
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    throw new OllamaConnectionError(error.message, error);
+  }
+  
+  // 中断错误
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    throw new OllamaTimeoutError(0, error);
+  }
+  
+  // 未知错误 - 使用专门的OllamaUnknownError
+  throw new OllamaUnknownError(
+    error instanceof Error ? error.message : String(error),
+    error
+  );
 }
 
 /**
@@ -299,127 +328,156 @@ class OllamaService {
    * @returns 对话响应
    */
   async chat(request: OllamaChatRequest): Promise<OllamaChatResponse> {
-    return fetchJson<OllamaChatResponse>(`${OLLAMA_API_BASE_URL}/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        messages: request.messages,
-        stream: request.stream ?? false,
-        options: request.options || {},
-        format: request.format,
-        template: request.template,
-        keep_alive: request.keep_alive,
-      }),
-    });
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: request.model,
+          messages: request.messages,
+          stream: request.stream ?? false,
+          options: request.options || {},
+          format: request.format,
+          template: request.template,
+          keep_alive: request.keep_alive,
+        }),
+      });
+
+      if (!response.ok) {
+        await parseResponseError(response, '/chat', request.model);
+      }
+
+      return response.json() as Promise<OllamaChatResponse>;
+    } catch (error) {
+      handleCommonErrors(error);
+    }
   }
 
   /**
-   * 与 Ollama 模型进行流式对话（使用 /api/chat 端点）
-   * @param request 对话请求参数
-   * @param onChunk 处理每个响应块的回调函数
-   * @param onComplete 对话完成时的回调函数
+   * 使用 AbortSignal 进行流式聊天
+   * @param request 聊天请求
+   * @param options 附加选项，包含 AbortSignal
+   * @param onChunk 块响应回调
+   * @param onComplete 完成回调
    */
   async chatStream(
     request: OllamaChatRequest,
+    options: ChatStreamOptions = {},
     onChunk: (chunk: OllamaChatResponse) => void,
     onComplete?: (fullResponse: OllamaMessage) => void
   ): Promise<void> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        messages: request.messages,
-        stream: true,
-        options: request.options || {},
-        format: request.format,
-        template: request.template,
-        keep_alive: request.keep_alive,
-      }),
-    });
+    // 确保流模式开启
+    request.stream = true;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal: options.signal, // 使用传入的AbortSignal，如果没有则为undefined
+      });
 
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
-      }
-
-      throw new OllamaError(response.status, '/chat', errorMessage);
-    }
-
-    if (!response.body) {
-      throw new OllamaError(0, '/chat', '响应没有可读取的内容');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      // 解码二进制数据为文本
-      const chunk = decoder.decode(value, { stream: true });
-      buffer += chunk;
-
-      // 处理可能包含多个或不完整的 JSON 对象的响应
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // 保留最后一行，可能是不完整的
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
+      if (!response.ok) {
+        // 使用自定义逻辑处理流式聊天的错误，因为我们需要特殊处理
+        const errorText = await response.text();
+        let errorMessage = `状态码: ${response.status}`;
 
         try {
-          const jsonChunk = JSON.parse(line) as OllamaChatResponse;
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error) {
+            errorMessage = errorJson.error;
+          }
+        } catch {
+          errorMessage = `${errorMessage}, ${errorText}`;
+        }
+
+        // 根据状态码选择合适的异常类型
+        if (response.status === 404) {
+          throw new OllamaModelNotFoundError(request.model, response.status, errorMessage, errorText);
+        } else if (response.status === 500 && errorMessage.includes("failed to load model")) {
+          throw new OllamaModelLoadError(request.model, response.status, errorMessage, errorText);
+        } else {
+          throw new OllamaChatStreamError(response.status, errorMessage, false, errorText);
+        }
+      }
+
+      if (!response.body) {
+        throw new OllamaChatStreamError(0, '响应没有可读取的内容');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          // 解码二进制数据为文本
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // 处理可能包含多个或不完整的 JSON 对象的响应
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // 保留最后一行，可能是不完整的
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const jsonChunk = JSON.parse(line) as OllamaChatResponse;
+              onChunk(jsonChunk);
+
+              if (jsonChunk.message?.content && typeof jsonChunk.message.content === 'string') {
+                fullContent += jsonChunk.message.content;
+              }
+            } catch (e) {
+              console.warn('解析 JSON 响应失败:', line, e);
+              // 不中断流，只记录解析错误
+            }
+          }
+        }
+      } catch (error: any) {
+        // 处理中断错误
+        if (error.name === 'AbortError') {
+          console.log('流式生成被用户中断');
+          throw new OllamaStreamAbortedError(); // 使用新的中断异常类
+        }
+        throw error;
+      }
+
+      // 处理缓冲区中的最后一个不完整行
+      if (buffer.trim()) {
+        try {
+          const jsonChunk = JSON.parse(buffer) as OllamaChatResponse;
           onChunk(jsonChunk);
 
           if (jsonChunk.message?.content && typeof jsonChunk.message.content === 'string') {
             fullContent += jsonChunk.message.content;
           }
         } catch (e) {
-          console.warn('解析 JSON 响应失败:', line, e);
+          console.warn('解析最终 JSON 响应失败:', buffer, e);
+          // 记录但不抛出异常，因为这可能只是部分响应
         }
       }
-    }
 
-    // 处理缓冲区中的最后一个不完整行
-    if (buffer.trim()) {
-      try {
-        const jsonChunk = JSON.parse(buffer) as OllamaChatResponse;
-        onChunk(jsonChunk);
-
-        if (jsonChunk.message?.content && typeof jsonChunk.message.content === 'string') {
-          fullContent += jsonChunk.message.content;
-        }
-      } catch (e) {
-        console.warn('解析最终 JSON 响应失败:', buffer, e);
+      if (onComplete) {
+        onComplete({
+          role: 'assistant',
+          content: fullContent,
+        });
       }
-    }
-
-    if (onComplete) {
-      onComplete({
-        role: 'assistant',
-        content: fullContent,
-      });
+    } catch (error) {
+      handleCommonErrors(error);
     }
   }
 
@@ -429,134 +487,35 @@ class OllamaService {
    * @returns 生成响应
    */
   async generate(request: OllamaGenerateRequest): Promise<OllamaGenerateResponse> {
-    return fetchJson<OllamaGenerateResponse>(`${OLLAMA_API_BASE_URL}/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        prompt: request.prompt,
-        system: request.system,
-        template: request.template,
-        context: request.context,
-        stream: request.stream ?? false,
-        raw: request.raw,
-        format: request.format,
-        options: request.options || {},
-        keep_alive: request.keep_alive,
-        images: request.images,
-        suffix: request.suffix,
-      }),
-    });
-  }
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: request.model,
+          prompt: request.prompt,
+          system: request.system,
+          template: request.template,
+          context: request.context,
+          stream: request.stream ?? false,
+          raw: request.raw,
+          format: request.format,
+          options: request.options || {},
+          keep_alive: request.keep_alive,
+          images: request.images,
+          suffix: request.suffix,
+        }),
+      });
 
-  /**
-   * 流式生成文本补全（使用 /api/generate 端点）
-   * @param request 生成请求参数
-   * @param onChunk 处理每个响应块的回调函数
-   * @param onComplete 生成完成时的回调函数
-   */
-  async generateStream(
-    request: OllamaGenerateRequest,
-    onChunk: (chunk: OllamaGenerateResponse) => void,
-    onComplete?: (fullResponse: string) => void
-  ): Promise<void> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        prompt: request.prompt,
-        system: request.system,
-        template: request.template,
-        context: request.context,
-        stream: true,
-        raw: request.raw,
-        format: request.format,
-        options: request.options || {},
-        keep_alive: request.keep_alive,
-        images: request.images,
-        suffix: request.suffix,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
+      if (!response.ok) {
+        await parseResponseError(response, '/generate', request.model);
       }
 
-      throw new OllamaError(response.status, '/generate', errorMessage);
-    }
-
-    if (!response.body) {
-      throw new OllamaError(0, '/generate', '响应没有可读取的内容');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullResponse = '';
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      // 解码二进制数据为文本
-      const chunk = decoder.decode(value, { stream: true });
-      buffer += chunk;
-
-      // 处理可能包含多个或不完整的 JSON 对象的响应
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // 保留最后一行，可能是不完整的
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-
-        try {
-          const jsonChunk = JSON.parse(line) as OllamaGenerateResponse;
-          onChunk(jsonChunk);
-
-          if (jsonChunk.response) {
-            fullResponse += jsonChunk.response;
-          }
-        } catch (e) {
-          console.warn('解析 JSON 响应失败:', line, e);
-        }
-      }
-    }
-
-    // 处理缓冲区中的最后一个不完整行
-    if (buffer.trim()) {
-      try {
-        const jsonChunk = JSON.parse(buffer) as OllamaGenerateResponse;
-        onChunk(jsonChunk);
-
-        if (jsonChunk.response) {
-          fullResponse += jsonChunk.response;
-        }
-      } catch (e) {
-        console.warn('解析最终 JSON 响应失败:', buffer, e);
-      }
-    }
-
-    if (onComplete) {
-      onComplete(fullResponse);
+      return response.json() as Promise<OllamaGenerateResponse>;
+    } catch (error) {
+      handleCommonErrors(error);
     }
   }
 
@@ -565,8 +524,18 @@ class OllamaService {
    * @returns 模型列表
    */
   async listModels(): Promise<OllamaModel[]> {
-    const data = await fetchJson<OllamaModelListResponse>(`${OLLAMA_API_BASE_URL}/tags`);
-    return data.models || [];
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/tags`);
+
+      if (!response.ok) {
+        await parseResponseError(response, '/tags');
+      }
+
+      const data = await response.json() as OllamaModelListResponse;
+      return data.models || [];
+    } catch (error) {
+      handleCommonErrors(error);
+    }
   }
 
   /**
@@ -574,8 +543,18 @@ class OllamaService {
    * @returns 运行中的模型列表
    */
   async listRunningModels(): Promise<OllamaRunningModel[]> {
-    const data = await fetchJson<OllamaRunningModelListResponse>(`${OLLAMA_API_BASE_URL}/ps`);
-    return data.models || [];
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/ps`);
+
+      if (!response.ok) {
+        await parseResponseError(response, '/ps');
+      }
+
+      const data = await response.json() as OllamaRunningModelListResponse;
+      return data.models || [];
+    } catch (error) {
+      handleCommonErrors(error);
+    }
   }
 
   /**
@@ -584,344 +563,45 @@ class OllamaService {
    * @returns 模型详细信息
    */
   async showModel(request: OllamaShowRequest): Promise<OllamaShowResponse> {
-    return fetchJson<OllamaShowResponse>(`${OLLAMA_API_BASE_URL}/show`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: request.name,
-        verbose: request.verbose,
-      }),
-    });
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/show`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: request.name,
+          verbose: request.verbose,
+        }),
+      });
+
+      if (!response.ok) {
+        await parseResponseError(response, '/show', request.name);
+      }
+
+      return response.json() as Promise<OllamaShowResponse>;
+    } catch (error) {
+      handleCommonErrors(error);
+    }
   }
 
   /**
-   * 创建模型（使用 /api/create 端点）
-   * @param request 创建模型请求参数
-   * @param onProgress 进度回调函数
-   * @returns 成功返回 true，失败返回 false
+   * 获取 Ollama 版本信息
+   * @returns 版本信息
    */
-  async createModel(
-    request: OllamaCreateRequest,
-    onProgress?: (status: string) => void
-  ): Promise<boolean> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: request.name,
-        modelfile: request.modelfile,
-        stream: request.stream ?? !!onProgress,
-        path: request.path,
-      }),
-    });
+  async getVersion(): Promise<string> {
+    try {
+      const response = await fetch(`${OLLAMA_API_BASE_URL}/version`);
 
-    if (!response.ok || !response.body) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
+      if (!response.ok) {
+        await parseResponseError(response, '/version');
       }
 
-      throw new OllamaError(response.status, '/create', errorMessage);
+      const data = await response.json() as OllamaVersionResponse;
+      return data.version;
+    } catch (error) {
+      handleCommonErrors(error);
     }
-
-    // 如果需要跟踪进度
-    if (onProgress && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (typeof data === 'object' && data !== null && data.status) {
-              onProgress(data.status);
-            }
-          } catch (e) {
-            console.warn('解析 JSON 响应失败:', line, e);
-          }
-        }
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * 复制模型（使用 /api/copy 端点）
-   * @param request 复制模型请求参数
-   * @returns 成功返回 true，失败抛出异常
-   */
-  async copyModel(request: OllamaCopyRequest): Promise<boolean> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/copy`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        source: request.source,
-        destination: request.destination,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
-      }
-
-      throw new OllamaError(response.status, '/copy', errorMessage);
-    }
-
-    return true;
-  }
-
-  /**
-   * 删除模型（使用 /api/delete 端点）
-   * @param request 删除模型请求参数
-   * @returns 成功返回 true，失败抛出异常
-   */
-  async deleteModel(request: OllamaDeleteRequest): Promise<boolean> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/delete`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
-      }
-
-      throw new OllamaError(response.status, '/delete', errorMessage);
-    }
-
-    return true;
-  }
-
-  /**
-   * 拉取/下载一个模型（使用 /api/pull 端点）
-   * @param request 拉取模型请求参数
-   * @param onProgress 进度回调函数
-   * @returns 成功返回 true，失败返回 false
-   */
-  async pullModel(
-    request: OllamaPullRequest,
-    onProgress?: (progress: OllamaProgressResponse) => void
-  ): Promise<boolean> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/pull`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        stream: request.stream ?? !!onProgress,
-        insecure: request.insecure,
-      }),
-    });
-
-    if (!response.ok || !response.body) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
-      }
-
-      throw new OllamaError(response.status, '/pull', errorMessage);
-    }
-
-    // 如果需要跟踪进度
-    if (onProgress && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (typeof data === 'object' && data !== null && data.status) {
-              onProgress(data as OllamaProgressResponse);
-            }
-          } catch (e) {
-            console.warn('解析 JSON 响应失败:', line, e);
-          }
-        }
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * 推送模型到库（使用 /api/push 端点）
-   * @param request 推送模型请求参数
-   * @param onProgress 进度回调函数
-   * @returns 成功返回 true，失败抛出异常
-   */
-  async pushModel(
-    request: OllamaPushRequest,
-    onProgress?: (progress: OllamaProgressResponse) => void
-  ): Promise<boolean> {
-    const response = await fetch(`${OLLAMA_API_BASE_URL}/push`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        insecure: request.insecure,
-        stream: request.stream ?? !!onProgress,
-      }),
-    });
-
-    if (!response.ok || !response.body) {
-      const errorText = await response.text();
-      let errorMessage = `状态码: ${response.status}`;
-
-      try {
-        // 尝试解析错误响应为JSON
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error) {
-          errorMessage = errorJson.error;
-        }
-      } catch {
-        // 如果不是JSON，使用原始错误文本
-        errorMessage = `${errorMessage}, ${errorText}`;
-      }
-
-      throw new OllamaError(response.status, '/push', errorMessage);
-    }
-
-    // 如果需要跟踪进度
-    if (onProgress && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line) as OllamaProgressResponse;
-            onProgress(data);
-          } catch (e) {
-            console.warn('解析 JSON 响应失败:', line, e);
-          }
-        }
-      }
-    }
-
-    return true;
-  }
-
-  /**
-   * 生成嵌入向量（使用 /api/embed 端点）
-   * @param request 嵌入请求参数
-   * @returns 嵌入向量响应
-   */
-  async embed(request: OllamaEmbedRequest): Promise<OllamaEmbedResponse> {
-    return fetchJson<OllamaEmbedResponse>(`${OLLAMA_API_BASE_URL}/embed`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        input: request.input,
-        truncate: request.truncate,
-        options: request.options || {},
-        keep_alive: request.keep_alive,
-      }),
-    });
-  }
-
-  /**
-   * 生成嵌入向量（使用旧版 /api/embeddings 端点）
-   * @param request 嵌入请求参数
-   * @returns 嵌入向量响应
-   */
-  async embeddings(request: OllamaEmbeddingsRequest): Promise<OllamaEmbeddingsResponse> {
-    return fetchJson<OllamaEmbeddingsResponse>(`${OLLAMA_API_BASE_URL}/embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: request.model,
-        prompt: request.prompt,
-        options: request.options || {},
-        keep_alive: request.keep_alive,
-      }),
-    });
   }
 
   /**
@@ -939,22 +619,6 @@ class OllamaService {
     } catch (error) {
       // 仅返回false，不抛出异常
       return false;
-    }
-  }
-
-  /**
-   * 获取 Ollama 版本信息
-   * @returns 版本信息
-   */
-  async getVersion(): Promise<string> {
-    try {
-      const response = await fetchJson<OllamaVersionResponse>(`${OLLAMA_API_BASE_URL}/version`);
-      return response.version;
-    } catch (error) {
-      if (error instanceof OllamaError) {
-        throw error;
-      }
-      throw new OllamaError(0, '/version', error instanceof Error ? error.message : String(error));
     }
   }
 }

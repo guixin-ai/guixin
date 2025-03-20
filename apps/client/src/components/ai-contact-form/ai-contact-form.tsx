@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import GroupFormDialog from '@/components/group-form-dialog/group-form-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -499,16 +498,6 @@ export const AIContactForm = ({
           </Button>
         </div>
       </Form>
-
-      {/* 使用提取出来的分组表单对话框组件 */}
-      {onAddGroup && (
-        <GroupFormDialog
-          open={isNewGroupDialogOpen}
-          onOpenChange={setIsNewGroupDialogOpen}
-          onSubmit={handleAddNewGroup}
-          isLoading={isLoading}
-        />
-      )}
     </div>
   );
 };

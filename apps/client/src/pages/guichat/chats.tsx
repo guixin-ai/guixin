@@ -13,6 +13,7 @@ import { ChatListInitFailedException, GroupChatCreationFailedException } from '@
 import DelayedLoading from '../../components/delayed-loading';
 import NewChat from '../../components/new-chat';
 import CreateFriend from '../../components/create-friend';
+import { ChatListItem } from '../../components/chat-list-item';
 import { useShallow } from 'zustand/react/shallow';
 import { ChatItem, ChatDetail } from '../../types/chat';
 
@@ -193,41 +194,11 @@ const ChatsPage = () => {
           {filteredChats.length > 0 && (
             <ul>
               {filteredChats.map(chat => (
-                <li
+                <ChatListItem
                   key={chat.id}
-                  className="p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
-                  onClick={() => handleChatClick(chat.id)}
-                >
-                  <div className="flex items-center">
-                    {/* 头像 */}
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-md bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold">
-                        {chat.avatar}
-                      </div>
-                      {/* 未读消息提示 */}
-                      {chat.unread && chat.unread > 0 && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
-                          {chat.unread}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 聊天信息 */}
-                    <div className="ml-3 flex-1 min-w-0">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-800 dark:text-white truncate">
-                          {chat.name}
-                        </span>
-                        <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
-                          {chat.timestamp}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
-                        {chat.lastMessage}
-                      </div>
-                    </div>
-                  </div>
-                </li>
+                  chat={chat}
+                  onClick={handleChatClick}
+                />
               ))}
             </ul>
           )}

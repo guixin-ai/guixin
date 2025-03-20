@@ -7,6 +7,30 @@ import {
   ChatDetailFetchException, 
   ChatMessagesFetchException 
 } from '@/errors/service.errors';
+import { invoke } from '@tauri-apps/api/core';
+import { formatChatTime } from '@/utils/date-utils';
+
+/**
+ * 后端返回的聊天列表项接口
+ */
+interface BackendChatListItem {
+  id: string;
+  name: string;
+  avatar: string;
+  last_message: string | null;
+  timestamp: string | null;
+  created_at: string | null;   // ISO格式的创建时间
+  updated_at: string | null;   // ISO格式的更新时间
+  unread: number | null;
+}
+
+/**
+ * 后端返回的聊天列表接口
+ */
+interface BackendChatListResponse {
+  chats: BackendChatListItem[];
+  total: number;
+}
 
 /**
  * 聊天服务类
@@ -14,129 +38,6 @@ import {
 class ChatService {
   // 单例实例
   private static instance: ChatService;
-  
-  // 模拟聊天数据
-  private mockChats: ChatItem[] = [
-    {
-      id: '1',
-      name: '文件传输助手',
-      avatar: '文',
-      lastMessage: '[图片]',
-      timestamp: '星期二',
-    },
-    {
-      id: '2',
-      name: '老婆',
-      avatar: '老',
-      lastMessage: '晚安宝宝',
-      timestamp: '昨天',
-      unread: 1,
-    },
-    {
-      id: '3',
-      name: '张薇张薇',
-      avatar: '张',
-      lastMessage: '周末一起打球？',
-      timestamp: '昨天',
-    },
-    {
-      id: '4',
-      name: 'AI助手',
-      avatar: 'A',
-      lastMessage: '有什么我可以帮您的？',
-      timestamp: '今天',
-    }
-  ];
-  
-  // 模拟聊天消息数据
-  private mockChatMessages: Record<string, ChatMessage[]> = {
-    '1': [
-      {
-        id: '1_1',
-        content: '你好，这是文件传输助手',
-        isSelf: false,
-        timestamp: '10:00',
-      },
-      {
-        id: '1_2',
-        content: '我可以帮你传输文件',
-        isSelf: false,
-        timestamp: '10:01',
-      },
-      {
-        id: '1_3',
-        content: '好的，我知道了',
-        isSelf: true,
-        timestamp: '10:05',
-      }
-    ],
-    '2': [
-      {
-        id: '2_1',
-        content: '亲爱的',
-        isSelf: false,
-        timestamp: '20:00',
-      },
-      {
-        id: '2_2',
-        content: '今天加班吗？',
-        isSelf: false,
-        timestamp: '20:01',
-      },
-      {
-        id: '2_3',
-        content: '是的，可能要晚点回家',
-        isSelf: true,
-        timestamp: '20:10',
-      },
-      {
-        id: '2_4',
-        content: '好的，注意休息',
-        isSelf: false,
-        timestamp: '20:11',
-      },
-      {
-        id: '2_5',
-        content: '晚安宝宝',
-        isSelf: false,
-        timestamp: '22:30',
-      }
-    ],
-    '3': [
-      {
-        id: '3_1',
-        content: '嘿，最近怎么样？',
-        isSelf: false,
-        timestamp: '15:00',
-      },
-      {
-        id: '3_2',
-        content: '还不错，你呢？',
-        isSelf: true,
-        timestamp: '15:05',
-      },
-      {
-        id: '3_3',
-        content: '周末一起打球？',
-        isSelf: false,
-        timestamp: '15:10',
-      }
-    ],
-    '4': [
-      {
-        id: '4_1',
-        content: '你好，我是AI助手',
-        isSelf: false,
-        timestamp: '09:00',
-      },
-      {
-        id: '4_2',
-        content: '有什么我可以帮您的？',
-        isSelf: false,
-        timestamp: '09:01',
-      }
-    ]
-  };
   
   // 私有构造函数，防止外部实例化
   private constructor() {}
@@ -156,12 +57,27 @@ class ChatService {
    */
   public async getChats(): Promise<ChatsResponse> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 调用后端API获取聊天列表
+      const response = await invoke<BackendChatListResponse>('get_user_chat_list');
+      
+      // 将后端数据转换为前端所需格式
+      const chats: ChatItem[] = response.chats.map(item => {
+        // 格式化时间戳，优先使用created_at，如果没有则使用updated_at
+        const timestamp = formatChatTime(item.created_at || item.updated_at);
+        
+        return {
+          id: item.id,
+          name: item.name,
+          avatar: item.avatar,
+          lastMessage: item.last_message || '',
+          timestamp,
+          unread: item.unread || undefined
+        };
+      });
       
       return {
-        chats: this.mockChats,
-        total: this.mockChats.length
+        chats,
+        total: response.total
       };
     } catch (error) {
       console.error('获取聊天列表失败:', error);
@@ -174,10 +90,11 @@ class ChatService {
    */
   public async getChatById(id: string): Promise<ChatItem | null> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 获取所有聊天
+      const { chats } = await this.getChats();
       
-      const chat = this.mockChats.find(chat => chat.id === id);
+      // 查找匹配ID的聊天
+      const chat = chats.find(chat => chat.id === id);
       return chat || null;
     } catch (error) {
       console.error(`获取聊天 ${id} 详情失败:`, error);
@@ -192,17 +109,9 @@ class ChatService {
    */
   public async getChatMessages(chatId: string): Promise<ChatMessage[]> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      // 获取聊天消息
-      const messages = this.mockChatMessages[chatId] || [];
-      
-      // 按时间排序（这里假设timestamp是时间字符串，实际可能需要转换为Date进行排序）
-      return [...messages].sort((a, b) => {
-        // 简单模拟时间排序，实际应用中应该将timestamp转为Date对象后比较
-        return a.timestamp.localeCompare(b.timestamp);
-      });
+      // TODO: 将来实现后端API获取聊天消息
+      // 目前返回空数组，等待后端实现
+      return [];
     } catch (error) {
       console.error(`获取聊天 ${chatId} 消息失败:`, error);
       throw new ChatMessagesFetchException(chatId);

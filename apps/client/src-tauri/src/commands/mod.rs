@@ -5,3 +5,5 @@ pub mod user_commands;
 pub mod app_commands;
 
 pub use app_commands::*;
+pub use user_commands::*;
+pub use chat_commands::*;

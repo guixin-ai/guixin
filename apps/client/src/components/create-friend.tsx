@@ -15,6 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useChatStore } from '@/models/chat.model';
 import { useContactStore } from '@/models/contact.model';
+import { userService } from '@/services/user.service';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 // 组件Props类型
 interface CreateFriendProps {
@@ -99,6 +102,7 @@ const getFirstPinyin = (name: string): string => {
 const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
   const { addChat } = useChatStore();
   const { addContact } = useContactStore();
+  const [isCreating, setIsCreating] = useState(false);
 
   // 初始化表单
   const form = useForm<FormValues>({
@@ -111,16 +115,20 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
 
   // 处理提交
   const onSubmit = async (values: FormValues) => {
+    setIsCreating(true);
+    
     try {
-      // 创建新的ID
-      const newId = `ai-${Date.now()}`;
+      // 调用userService创建AI用户
+      const aiUser = await userService.createAiUser(values.name, values.description);
+      
+      // 获取第一个字符作为头像
       const avatarChar = values.name.charAt(0);
       const pinyinFirstLetter = getFirstPinyin(values.name);
 
       // 添加到聊天列表
       addChat({
-        id: newId,
-        name: values.name,
+        id: aiUser.id,
+        name: aiUser.name,
         avatar: avatarChar,
         lastMessage: '你好，我是你创建的AI朋友',
         timestamp: '刚刚',
@@ -128,29 +136,36 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
 
       // 添加到联系人列表
       addContact({
-        id: newId,
-        name: values.name,
+        id: aiUser.id,
+        name: aiUser.name,
         avatar: avatarChar,
-        pinyin: pinyinFirstLetter + values.name, // 确保排序正确
+        pinyin: pinyinFirstLetter + aiUser.name, // 确保排序正确
       });
       
       // 添加联系人详情
       const { addContactDetail } = useContactStore.getState();
       addContactDetail({
-        id: newId,
-        name: values.name,
+        id: aiUser.id,
+        name: aiUser.name,
         avatar: avatarChar,
-        description: values.description
+        description: aiUser.description || ''
       });
+
+      // 显示成功消息
+      toast.success(`成功创建AI朋友 ${aiUser.name}`);
 
       // 调用完成回调
       if (onComplete) {
-        onComplete(newId);
+        onComplete(aiUser.id);
       } else {
         onBack();
       }
     } catch (error) {
       console.error('创建朋友失败:', error);
+      // 使用toast显示错误信息
+      toast.error(`创建AI朋友失败: ${error}`);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -217,8 +232,9 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
             <Button
               type="submit"
               className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-md"
+              disabled={isCreating}
             >
-              创建智能朋友
+              {isCreating ? '创建中...' : '创建智能朋友'}
             </Button>
           </form>
         </Form>

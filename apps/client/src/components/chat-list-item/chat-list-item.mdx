@@ -1,0 +1,57 @@
+import { Meta, Title, Description, Controls, Story } from '@storybook/blocks';
+import * as ChatListItemStories from './chat-list-item.stories';
+
+<Meta of={ChatListItemStories} />
+
+<Title>ChatListItem 聊天列表项</Title>
+
+聊天列表项组件用于在聊天列表中显示单个聊天的信息，包括头像、名称、最后一条消息内容和时间戳。
+
+## 特点
+
+- 显示聊天头像，使用首字母作为默认头像
+- 显示聊天名称和最后一条消息的预览
+- 显示消息时间戳
+- 支持未读消息提示徽章
+- 支持点击事件
+
+## 使用方法
+
+```tsx
+import { ChatListItem } from '@/components/chat-list-item';
+
+// 使用示例
+<ChatListItem 
+  chat={{
+    id: 'chat-1',
+    name: '张三',
+    avatar: '张',
+    lastMessage: '你好，最近在忙什么呢？',
+    timestamp: '10:30',
+    unread: 2 // 可选
+  }}
+  onClick={(chatId) => console.log('点击了聊天:', chatId)}
+/>
+```
+
+## 组件属性
+
+<Controls />
+
+## 变体展示
+
+### 基础聊天列表项
+
+<Story of={ChatListItemStories.Default} />
+
+### 带有未读消息的聊天列表项
+
+<Story of={ChatListItemStories.WithUnread} />
+
+### 长内容的聊天列表项
+
+<Story of={ChatListItemStories.WithLongContent} />
+
+### AI朋友聊天列表项
+
+<Story of={ChatListItemStories.AIFriend} /> 

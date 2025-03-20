@@ -32,7 +32,10 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            commands::get_app_version
+            commands::get_app_version,
+            commands::create_ai_user,
+            commands::get_current_user,
+            commands::get_user_chat_list
         ])
         .run(tauri::generate_context!())
         .expect("运行应用失败");

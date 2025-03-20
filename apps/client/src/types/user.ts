@@ -4,6 +4,8 @@
 export interface User {
   id: string;
   name: string;
+  description?: string;
+  isAi?: boolean;
 }
 
 // 创建用户请求接口

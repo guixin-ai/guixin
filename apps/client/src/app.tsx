@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
-import { useApp, useUser } from './models/app.model';
 import DelayedLoading from './components/delayed-loading';
+import { useAppStore } from './models/app.model';
 
 // 定义 App 组件的属性类型
 interface AppProps {
@@ -9,7 +9,7 @@ interface AppProps {
 }
 
 function App({ children }: AppProps) {
-  const { initialize, initialized } = useApp();
+  const { initialize } = useAppStore();
   const [loading, setLoading] = useState(true);
 
   // 在应用加载时初始化基础数据

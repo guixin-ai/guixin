@@ -2,7 +2,7 @@ use chrono::Utc;
 use diesel::prelude::*;
 use uuid::Uuid;
 
-use super::error::{RepositoryError, RepositoryResult};
+use super::error::RepositoryError;
 use crate::db::DbPool;
 use crate::models::{NewUser, User};
 use crate::schema::users;

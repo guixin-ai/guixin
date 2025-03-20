@@ -8,7 +8,10 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "target": "ES2015",
-    "types": ["node", "@wdio/types", "@wdio/globals/types", "@wdio/mocha-framework"]
+    "types": ["node", "@wdio/types", "@wdio/globals/types", "@wdio/mocha-framework"],
+    "paths": {
+      "@/*": ["../src/*"]
+    }
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../src/models/**/*.ts", "../src/types/**/*.ts", "../src/utils/**/*.ts"]
 }

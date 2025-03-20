@@ -1,3 +1,5 @@
+// 不再需要导出空模块，因为全局类型定义已经移至独立文件
+
 describe('应用启动测试', () => {
   it('应该显示应用Logo', async () => {
     // 验证logo存在并可见
@@ -19,11 +21,11 @@ describe('应用启动测试', () => {
   it('应该存在全局对象__STORES__和__TAURI_INTERNALS__', async () => {
     // 检查全局对象是否存在
     const hasStores = await browser.execute(() => {
-      return typeof (window as any).__STORES__ !== 'undefined';
+      return typeof window.__STORES__ !== 'undefined';
     });
 
     const hasTauriInternals = await browser.execute(() => {
-      return typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
+      return typeof window.__TAURI_INTERNALS__ !== 'undefined';
     });
 
     // 输出调试信息

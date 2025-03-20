@@ -2,21 +2,33 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { useContactStore, Contact, ContactGroup } from '../../models/contact.model';
+import { useContactStore } from '../../models/contact.model';
+import { ContactGroup } from '../../types/contact';
 
 const ContactsPage = () => {
   const navigate = useNavigate();
-  const { fetchAllContacts, getGroupedContacts, searchContacts, setCurrentContact } = useContactStore();
+  const { searchContacts, getGroups, initialize } = useContactStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [loading, setLoading] = useState(true);
   
-  // 组件加载时获取联系人列表
+  // 初始化联系人数据
   useEffect(() => {
-    fetchAllContacts();
-  }, [fetchAllContacts]);
+    const initContacts = async () => {
+      try {
+        await initialize();
+        setLoading(false);
+      } catch (error) {
+        console.error('初始化联系人数据失败:', error);
+        setLoading(false);
+      }
+    };
+    
+    initContacts();
+  }, [initialize]);
   
-  // 获取按字母分组的联系人
-  const groups = getGroupedContacts();
+  // 从计算属性获取分组数据
+  const groups = getGroups();
   
   // 搜索过滤
   const filteredGroups = searchQuery
@@ -30,7 +42,6 @@ const ContactsPage = () => {
   
   // 导航到联系人详情
   const goToContactDetail = (contactId: string) => {
-    setCurrentContact(contactId);
     navigate(`/contact/${contactId}`);
   };
   
@@ -50,6 +61,16 @@ const ContactsPage = () => {
     navigate('/create-friend');
     setShowDropdown(false);
   };
+  
+  // 显示加载中状态
+  if (loading) {
+    return (
+      <div className="flex flex-col h-screen bg-white dark:bg-black items-center justify-center">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">加载中...</p>
+      </div>
+    );
+  }
   
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-black">
@@ -106,31 +127,37 @@ const ContactsPage = () => {
       
       {/* 联系人列表 */}
       <div className="flex-1 overflow-y-auto">
-        {/* 按字母分组的联系人 */}
-        {filteredGroups.map(group => (
-          <div key={group.letter} id={group.letter}>
-            {/* 字母索引 */}
-            <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 sticky top-0">
-              {group.letter}
-            </div>
-            
-            {/* 联系人 */}
-            {group.contacts.map(contact => (
-              <button
-                key={contact.id}
-                className="flex items-center w-full p-4 border-b border-gray-100 dark:border-gray-800 last:border-b-0 bg-white dark:bg-black"
-                onClick={() => goToContactDetail(contact.id)}
-              >
-                <div className="w-10 h-10 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold">
-                  {contact.avatar}
-                </div>
-                <span className="ml-3 text-gray-800 dark:text-white text-left">
-                  {contact.name}
-                </span>
-              </button>
-            ))}
+        {filteredGroups.length === 0 ? (
+          <div className="flex justify-center items-center h-32 text-gray-500">
+            暂无联系人
           </div>
-        ))}
+        ) : (
+          /* 按字母分组的联系人 */
+          filteredGroups.map(group => (
+            <div key={group.letter} id={group.letter}>
+              {/* 字母索引 */}
+              <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 sticky top-0">
+                {group.letter}
+              </div>
+              
+              {/* 联系人 */}
+              {group.contacts.map(contact => (
+                <button
+                  key={contact.id}
+                  className="flex items-center w-full p-4 border-b border-gray-100 dark:border-gray-800 last:border-b-0 bg-white dark:bg-black"
+                  onClick={() => goToContactDetail(contact.id)}
+                >
+                  <div className="w-10 h-10 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold">
+                    {contact.avatar}
+                  </div>
+                  <span className="ml-3 text-gray-800 dark:text-white text-left">
+                    {contact.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))
+        )}
       </div>
       
       {/* 字母导航条 */}

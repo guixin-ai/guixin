@@ -2,22 +2,19 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Send, Paperclip, Smile, Image, Mic, MoreVertical, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
-
-// 消息类型
-interface Message {
-  id: string;
-  content: string;
-  isSelf: boolean;
-  timestamp: string;
-  status?: 'sent' | 'delivered' | 'read';
-}
+import { useChat } from '../models/chat.model';
+import { ChatMessage } from '@/types/chat';
+import { 
+  ChatNotFoundException, 
+  ChatListInitFailedException, 
+  ChatMessagesInitFailedException 
+} from '@/errors/chat.errors';
 
 // 联系人类型
 interface Contact {
   id: string;
   name: string;
   avatar: string;
-  online?: boolean;
 }
 
 const ChatPage = () => {
@@ -25,66 +22,61 @@ const ChatPage = () => {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [inputValue, setInputValue] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [contact, setContact] = useState<Contact | null>(null);
   const [showChatInfo, setShowChatInfo] = useState(false);
+  const [loading, setLoading] = useState(true);
   
-  // 模拟加载聊天数据
+  // 使用聊天模型的状态和方法
+  const { initialize, fetchChatById, initializeChatMessages, addChatMessage } = useChat();
+  
+  // 加载聊天数据
   useEffect(() => {
-    // 假设联系人数据
-    const mockContact: Contact = {
-      id: chatId || '1',
-      name: chatId === '1' ? '文件传输助手' : 
-            chatId === '2' ? '老婆' : 
-            chatId === '3' ? '张薇张薇' : '陌生人',
-      avatar: chatId === '1' ? '文' : 
-              chatId === '2' ? '老' : 
-              chatId === '3' ? '张' : '陌',
-      online: chatId === '2' || chatId === '3',
+    if (!chatId) return;
+    
+    const loadChatData = async () => {
+      setLoading(true);
+      
+      try {
+        // 初始化聊天列表并直接获取列表数据
+        const chatsList = await initialize();
+        
+        // 从返回的列表中查找聊天信息
+        const chatInfo = chatsList.find(chat => chat.id === chatId);
+        
+        // 如果列表中没有找到，抛出异常
+        if (!chatInfo) {
+          throw new ChatNotFoundException(chatId);
+        }
+        
+        // 设置联系人信息
+        setContact({
+          id: chatInfo.id,
+          name: chatInfo.name,
+          avatar: chatInfo.avatar,
+        });
+        
+        // 初始化并获取聊天消息
+        const chatMessages = await initializeChatMessages(chatId);
+        setMessages(chatMessages);
+      } catch (error) {
+        // 处理不同类型的错误
+        if (error instanceof ChatNotFoundException) {
+          console.error(`聊天未找到: ${error.message}`);
+        } else if (error instanceof ChatListInitFailedException) {
+          console.error(`聊天列表初始化失败: ${error.message}`);
+        } else if (error instanceof ChatMessagesInitFailedException) {
+          console.error(`聊天消息初始化失败: ${error.message}`);
+        } else {
+          console.error('加载聊天数据失败:', error);
+        }
+      } finally {
+        setLoading(false);
+      }
     };
     
-    // 假设消息历史
-    const mockMessages: Message[] = [
-      {
-        id: '1',
-        content: '你好啊',
-        isSelf: false,
-        timestamp: '10:00',
-        status: 'read',
-      },
-      {
-        id: '2',
-        content: '最近怎么样？',
-        isSelf: false,
-        timestamp: '10:01',
-        status: 'read',
-      },
-      {
-        id: '3',
-        content: '挺好的，你呢？',
-        isSelf: true,
-        timestamp: '10:05',
-        status: 'read',
-      },
-      {
-        id: '4',
-        content: '我也不错，最近在忙什么呢？',
-        isSelf: false,
-        timestamp: '10:06',
-        status: 'read',
-      },
-      {
-        id: '5',
-        content: '在写一些代码，做一个聊天应用',
-        isSelf: true,
-        timestamp: '10:10',
-        status: 'delivered',
-      },
-    ];
-    
-    setContact(mockContact);
-    setMessages(mockMessages);
-  }, [chatId]);
+    loadChatData();
+  }, [chatId, initialize, fetchChatById, initializeChatMessages]);
   
   // 自动滚动到最新消息
   useEffect(() => {
@@ -102,28 +94,33 @@ const ChatPage = () => {
   
   // 发送消息
   const handleSend = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || !chatId) return;
     
-    const newMessage: Message = {
+    const newMessage: ChatMessage = {
       id: `${Date.now()}`,
       content: inputValue,
       isSelf: true,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'sent',
     };
     
+    // 添加消息到模型缓存
+    addChatMessage(chatId, newMessage);
+    // 更新本地状态
     setMessages([...messages, newMessage]);
     setInputValue('');
     
     // 模拟对方回复
     setTimeout(() => {
-      const replyMessage: Message = {
+      const replyMessage: ChatMessage = {
         id: `${Date.now() + 1}`,
         content: '好的，我知道了',
         isSelf: false,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       
+      // 添加回复消息到模型缓存
+      addChatMessage(chatId, replyMessage);
+      // 更新本地状态
       setMessages(prevMessages => [...prevMessages, replyMessage]);
     }, 1000);
   };
@@ -141,17 +138,29 @@ const ChatPage = () => {
     setShowChatInfo(true);
   };
   
+  // 显示加载状态
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white dark:bg-black">
+        <div className="flex flex-col items-center">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+  
   if (!contact) {
     return (
       <div className="flex h-screen items-center justify-center bg-white dark:bg-black">
-        <p className="text-gray-500">加载中...</p>
+        <p className="text-gray-500">未找到聊天</p>
       </div>
     );
   }
   
   // 按时间分组消息
   const groupMessagesByDate = () => {
-    const groups: { date: string; messages: Message[] }[] = [];
+    const groups: { date: string; messages: ChatMessage[] }[] = [];
     let currentDate = '';
     
     messages.forEach(message => {
@@ -203,7 +212,6 @@ const ChatPage = () => {
               {contact.avatar}
             </div>
             <h3 className="text-lg font-medium">{contact.name}</h3>
-            {contact.online && <span className="text-xs text-green-500 mt-1">在线</span>}
           </div>
           
           {/* 添加聊天成员 */}
@@ -308,9 +316,6 @@ const ChatPage = () => {
           <h2 className="font-medium text-gray-800 dark:text-white">
             {contact.name}
           </h2>
-          {contact.online && (
-            <span className="text-xs text-green-500">在线</span>
-          )}
         </div>
         
         <Button 
@@ -366,18 +371,9 @@ const ChatPage = () => {
                       {message.content}
                     </div>
                     <div className="flex justify-end items-center mt-1">
-                      <span className="text-xs text-gray-500 mr-1">
+                      <span className="text-xs text-gray-500">
                         {message.timestamp}
                       </span>
-                      {message.status === 'sent' && (
-                        <span className="text-xs text-gray-500">已发送</span>
-                      )}
-                      {message.status === 'delivered' && (
-                        <span className="text-xs text-gray-500">已送达</span>
-                      )}
-                      {message.status === 'read' && (
-                        <span className="text-xs text-gray-500">已读</span>
-                      )}
                     </div>
                   </div>
                 )}

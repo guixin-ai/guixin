@@ -1,147 +1,104 @@
 /**
- * 联系人服务 - 提供与联系人相关的操作方法
- * 使用 Tauri 的 invoke 调用后端 API
+ * 联系人服务 - 提供联系人相关的API接口
  */
+import { Contact, ContactGroup, ContactsResponse, GroupedContactsResponse } from '@/types/contact';
 
-import { invoke } from '@tauri-apps/api/core';
-import {
-  Contact,
-  ContactGroup,
-  ContactWithGroup,
-  CreateContactRequest,
-  CreateAIContactRequest,
-  UpdateContactRequest,
-} from '../types';
-
+/**
+ * 联系人服务类
+ */
 class ContactService {
+  // 单例实例
+  private static instance: ContactService;
+  
+  // 模拟联系人数据
+  private mockContacts: Contact[] = [
+    { id: 'a1', name: '阿里巴巴', avatar: '阿', pinyin: 'alibaba' },
+    { id: 'a2', name: '阿童木', avatar: '阿', pinyin: 'atom' },
+    { id: 'b1', name: '白起', avatar: '白', pinyin: 'baiqi' },
+    { id: 'b2', name: '班主任', avatar: '班', pinyin: 'banzhuren' },
+    { id: 'c1', name: '陈奕迅', avatar: '陈', pinyin: 'chenyixun' },
+    { id: 'l1', name: '老婆', avatar: '老', pinyin: 'laopo' },
+    { id: 'w1', name: '王小波', avatar: '王', pinyin: 'wangxiaobo' },
+    { id: 'z1', name: '张三', avatar: '张', pinyin: 'zhangsan' },
+  ];
+  
+  // 私有构造函数，防止外部实例化
+  private constructor() {}
+  
   /**
-   * 获取所有联系人
-   * @returns 联系人列表
+   * 获取单例实例
    */
-  async getAllContacts(): Promise<Contact[]> {
-    return await invoke<Contact[]>('get_all_contacts');
+  public static getInstance(): ContactService {
+    if (!ContactService.instance) {
+      ContactService.instance = new ContactService();
+    }
+    return ContactService.instance;
   }
-
+  
   /**
-   * 根据ID获取联系人
-   * @param id 联系人ID
-   * @returns 联系人信息
+   * 获取联系人列表
    */
-  async getContactById(id: string): Promise<Contact> {
-    return await invoke<Contact>('get_contact_by_id', { id });
-  }
-
-  /**
-   * 根据拥有者ID获取联系人
-   * @param ownerId 拥有者ID
-   * @returns 联系人列表
-   */
-  async getContactsByOwnerId(ownerId: string): Promise<Contact[]> {
-    return await invoke<Contact[]>('get_contacts_by_user_id', { userId: ownerId });
-  }
-
-  /**
-   * 根据分组ID获取联系人
-   * @param groupId 分组ID
-   * @returns 联系人列表
-   */
-  async getContactsByGroupId(groupId: string): Promise<Contact[]> {
-    return await invoke<Contact[]>('get_contacts_by_group_id', { groupId });
-  }
-
-  /**
-   * 根据用户链接ID获取联系人
-   * @param userLinkId 用户链接ID
-   * @returns 联系人列表
-   */
-  async getContactsByUserLinkId(userLinkId: string): Promise<Contact[]> {
-    return await invoke<Contact[]>('get_contacts_by_contact_user_id', {
-      contactUserId: userLinkId,
+  public async getContacts(): Promise<ContactsResponse> {
+    // 模拟API请求延迟
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 按拼音排序
+    const sortedContacts = [...this.mockContacts].sort((a, b) => {
+      if (!a.pinyin || !b.pinyin) return 0;
+      return a.pinyin.localeCompare(b.pinyin);
     });
+    
+    return {
+      contacts: sortedContacts,
+      total: sortedContacts.length
+    };
   }
-
+  
   /**
-   * 创建联系人
-   * @param request 创建联系人请求
-   * @returns 创建的联系人信息
+   * 获取按字母分组的联系人
    */
-  async createContact(request: CreateContactRequest): Promise<Contact> {
-    return await invoke<Contact>('create_contact', { request });
-  }
-
-  /**
-   * 创建AI联系人（原子操作）
-   *
-   * 这个方法执行以下步骤：
-   * 1. 创建Agent
-   * 2. 创建AI用户
-   * 3. 更新Agent关联到AI用户
-   * 4. 创建联系人用户链接
-   * 5. 创建联系人
-   *
-   * @param request 创建AI联系人请求
-   * @returns 创建的联系人信息
-   */
-  async createAIContact(request: CreateAIContactRequest): Promise<Contact> {
-    return await invoke<Contact>('create_ai_contact', { request });
-  }
-
-  /**
-   * 更新联系人
-   * @param request 更新联系人请求
-   * @returns 更新后的联系人信息
-   */
-  async updateContact(request: UpdateContactRequest): Promise<Contact> {
-    return await invoke<Contact>('update_contact', { request });
-  }
-
-  /**
-   * 删除联系人及其相关数据
-   * @param id 联系人ID
-   * @param userId 当前用户ID
-   * @returns 操作结果
-   */
-  async deleteContact(id: string, userId: string): Promise<boolean> {
-    return await invoke<boolean>('delete_contact', { id, userId });
-  }
-
-  /**
-   * 获取所有联系人及其分组信息
-   * @returns 联系人及分组信息列表
-   */
-  async getAllContactsWithGroup(): Promise<ContactWithGroup[]> {
-    return await invoke<ContactWithGroup[]>('get_all_contacts_with_group');
-  }
-
-  /**
-   * 根据ID获取联系人及其分组信息
-   * @param id 联系人ID
-   * @returns 联系人及分组信息
-   */
-  async getContactByIdWithGroup(id: string): Promise<ContactWithGroup> {
-    return await invoke<ContactWithGroup>('get_contact_by_id_with_group', { id });
-  }
-
-  /**
-   * 根据拥有者ID获取联系人及其分组信息
-   * @param ownerId 拥有者ID
-   * @returns 联系人及分组信息列表
-   */
-  async getContactsByOwnerIdWithGroup(ownerId: string): Promise<ContactWithGroup[]> {
-    return await invoke<ContactWithGroup[]>('get_contacts_by_user_id_with_group', {
-      userId: ownerId,
+  public async getGroupedContacts(): Promise<GroupedContactsResponse> {
+    // 模拟API请求延迟
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 先按拼音排序
+    const sortedContacts = [...this.mockContacts].sort((a, b) => {
+      if (!a.pinyin || !b.pinyin) return 0;
+      return a.pinyin.localeCompare(b.pinyin);
     });
+    
+    // 分组
+    const groups: ContactGroup[] = [];
+    let currentLetter = '';
+    
+    sortedContacts.forEach(contact => {
+      const firstLetter = contact.pinyin?.[0].toUpperCase() || '#';
+      
+      if (currentLetter !== firstLetter) {
+        currentLetter = firstLetter;
+        groups.push({ letter: firstLetter, contacts: [contact] });
+      } else {
+        groups[groups.length - 1].contacts.push(contact);
+      }
+    });
+    
+    return {
+      groups,
+      total: sortedContacts.length
+    };
   }
-
+  
   /**
-   * 根据分组ID获取联系人及其分组信息
-   * @param groupId 分组ID
-   * @returns 联系人及分组信息列表
+   * 根据ID获取联系人详情
    */
-  async getContactsByGroupIdWithGroup(groupId: string): Promise<ContactWithGroup[]> {
-    return await invoke<ContactWithGroup[]>('get_contacts_by_group_id_with_group', { groupId });
+  public async getContactById(id: string): Promise<Contact | null> {
+    // 模拟API请求延迟
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    const contact = this.mockContacts.find(contact => contact.id === id);
+    return contact || null;
   }
 }
 
-// 导出单例实例
-export const contactService = new ContactService();
+// 导出联系人服务单例
+export const contactService = ContactService.getInstance(); 

@@ -1,64 +1,45 @@
 /**
  * 用户服务 - 提供与用户相关的操作方法
- * 使用 Tauri 的 invoke 调用后端 API
  */
+import { User } from '../types';
 
-import { invoke } from '@tauri-apps/api/core';
-import { User, CreateUserRequest, UpdateUserRequest } from '../types';
-
+/**
+ * 用户服务类
+ */
 class UserService {
+  // 单例实例
+  private static instance: UserService;
+  
+  // 模拟用户数据
+  private mockUser: User = {
+    id: '1',
+    name: '张三',
+  };
+  
+  // 私有构造函数，防止外部实例化
+  private constructor() {}
+  
   /**
-   * 获取当前用户（默认用户）
+   * 获取单例实例
+   */
+  public static getInstance(): UserService {
+    if (!UserService.instance) {
+      UserService.instance = new UserService();
+    }
+    return UserService.instance;
+  }
+
+  /**
+   * 获取当前用户
    * @returns 当前用户信息
    */
   async getCurrentUser(): Promise<User> {
-    return await invoke<User>('get_current_user');
-  }
-
-  /**
-   * 创建用户
-   * @param request 创建用户请求
-   * @returns 创建的用户信息
-   */
-  async createUser(request: CreateUserRequest): Promise<User> {
-    return await invoke<User>('create_user', { request });
-  }
-
-  /**
-   * 获取所有用户
-   * @returns 用户列表
-   */
-  async getAllUsers(): Promise<User[]> {
-    return await invoke<User[]>('get_all_users');
-  }
-
-  /**
-   * 根据ID获取用户
-   * @param id 用户ID
-   * @returns 用户信息
-   */
-  async getUserById(id: string): Promise<User> {
-    return await invoke<User>('get_user_by_id', { id });
-  }
-
-  /**
-   * 更新用户
-   * @param request 更新用户请求
-   * @returns 更新后的用户信息
-   */
-  async updateUser(request: UpdateUserRequest): Promise<User> {
-    return await invoke<User>('update_user', { request });
-  }
-
-  /**
-   * 删除用户
-   * @param id 用户ID
-   * @returns 操作结果
-   */
-  async deleteUser(id: string): Promise<boolean> {
-    return await invoke<boolean>('delete_user', { id });
+    // 模拟API请求延迟
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    return this.mockUser;
   }
 }
 
-// 导出单例实例
-export const userService = new UserService();
+// 导出用户服务单例
+export const userService = UserService.getInstance(); 

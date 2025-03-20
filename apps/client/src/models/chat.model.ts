@@ -4,136 +4,93 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
+import { chatService } from '@/services/chat.service';
+import { ChatItem, ChatMessage } from '@/types/chat';
+import { 
+  ChatNotFoundException, 
+  ChatListInitFailedException, 
+  ChatMessagesInitFailedException 
+} from '@/errors/chat.errors';
 
-// 聊天项类型
-export interface ChatItem {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  timestamp: string;
-  unread?: number;
-}
+// 启用 MapSet 支持 Set 数据结构
+enableMapSet();
 
 // 聊天状态接口
 export interface ChatState {
   // 聊天列表
   chats: ChatItem[];
-  // 当前选中的聊天ID
-  currentChatId: string | null;
+  // 聊天消息，以聊天ID为键
+  chatMessages: Record<string, ChatMessage[]>;
+  // 已初始化的聊天消息ID集合
+  initializedChatIds: Set<string>;
+  // 是否已初始化
+  initialized: boolean;
 
   // 操作方法
-  fetchAllChats: () => void;
-  fetchChatById: (id: string) => ChatItem | undefined;
-  setCurrentChat: (chatId: string) => void;
-  clearCurrentChat: () => void;
+  fetchAllChats: () => Promise<void>;
+  fetchChatById: (id: string) => Promise<ChatItem | null>;
   searchChats: (query: string) => ChatItem[];
   addChat: (chat: ChatItem) => void;
+  
+  // 聊天消息相关方法
+  getChatMessages: (chatId: string) => Promise<ChatMessage[]>;
+  addChatMessage: (chatId: string, message: ChatMessage) => void;
+  
+  // 初始化方法
+  initialize: () => Promise<ChatItem[]>;
+  // 初始化指定聊天的消息
+  initializeChatMessages: (chatId: string) => Promise<ChatMessage[]>;
 }
 
 // 示例数据
-const initialChats: ChatItem[] = [
-  {
-    id: '1',
-    name: '文件传输助手',
-    avatar: '文',
-    lastMessage: '[图片]',
-    timestamp: '星期二',
-  },
-  {
-    id: '2',
-    name: '老婆',
-    avatar: '老',
-    lastMessage: '晚安宝宝',
-    timestamp: '昨天',
-    unread: 1,
-  },
-  {
-    id: '3',
-    name: '张薇张薇',
-    avatar: '张',
-    lastMessage: '周末一起打球？',
-    timestamp: '昨天',
-  },
-  {
-    id: '4',
-    name: '于雯雯医生',
-    avatar: '于',
-    lastMessage: '好的，请按时服药',
-    timestamp: '昨天',
-  },
-  {
-    id: '5',
-    name: '柒公子 顺丰快递 收件',
-    avatar: '柒',
-    lastMessage: '您的快递已经送达前台',
-    timestamp: '昨天',
-  },
-  {
-    id: '6',
-    name: '订阅号',
-    avatar: '订',
-    lastMessage: '南京本地宝: 好消息！江苏新增5家国家级旅游度假区',
-    timestamp: '昨天',
-    unread: 3,
-  },
-  {
-    id: '7',
-    name: '大疆',
-    avatar: 'D',
-    lastMessage: '新品发布会邀请',
-    timestamp: '昨天',
-  },
-  {
-    id: '8',
-    name: '扣子Coze',
-    avatar: '扣',
-    lastMessage: '有什么可以帮到您？',
-    timestamp: '星期二',
-  },
-  {
-    id: '9',
-    name: '携程旅行网',
-    avatar: '携',
-    lastMessage: '最后一天，超爆全返场！限时优惠！',
-    timestamp: '星期二',
-  },
-];
+const initialChats: ChatItem[] = [];
 
 // 创建聊天状态存储
 export const useChatStore = create(
   immer<ChatState>((set, get) => ({
     // 初始状态
     chats: initialChats,
-    currentChatId: null,
+    chatMessages: {},
+    initializedChatIds: new Set<string>(),
+    initialized: false,
 
     // 获取所有聊天
-    fetchAllChats: () => {
-      // 这里可以添加从API获取聊天列表的逻辑
-      // 目前直接使用本地数据
-      set(state => {
-        state.chats = initialChats;
-      });
+    fetchAllChats: async () => {
+      try {
+        // 调用服务获取聊天列表
+        const response = await chatService.getChats();
+        
+        set(state => {
+          state.chats = response.chats;
+        });
+      } catch (error) {
+        console.error('获取聊天列表失败:', error);
+      }
     },
 
     // 根据ID获取聊天
-    fetchChatById: (id: string) => {
-      const chat = get().chats.find(chat => chat.id === id);
-      return chat;
-    },
-
-    // 设置当前聊天
-    setCurrentChat: (chatId: string) => {
-      set(state => {
-        state.currentChatId = chatId;
-      });
-    },
-
-    // 清除当前聊天
-    clearCurrentChat: () => {
-      set(state => {
-        state.currentChatId = null;
-      });
+    fetchChatById: async (id: string) => {
+      try {
+        // 先从本地状态查找
+        const localChat = get().chats.find(chat => chat.id === id);
+        if (localChat) return localChat;
+        
+        // 如果本地没有，则调用服务获取
+        const chat = await chatService.getChatById(id);
+        if (!chat) {
+          throw new ChatNotFoundException(id);
+        }
+        return chat;
+      } catch (error) {
+        console.error('获取聊天详情失败:', error);
+        // 重新抛出异常，让调用方处理
+        if (error instanceof ChatNotFoundException) {
+          throw error;
+        }
+        // 其他错误可以包装一下再抛出
+        throw new ChatNotFoundException(id);
+      }
     },
 
     // 搜索聊天
@@ -149,18 +106,100 @@ export const useChatStore = create(
       set(state => {
         // 将新聊天添加到列表最前面
         state.chats.unshift(chat);
-        // 设置为当前聊天
-        state.currentChatId = chat.id;
       });
     },
+    
+    // 获取聊天消息
+    getChatMessages: async (chatId: string) => {
+      // 如果该聊天已初始化，直接返回缓存数据
+      const state = get();
+      if (state.initializedChatIds.has(chatId)) {
+        return state.chatMessages[chatId] || [];
+      }
+      
+      // 如果未初始化，则调用初始化方法
+      return await get().initializeChatMessages(chatId);
+    },
+    
+    // 添加新消息
+    addChatMessage: (chatId: string, message: ChatMessage) => {
+      set(state => {
+        // 如果缓存中没有该聊天的消息，先创建空数组
+        if (!state.chatMessages[chatId]) {
+          state.chatMessages[chatId] = [];
+        }
+        
+        // 添加消息到缓存
+        state.chatMessages[chatId].push(message);
+        
+        // 更新聊天列表中的最后一条消息
+        const chatIndex = state.chats.findIndex(chat => chat.id === chatId);
+        if (chatIndex !== -1) {
+          state.chats[chatIndex].lastMessage = message.content;
+          state.chats[chatIndex].timestamp = '刚刚';
+          
+          // 将此聊天移到列表最前面
+          const chat = state.chats[chatIndex];
+          state.chats.splice(chatIndex, 1);
+          state.chats.unshift(chat);
+        }
+      });
+    },
+    
+    // 初始化聊天列表
+    initialize: async () => {
+      const state = get();
+      
+      // 如果已经初始化，则直接返回聊天列表
+      if (state.initialized) {
+        return state.chats;
+      }
+      
+      try {
+        // 调用fetchAllChats获取聊天列表
+        await get().fetchAllChats();
+        
+        // 标记为已初始化
+        set(state => {
+          state.initialized = true;
+        });
+        
+        // 返回初始化后的聊天列表
+        return get().chats;
+      } catch (error) {
+        console.error('聊天模型初始化失败:', error);
+        // 抛出自定义异常
+        throw new ChatListInitFailedException(error);
+      }
+    },
+    
+    // 初始化指定聊天的消息
+    initializeChatMessages: async (chatId: string) => {
+      // 检查是否已经初始化
+      const state = get();
+      if (state.initializedChatIds.has(chatId)) {
+        return state.chatMessages[chatId] || [];
+      }
+      
+      try {
+        // 从服务获取消息
+        const messages = await chatService.getChatMessages(chatId);
+        
+        // 将获取的消息存入缓存并标记为已初始化
+        set(state => {
+          state.chatMessages[chatId] = messages;
+          state.initializedChatIds.add(chatId);
+        });
+        
+        return messages;
+      } catch (error) {
+        console.error(`初始化聊天 ${chatId} 的消息失败:`, error);
+        // 抛出自定义异常
+        throw new ChatMessagesInitFailedException(chatId, error);
+      }
+    }
   }))
 );
-
-// 获取当前选中的聊天（计算属性）
-export const useCurrentChat = () => {
-  const { currentChatId, chats } = useChatStore();
-  return chats.find(chat => chat.id === currentChatId) || null;
-};
 
 // 导出聊天状态钩子
 export const useChat = () => useChatStore(); 

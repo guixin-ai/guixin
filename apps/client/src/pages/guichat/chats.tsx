@@ -8,17 +8,28 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { useChatStore, ChatItem } from '../../models/chat.model';
+import { useChatStore } from '../../models/chat.model';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
-  const { chats, fetchAllChats, searchChats, setCurrentChat } = useChatStore();
+  const { chats, searchChats, initialize } = useChatStore();
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // 组件加载时获取聊天列表
+  // 初始化聊天数据
   useEffect(() => {
-    fetchAllChats();
-  }, [fetchAllChats]);
+    const initChats = async () => {
+      try {
+        await initialize();
+        setLoading(false);
+      } catch (error) {
+        console.error('初始化聊天数据失败:', error);
+        setLoading(false);
+      }
+    };
+    
+    initChats();
+  }, [initialize]);
 
   // 过滤后的聊天列表
   const filteredChats = searchQuery 
@@ -27,8 +38,7 @@ const ChatsPage = () => {
 
   // 打开聊天详情
   const handleChatClick = (chatId: string) => {
-    setCurrentChat(chatId);
-    navigate(`/guichat/chat/${chatId}`);
+    navigate(`/chat/${chatId}`);
   };
 
   // 新建聊天
@@ -45,6 +55,16 @@ const ChatsPage = () => {
   const handleCreateFriend = () => {
     navigate('/create-friend');
   };
+
+  // 显示加载中状态
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 items-center justify-center">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
+        <p className="mt-2 text-sm text-gray-500">加载中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">

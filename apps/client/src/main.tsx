@@ -4,6 +4,9 @@ import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import App from './app';
 import router from './routes';
+import { enableMapSet } from 'immer';
+// 启用 MapSet 支持 Set 数据结构
+enableMapSet();
 
 // 添加全局错误处理
 // 捕获未处理的错误

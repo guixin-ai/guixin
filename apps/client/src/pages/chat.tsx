@@ -17,6 +17,7 @@ import {
   ChatNotFoundException,
   ChatListInitFailedException,
   ChatMessagesInitFailedException,
+  ChatDetailInitFailedException,
 } from '@/errors/chat.errors';
 import DelayedLoading from '../components/delayed-loading';
 import {
@@ -37,6 +38,7 @@ import {
   OllamaModelNotFoundError,
   OllamaModelLoadError,
 } from '@/errors/ollama.errors';
+import ChatInfoPage from './chat-info';
 
 // 联系人类型
 interface Contact {
@@ -80,11 +82,11 @@ const ChatPage = () => {
   const virtuosoRef = useRef<VirtuosoMessageListMethods<VirtuosoMessageItem>>(null);
   const [inputValue, setInputValue] = useState('');
   const [contact, setContact] = useState<Contact | null>(null);
-  const [showChatInfo, setShowChatInfo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAIResponding, setIsAIResponding] = useState(false);
   const [isMessagesInitialized, setIsMessagesInitialized] = useState(false);
   const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
+  const [showChatInfo, setShowChatInfo] = useState(false);
 
   // 添加AbortController引用
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -93,12 +95,13 @@ const ChatPage = () => {
 
   // 使用聊天模型的状态和方法
   const {
-    initialize,
-    fetchChatById,
+    initializeChatList,
+    initializeChatDetail,
     initializeChatMessages,
     addChatMessage,
     updateChatMessage,
     getChatMessages,
+    getChatDetail,
   } = useChat();
 
   // 转换ChatMessage为VirtuosoMessageItem
@@ -120,29 +123,23 @@ const ChatPage = () => {
       setIsMessagesInitialized(false);
 
       try {
-        // 初始化聊天列表并直接获取列表数据
-        const chatsList = await initialize();
+        // 获取聊天详情
+        const chatDetail = await getChatDetail(chatId);
 
-        // 从返回的列表中查找聊天信息
-        const chatInfo = chatsList.find(chat => chat.id === chatId);
-
-        // 如果列表中没有找到，抛出异常
-        if (!chatInfo) {
+        // 如果没有找到，抛出异常
+        if (!chatDetail) {
           throw new ChatNotFoundException(chatId);
         }
 
-        // 设置联系人信息（添加isAI标记）
+        // 设置联系人信息
         setContact({
-          id: chatInfo.id,
-          name: chatInfo.name,
-          avatar: chatInfo.avatar,
-          isAI: true, // 假设所有聊天都是AI
+          id: chatDetail.id,
+          name: chatDetail.name,
+          avatar: chatDetail.avatar,
+          isAI: chatDetail.isAI || false,
         });
 
-        // 初始化聊天消息
-        await initializeChatMessages(chatId);
-
-        // 获取聊天记录并转换为VirtuosoMessageItem
+        // 获取聊天消息并转换为VirtuosoMessageItem
         const chatMessages = await getChatMessages(chatId);
         const virtuosoMessages = chatMessages.map(convertToVirtuosoMessage);
         setInitialMessages(virtuosoMessages);
@@ -152,8 +149,8 @@ const ChatPage = () => {
         // 处理不同类型的错误
         if (error instanceof ChatNotFoundException) {
           console.error(`聊天未找到: ${error.message}`);
-        } else if (error instanceof ChatListInitFailedException) {
-          console.error(`聊天列表初始化失败: ${error.message}`);
+        } else if (error instanceof ChatDetailInitFailedException) {
+          console.error(`聊天详情初始化失败: ${error.message}`);
         } else if (error instanceof ChatMessagesInitFailedException) {
           console.error(`聊天消息初始化失败: ${error.message}`);
         } else {
@@ -165,7 +162,7 @@ const ChatPage = () => {
     };
 
     loadChatData();
-  }, [chatId, initialize, fetchChatById, initializeChatMessages, getChatMessages]);
+  }, [chatId, getChatDetail, getChatMessages]);
 
   // 返回聊天列表
   const handleBack = () => {
@@ -477,239 +474,147 @@ const ChatPage = () => {
     );
   };
 
-  // 聊天信息设置页面
-  if (showChatInfo) {
-    return (
-      <div className="flex flex-col h-screen bg-black text-white">
-        {/* 头部 */}
-        <div className="flex items-center p-3 bg-gray-900 border-b border-gray-800">
-          <Button variant="ghost" size="icon" className="text-gray-300 mr-2" onClick={handleBack}>
-            <ArrowLeft size={20} />
-          </Button>
-
-          <div className="flex-1 text-center">
-            <h2 className="font-medium text-white">聊天信息</h2>
-          </div>
-
-          <div className="w-8"></div>
-        </div>
-
-        {/* 聊天参与者 */}
-        <div className="p-4">
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-20 h-20 rounded-md bg-green-500 flex items-center justify-center text-white text-2xl font-semibold mb-2">
-              {contact?.avatar}
-            </div>
-            <h3 className="text-lg font-medium">{contact?.name}</h3>
-            {contact?.isAI && <div className="text-xs text-green-400 mt-1">AI助手</div>}
-          </div>
-
-          {/* 添加聊天成员 */}
-          <div className="mt-4 mb-2">
-            <h4 className="text-gray-400 text-sm mb-2">聊天成员</h4>
-            <div className="grid grid-cols-5 gap-2 mb-4">
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold mb-1">
-                  我
-                </div>
-                <span className="text-xs">我</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold mb-1">
-                  {contact?.avatar}
-                </div>
-                <span className="text-xs">{contact?.name}</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-md border border-dashed border-gray-600 flex items-center justify-center text-gray-400 mb-1">
-                  +
-                </div>
-                <span className="text-xs text-gray-400">添加</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 功能列表 */}
-        <div className="mt-2">
-          <div className="bg-gray-900">
-            {/* 查找聊天记录 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <span>查找聊天记录</span>
-              <ChevronRight size={20} className="text-gray-600" />
-            </div>
-
-            {/* 消息免打扰 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <span>消息免打扰</span>
-              <div className="w-12 h-6 rounded-full bg-gray-700 relative">
-                <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white"></div>
-              </div>
-            </div>
-
-            {/* 置顶聊天 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <span>置顶聊天</span>
-              <div className="w-12 h-6 rounded-full bg-green-500 relative">
-                <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white"></div>
-              </div>
-            </div>
-
-            {/* 提醒 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <span>提醒</span>
-              <div className="w-12 h-6 rounded-full bg-gray-700 relative">
-                <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white"></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-2 bg-gray-900">
-            {/* 设置当前聊天背景 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <span>设置当前聊天背景</span>
-              <ChevronRight size={20} className="text-gray-600" />
-            </div>
-
-            {/* 清空聊天记录 */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800">
-              <span>清空聊天记录</span>
-              <ChevronRight size={20} className="text-gray-600" />
-            </div>
-
-            {/* 投诉 */}
-            <div className="flex items-center justify-between p-4">
-              <span>投诉</span>
-              <ChevronRight size={20} className="text-gray-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // 聊天页面（包括未找到聊天的情况）
   return (
     <DelayedLoading loading={loading}>
       {contact ? (
         <div className="flex flex-col h-screen bg-white dark:bg-black">
-          {/* 头部 */}
-          <div className="flex items-center p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-gray-600 dark:text-gray-300 mr-2"
-              onClick={handleBack}
-            >
-              <ArrowLeft size={20} />
-            </Button>
-
-            <div className="flex-1 text-center">
-              <h2 className="font-medium text-gray-800 dark:text-white">
-                {contact.name}
-                {contact.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
-              </h2>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-gray-600 dark:text-gray-300"
-              onClick={handleOpenChatInfo}
-            >
-              <MoreVertical size={20} />
-            </Button>
-          </div>
-
-          {/* 消息区域 - 使用VirtuosoMessage组件 */}
-          {isMessagesInitialized ? (
-            <VirtuosoMessage<VirtuosoMessageItem, null>
-              ref={virtuosoRef}
-              className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
-              computeItemKey={({ data }) => data.key}
-              ItemContent={MessageItemContent}
-              initialData={initialMessages}
-              initialLocation={{ index: 'LAST', align: 'end' }}
-            />
-          ) : (
-            <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>
-          )}
-
-          {/* 输入区域 */}
-          <div className="p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1">
+          {/* 聊天消息页面 - 始终显示 */}
+          <>
+            {/* 头部 */}
+            <div className="flex items-center p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-gray-500"
-                disabled={isAIResponding}
+                className="text-gray-600 dark:text-gray-300 mr-2"
+                onClick={handleBack}
               >
-                <Smile size={20} />
+                <ArrowLeft size={20} />
               </Button>
 
-              <div className="flex-1 mx-1">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  className="w-full p-2 bg-transparent text-gray-800 dark:text-white focus:outline-none"
-                  placeholder={isAIResponding ? 'AI正在回复中...' : '输入消息...'}
-                  value={inputValue}
-                  onChange={e => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  disabled={false}
-                />
+              <div className="flex-1 text-center">
+                <h2 className="font-medium text-gray-800 dark:text-white">
+                  {contact.name}
+                  {contact.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
+                </h2>
               </div>
 
-              <div className="flex items-center">
-                {!inputValue.trim() && !isAIResponding && (
-                  <>
-                    <Button variant="ghost" size="icon" className="text-gray-500">
-                      <Paperclip size={20} />
-                    </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-gray-600 dark:text-gray-300"
+                onClick={handleOpenChatInfo}
+              >
+                <MoreVertical size={20} />
+              </Button>
+            </div>
 
-                    <Button variant="ghost" size="icon" className="text-gray-500">
-                      <Mic size={20} />
-                    </Button>
-                  </>
-                )}
+            {/* 消息区域 - 使用VirtuosoMessage组件 */}
+            {isMessagesInitialized ? (
+              <VirtuosoMessage<VirtuosoMessageItem, null>
+                ref={virtuosoRef}
+                className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
+                computeItemKey={({ data }) => data.key}
+                ItemContent={MessageItemContent}
+                initialData={initialMessages}
+                initialLocation={{ index: 'LAST', align: 'end' }}
+              />
+            ) : (
+              <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>
+            )}
 
-                {inputValue.trim() && !isAIResponding && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white bg-green-500 rounded-full p-1.5"
-                    onClick={handleSend}
-                  >
-                    <Send size={18} />
-                  </Button>
-                )}
+            {/* 输入区域 */}
+            <div className="p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-500"
+                  disabled={isAIResponding}
+                >
+                  <Smile size={20} />
+                </Button>
 
-                {isAIResponding && (
-                  <div className="flex items-center">
-                    <div className="text-gray-500 text-xs mr-2 flex items-center">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                      <div
-                        className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
-                        style={{ animationDelay: '0.2s' }}
-                      ></div>
-                      <div
-                        className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
-                        style={{ animationDelay: '0.4s' }}
-                      ></div>
-                    </div>
+                <div className="flex-1 mx-1">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    className="w-full p-2 bg-transparent text-gray-800 dark:text-white focus:outline-none"
+                    placeholder={isAIResponding ? 'AI正在回复中...' : '输入消息...'}
+                    value={inputValue}
+                    onChange={e => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    disabled={false}
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  {!inputValue.trim() && !isAIResponding && (
+                    <>
+                      <Button variant="ghost" size="icon" className="text-gray-500">
+                        <Paperclip size={20} />
+                      </Button>
+
+                      <Button variant="ghost" size="icon" className="text-gray-500">
+                        <Mic size={20} />
+                      </Button>
+                    </>
+                  )}
+
+                  {inputValue.trim() && !isAIResponding && (
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="text-red-500 text-xs ml-1"
-                      onClick={cancelCurrentGeneration}
+                      size="icon"
+                      className="text-white bg-green-500 rounded-full p-1.5"
+                      onClick={handleSend}
                     >
-                      终止生成
+                      <Send size={18} />
                     </Button>
-                  </div>
-                )}
+                  )}
+
+                  {isAIResponding && (
+                    <div className="flex items-center">
+                      <div className="text-gray-500 text-xs mr-2 flex items-center">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                        <div
+                          className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
+                          style={{ animationDelay: '0.2s' }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                          style={{ animationDelay: '0.4s' }}
+                        ></div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 text-xs ml-1"
+                        onClick={cancelCurrentGeneration}
+                      >
+                        终止生成
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </>
+
+          {/* 聊天信息组件 - 条件渲染且浮动在上面 */}
+          {showChatInfo && (
+            <div className="absolute inset-0 z-10 bg-white dark:bg-black">
+              {chatId ? (
+                <ChatInfoPage 
+                  onBack={() => setShowChatInfo(false)} 
+                  chatId={chatId}
+                />
+              ) : (
+                (() => {
+                  throw new ChatNotFoundException('未指定聊天ID');
+                })()
+              )}
+            </div>
+          )}
         </div>
       ) : (
         // 空白页面 - 不显示未找到聊天的提示

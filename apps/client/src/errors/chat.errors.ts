@@ -30,4 +30,15 @@ export class ChatListInitFailedException extends Error {
     this.name = 'ChatListInitFailedException';
     this.originalError = originalError;
   }
+}
+
+// 聊天详情初始化失败异常
+export class ChatDetailInitFailedException extends Error {
+  readonly originalError?: unknown;
+  
+  constructor(chatId: string, originalError?: unknown) {
+    super(`初始化聊天 ${chatId} 的详情失败`);
+    this.name = 'ChatDetailInitFailedException';
+    this.originalError = originalError;
+  }
 } 

@@ -9,28 +9,32 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { useChatStore } from '../../models/chat.model';
+import { ChatListInitFailedException } from '@/errors/chat.errors';
 import DelayedLoading from '../../components/delayed-loading';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
-  const { chats, searchChats, initialize } = useChatStore();
+  const { chats, searchChats, getChatList } = useChatStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   // 初始化聊天数据
   useEffect(() => {
-    const initChats = async () => {
+    const loadChats = async () => {
       try {
-        await initialize();
+        await getChatList();
         setLoading(false);
       } catch (error) {
-        console.error('初始化聊天数据失败:', error);
+        console.error('加载聊天列表失败:', error);
+        if (error instanceof ChatListInitFailedException) {
+          console.error(`聊天列表初始化失败: ${error.message}`);
+        }
         setLoading(false);
       }
     };
 
-    initChats();
-  }, [initialize]);
+    loadChats();
+  }, [getChatList]);
 
   // 过滤后的聊天列表
   const filteredChats = searchQuery ? searchChats(searchQuery) : chats;

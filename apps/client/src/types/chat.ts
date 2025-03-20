@@ -2,7 +2,7 @@
  * 聊天相关类型定义
  */
 
-// 聊天项类型
+// 聊天列表项类型
 export interface ChatItem {
   id: string;
   name: string;
@@ -10,6 +10,24 @@ export interface ChatItem {
   lastMessage: string;
   timestamp: string;
   unread?: number;
+}
+
+// 聊天详情类型
+export interface ChatDetail {
+  id: string;
+  name: string;
+  avatar: string;
+  isAI?: boolean;
+  members?: ChatMember[];
+}
+
+// 聊天成员类型
+export interface ChatMember {
+  id: string;
+  name: string;
+  avatar: string;
+  isAI?: boolean;
+  username?: string;
 }
 
 // 聊天消息类型

@@ -79,8 +79,17 @@ function getRandomPhrase() {
   return randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
 }
 
-const ChatPage = () => {
+// 新增 ChatPageWrapper 组件
+const ChatPageWrapper = () => {
   const { chatId } = useParams<{ chatId: string }>();
+  if (!chatId) {
+    throw new ChatNotFoundException('未指定聊天ID');
+  }
+  return <ChatPageContent chatId={chatId} />;
+};
+
+// 将原 ChatPage 组件重命名为 ChatPageContent，并接收 chatId 作为 props
+const ChatPageContent = ({ chatId }: { chatId: string }) => {
   const navigate = useNavigate();
   const virtuosoRef = useRef<VirtuosoMessageListMethods<VirtuosoMessageItem>>(null);
   const [inputValue, setInputValue] = useState('');
@@ -106,19 +115,19 @@ const ChatPage = () => {
       addChatMessage: state.addChatMessage,
       updateChatMessage: state.updateChatMessage,
       getChatDetail: state.getChatDetail,
-      addChatMember: state.addChatMember
+      addChatMember: state.addChatMember,
     }))
   );
-  
+
   // 使用析构来简化后续访问
-  const { 
-    chatDetails, 
-    initializeChatDetail, 
-    initializeChatMessages, 
-    addChatMessage, 
-    updateChatMessage, 
-    getChatDetail, 
-    addChatMember 
+  const {
+    chatDetails,
+    initializeChatDetail,
+    initializeChatMessages,
+    addChatMessage,
+    updateChatMessage,
+    getChatDetail,
+    addChatMember,
   } = chatStore;
 
   // 使用联系人模型获取联系人详情 - 方法不需要重新创建
@@ -136,8 +145,6 @@ const ChatPage = () => {
 
   // 加载聊天数据
   useEffect(() => {
-    if (!chatId) return;
-
     const loadChatData = async () => {
       setLoading(true);
       setIsMessagesInitialized(false);
@@ -212,8 +219,6 @@ const ChatPage = () => {
 
   // 处理选择联系人
   const handleSelectContacts = async (contactIds: string[]) => {
-    if (!chatId) return;
-
     // 获取聊天详情
     const chatDetail = await getChatDetail(chatId);
     if (!chatDetail) return;
@@ -238,25 +243,37 @@ const ChatPage = () => {
   };
 
   // 使用Ollama生成AI回复
-  const generateAIResponse = async (responseId: string, userMessage: string) => {
+  const generateAIResponse = async (responseId: string) => {
     setIsAIResponding(true);
 
-    // 创建初始空回复
-    const aiMessage: VirtuosoMessageItem = {
-      key: responseId,
-      content: '',
-      isSelf: false,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isStreaming: true,
-    };
+    try {
+      // 使用本地Ollama模型 - 这里使用gemma3模型
+      const MODEL_NAME = 'gemma3:1b';
 
-    // 直接添加到UI组件
-    if (virtuosoRef.current && isMessagesInitialized) {
-      virtuosoRef.current.data.append([aiMessage]);
-    }
+      // 准备聊天历史 - 在添加空消息前获取最新的消息列表
+      const latestMessages = await useChatStore.getState().getChatMessages(chatId);
+      const chatHistory: OllamaMessage[] = latestMessages.map(msg => ({
+        role: msg.isSelf ? 'user' : 'assistant',
+        content: msg.content,
+      }));
 
-    // 同步到模型层 - 初始添加空消息
-    if (chatId) {
+      // 注意：不需要再次添加用户消息，因为它已经包含在latestMessages中
+
+      // 创建初始空回复
+      const aiMessage: VirtuosoMessageItem = {
+        key: responseId,
+        content: '',
+        isSelf: false,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isStreaming: true,
+      };
+
+      // 直接添加到UI组件
+      if (virtuosoRef.current && isMessagesInitialized) {
+        virtuosoRef.current.data.append([aiMessage]);
+      }
+
+      // 同步到模型层 - 初始添加空消息
       const chatAiMessage: ChatMessage = {
         id: responseId,
         content: '',
@@ -264,28 +281,6 @@ const ChatPage = () => {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       addChatMessage(chatId, chatAiMessage);
-    }
-
-    try {
-      // 使用本地Ollama模型 - 这里使用gemma3模型
-      const MODEL_NAME = 'gemma3:1b';
-
-      // 准备聊天历史
-      let chatHistory: OllamaMessage[] = [];
-
-      // 如果有初始消息，构建聊天历史
-      if (initialMessages.length > 0) {
-        chatHistory = initialMessages.map(msg => ({
-          role: msg.isSelf ? 'user' : 'assistant',
-          content: msg.content,
-        }));
-      }
-
-      // 添加当前用户消息
-      chatHistory.push({
-        role: 'user',
-        content: userMessage,
-      });
 
       // 创建新的AbortController
       abortControllerRef.current = new AbortController();
@@ -320,13 +315,11 @@ const ChatPage = () => {
                   };
                 }
                 return msg;
-              }, 'smooth');
+              });
             }
 
             // 同步更新到模型层 - 使用updateChatMessage更新已有消息
-            if (chatId) {
-              updateChatMessage(chatId, responseId, currentContent);
-            }
+            updateChatMessage(chatId, responseId, currentContent);
           }
         },
         (fullResponse: OllamaMessage) => {
@@ -347,9 +340,7 @@ const ChatPage = () => {
           }
 
           // 同步最终完整的响应到模型层 - 使用updateChatMessage更新最终内容
-          if (chatId) {
-            updateChatMessage(chatId, responseId, finalContent);
-          }
+          updateChatMessage(chatId, responseId, finalContent);
 
           setIsAIResponding(false);
           // 清除当前的AbortController
@@ -404,9 +395,7 @@ const ChatPage = () => {
       }
 
       // 更新模型层中的错误消息
-      if (chatId) {
-        updateChatMessage(chatId, responseId, finalErrorContent);
-      }
+      updateChatMessage(chatId, responseId, finalErrorContent);
 
       setIsAIResponding(false);
       abortControllerRef.current = null;
@@ -415,8 +404,8 @@ const ChatPage = () => {
 
   // 发送消息
   const handleSend = () => {
-    // 如果没有输入内容或没有聊天ID，或者AI正在响应，则不发送消息
-    if (!inputValue.trim() || !chatId || isAIResponding) return;
+    // 如果没有输入内容或AI正在响应，则不发送消息
+    if (!inputValue.trim() || isAIResponding) return;
 
     const userMessageId = `user-${Date.now()}`;
     const aiResponseId = `ai-${Date.now()}`;
@@ -449,19 +438,17 @@ const ChatPage = () => {
     setInputValue('');
 
     // 将用户消息同步到模型层
-    if (chatId) {
-      const chatMessage: ChatMessage = {
-        id: userMessageId,
-        content: currentInput,
-        isSelf: true,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      addChatMessage(chatId, chatMessage);
-    }
+    const chatMessage: ChatMessage = {
+      id: userMessageId,
+      content: currentInput,
+      isSelf: true,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    addChatMessage(chatId, chatMessage);
 
     // 延迟1秒后开始生成AI回复
     setTimeout(() => {
-      generateAIResponse(aiResponseId, currentInput);
+      generateAIResponse(aiResponseId);
     }, 1000);
 
     // 保持输入框焦点
@@ -658,27 +645,23 @@ const ChatPage = () => {
           {/* 聊天信息组件 - 条件渲染且浮动在上面 */}
           {showChatInfo && (
             <div className="absolute inset-0 z-10 bg-white dark:bg-black">
-              {chatId ? (
-                <ChatInfoPage 
-                  onBack={() => setShowChatInfo(false)} 
-                  chatId={chatId}
-                  onAddMember={handleAddMember}
-                />
-              ) : (
-                (() => {
-                  throw new ChatNotFoundException('未指定聊天ID');
-                })()
-              )}
+              <ChatInfoPage
+                onBack={() => setShowChatInfo(false)}
+                chatId={chatId}
+                onAddMember={handleAddMember}
+              />
             </div>
           )}
 
           {/* 新聊天组件 - 条件渲染且浮动在上面 */}
-          {showNewChat && chatId && (
+          {showNewChat && (
             <div className="absolute inset-0 z-10 bg-white dark:bg-black">
               <NewChat
                 onBack={() => setShowNewChat(false)}
                 onComplete={handleSelectContacts}
-                preSelectedContactIds={chatDetails[chatId]?.members?.map((member: ChatMember) => member.id) || []}
+                preSelectedContactIds={
+                  chatDetails[chatId]?.members?.map((member: ChatMember) => member.id) || []
+                }
               />
             </div>
           )}
@@ -691,4 +674,5 @@ const ChatPage = () => {
   );
 };
 
-export default ChatPage;
+// 导出 ChatPageWrapper 作为默认组件
+export default ChatPageWrapper;

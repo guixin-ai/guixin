@@ -188,6 +188,12 @@ export const useChatStore = create(
 
       // 添加新消息
       addChatMessage: (chatId: string, message: ChatMessage) => {
+        // 先检查是否初始化
+        const state = get();
+        if (!state.initializedChatIds[chatId]) {
+          throw new ChatMessagesInitFailedException(chatId, '添加消息前必须初始化聊天消息');
+        }
+
         set(state => {
           console.log('添加新消息:', message);
           // 如果缓存中没有该聊天的消息，先创建空数组
@@ -214,6 +220,12 @@ export const useChatStore = create(
 
       // 更新现有消息
       updateChatMessage: (chatId: string, messageId: string, content: string) => {
+        // 先检查是否初始化
+        const state = get();
+        if (!state.initializedChatIds[chatId]) {
+          throw new ChatMessagesInitFailedException(chatId, '更新消息前必须初始化聊天消息');
+        }
+
         set(state => {
           // 如果缓存中没有该聊天的消息，直接返回
           if (!state.chatMessages[chatId]) {

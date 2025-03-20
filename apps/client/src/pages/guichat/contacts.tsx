@@ -7,6 +7,10 @@ import { Contact, ContactGroup, ContactDetail } from '../../types/contact';
 import DelayedLoading from '../../components/delayed-loading';
 import ContactDetailComponent from '../../components/contact-detail';
 import { useShallow } from 'zustand/react/shallow';
+import NewChat from '../../components/new-chat';
+import { useChatStore } from '../../models/chat.model';
+import { ChatItem, ChatDetail as ChatDetailType } from '../../types/chat';
+import { GroupChatCreationFailedException } from '@/errors/chat.errors';
 
 // 按拼音首字母分组联系人的函数
 const groupContactsByPinyin = (contacts: Contact[]): ContactGroup[] => {
@@ -50,6 +54,7 @@ const ContactsPage = () => {
   // 新增两个状态，用于控制联系人详情的显示
   const [showContactDetail, setShowContactDetail] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [showCreateChat, setShowCreateChat] = useState(false);
 
   // 初始化联系人数据
   useEffect(() => {
@@ -105,10 +110,43 @@ const ContactsPage = () => {
     setShowDropdown(!showDropdown);
   };
 
-  // 创建群聊
+  // 创建群聊 - 更新此方法
   const createGroup = () => {
-    // TODO: 实现创建群聊功能
+    setShowCreateChat(true);
     setShowDropdown(false);
+  };
+  
+  // 处理聊天创建完成
+  const handleChatCreated = async (contactIds: string[]) => {
+    if (!contactIds || contactIds.length === 0) {
+      return;
+    }
+    
+    try {
+      // 使用新的异步createGroupChat方法创建群聊
+      const chatId = await useChatStore.getState().createGroupChat(contactIds);
+      
+      // 导航到新的聊天页面
+      navigate(`/chat/${chatId}`);
+      setShowCreateChat(false);
+    } catch (error) {
+      console.error('创建群聊失败:', error);
+      
+      // 根据错误类型显示不同的错误信息
+      let errorMessage = '创建群聊失败，请稍后重试';
+      
+      if (error instanceof GroupChatCreationFailedException) {
+        errorMessage = error.message;
+      }
+      
+      // 这里可以添加显示错误提示的代码，例如toast通知
+      alert(errorMessage); // 实际应用中应替换为更友好的UI组件
+    }
+  };
+  
+  // 关闭创建聊天页面
+  const handleCloseCreateChat = () => {
+    setShowCreateChat(false);
   };
 
   // 添加朋友
@@ -246,6 +284,14 @@ const ContactsPage = () => {
           <ContactDetailComponent
             contactId={selectedContactId}
             onBack={handleCloseContactDetail}
+          />
+        )}
+        
+        {/* 新建聊天组件 - 条件渲染 */}
+        {showCreateChat && (
+          <NewChat
+            onBack={handleCloseCreateChat}
+            onComplete={handleChatCreated}
           />
         )}
       </div>

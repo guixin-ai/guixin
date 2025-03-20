@@ -241,9 +241,16 @@ export const useContactStore = create(
 
       // 更新联系人详情
       updateContactDetail: async (id: string, updates: Partial<ContactDetail>) => {
+        const state = get();
+        
+        // 检查是否已初始化联系人详情
+        if (!state.initializedDetailIds[id]) {
+          throw new ContactDetailInitFailedException(id, new Error('更新联系人详情前必须先初始化'));
+        }
+        
         try {
           // 获取当前联系人详情
-          const currentDetail = get().contactDetails[id];
+          const currentDetail = state.contactDetails[id];
           if (!currentDetail) {
             throw new ContactNotFoundException(id);
           }

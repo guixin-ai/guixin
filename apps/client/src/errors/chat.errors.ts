@@ -41,4 +41,15 @@ export class ChatDetailInitFailedException extends Error {
     this.name = 'ChatDetailInitFailedException';
     this.originalError = originalError;
   }
+}
+
+// 创建群聊失败异常
+export class GroupChatCreationFailedException extends Error {
+  readonly originalError?: unknown;
+  
+  constructor(message: string = '创建群聊失败', originalError?: unknown) {
+    super(message);
+    this.name = 'GroupChatCreationFailedException';
+    this.originalError = originalError;
+  }
 } 

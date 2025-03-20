@@ -12,7 +12,11 @@ import {
   ChatListInitFailedException,
   ChatMessagesInitFailedException,
   ChatDetailInitFailedException,
+  GroupChatCreationFailedException
 } from '@/errors/chat.errors';
+import { Contact } from '@/types/contact';
+import { useContactStore } from '@/models/contact.model';
+import { useAppStore } from '@/models/app.model';
 
 // 聊天状态接口
 export interface ChatState {
@@ -34,6 +38,7 @@ export interface ChatState {
   searchChats: (query: string) => ChatItem[];
   addChat: (chat: ChatItem) => void;
   getChatList: () => Promise<ChatItem[]>;
+  createGroupChat: (contactIds: string[]) => Promise<string>;
   
   // 聊天消息相关方法
   getChatMessages: (chatId: string) => Promise<ChatMessage[]>;
@@ -352,6 +357,119 @@ export const useChatStore = create(
           // 抛出自定义异常
           throw new ChatDetailInitFailedException(chatId, error);
         }
+      },
+
+      // 创建群聊
+      createGroupChat: async (contactIds: string[]): Promise<string> => {
+        if (!contactIds || contactIds.length === 0) {
+          throw new GroupChatCreationFailedException('创建群聊至少需要一个联系人');
+        }
+        
+        // 从应用模型中获取当前用户信息
+        const appStore = useAppStore;
+        const currentUser = appStore.getState().currentUser;
+        
+        if (!currentUser) {
+          // 如果未找到当前用户，尝试获取
+          try {
+            await appStore.getState().fetchCurrentUser();
+          } catch (error) {
+            throw new GroupChatCreationFailedException('获取当前用户信息失败，无法创建群聊', error);
+          }
+        }
+        
+        // 再次检查当前用户
+        const user = appStore.getState().currentUser;
+        if (!user) {
+          throw new GroupChatCreationFailedException('获取当前用户信息失败，无法创建群聊');
+        }
+        
+        // 从useContactStore中导入必要的函数
+        const contactStore = useContactStore;
+        
+        // 生成唯一ID
+        const now = new Date();
+        const chatId = `chat-${now.getTime()}`;
+        
+        // 获取成员信息
+        const members: ChatMember[] = [
+          // 添加当前用户作为第一个成员
+          {
+            id: user.id,
+            name: user.name || '我',
+            avatar: '我', // 用户可能没有avatar字段，直接使用默认值
+            username: `@${user.name}` // 用户可能没有username字段，使用name代替
+          }
+        ];
+        
+        // 从联系人详情中获取联系人信息（异步操作）
+        try {
+          // 不需要确保联系人列表已初始化，直接获取详情
+          // 获取每个联系人的详细信息
+          for (const contactId of contactIds) {
+            try {
+              // 直接获取联系人详情，getContactDetail内部会处理初始化
+              const contactDetail = await contactStore.getState().getContactDetail(contactId);
+              
+              if (!contactDetail) {
+                throw new Error(`联系人 ${contactId} 的详情不存在`);
+              }
+              
+              // 添加到成员列表
+              members.push({
+                id: contactId,
+                name: contactDetail.name,
+                avatar: contactDetail.avatar || contactDetail.name.charAt(0),
+                username: `@${contactDetail.name}`
+              });
+            } catch (error) {
+              console.error(`获取联系人 ${contactId} 详情失败:`, error);
+              throw new GroupChatCreationFailedException(`无法获取联系人 ${contactId} 的详情`, error);
+            }
+          }
+        } catch (error) {
+          console.error('获取联系人详情失败:', error);
+          throw new GroupChatCreationFailedException('获取联系人详情失败', error);
+        }
+        
+        // 创建新的聊天列表项
+        const newChat: ChatItem = {
+          id: chatId,
+          name: contactIds.length > 1 ? `群聊 (${members.length})` : members[1]?.name || "新的聊天",
+          avatar: contactIds.length > 1 ? "群" : members[1]?.avatar || "聊",
+          lastMessage: "还没有消息",
+          timestamp: "刚刚",
+          unread: 0
+        };
+        
+        // 添加到聊天列表
+        get().addChat(newChat);
+        
+        // 初始化聊天详情
+        const chatDetail: ChatDetail = {
+          id: chatId,
+          name: newChat.name,
+          avatar: newChat.avatar,
+          members: members
+        };
+        
+        // 手动设置聊天详情和消息初始化状态
+        set(state => {
+          if (!state.chatDetails) {
+            state.chatDetails = {};
+          }
+          state.chatDetails[chatId] = chatDetail;
+          state.initializedChatDetailIds[chatId] = true;
+          
+          // 初始化空的聊天消息列表
+          if (!state.chatMessages) {
+            state.chatMessages = {};
+          }
+          state.chatMessages[chatId] = [];
+          state.initializedChatIds[chatId] = true;
+        });
+        
+        return chatId;
       },
     })),
     {

@@ -9,11 +9,12 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import { useChatStore } from '../../models/chat.model';
-import { ChatListInitFailedException } from '@/errors/chat.errors';
+import { ChatListInitFailedException, GroupChatCreationFailedException } from '@/errors/chat.errors';
 import DelayedLoading from '../../components/delayed-loading';
 import NewChat from '../../components/new-chat';
 import CreateFriend from '../../components/create-friend';
 import { useShallow } from 'zustand/react/shallow';
+import { ChatItem, ChatDetail } from '../../types/chat';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
@@ -68,11 +69,31 @@ const ChatsPage = () => {
   };
 
   // 处理聊天创建
-  const handleChatCreated = (contactIds: string[]) => {
-    // 这里实际应用中会创建聊天并获取群ID
-    const chatId = `chat-${Date.now()}`;
-    navigate(`/chat/${chatId}`);
-    setShowNewChat(false);
+  const handleChatCreated = async (contactIds: string[]) => {
+    if (!contactIds || contactIds.length === 0) {
+      return;
+    }
+    
+    try {
+      // 使用新的异步createGroupChat方法创建群聊
+      const chatId = await useChatStore.getState().createGroupChat(contactIds);
+      
+      // 导航到新的聊天页面
+      navigate(`/chat/${chatId}`);
+      setShowNewChat(false);
+    } catch (error) {
+      console.error('创建群聊失败:', error);
+      
+      // 根据错误类型显示不同的错误信息
+      let errorMessage = '创建群聊失败，请稍后重试';
+      
+      if (error instanceof GroupChatCreationFailedException) {
+        errorMessage = error.message;
+      }
+      
+      // 这里可以添加显示错误提示的代码，例如toast通知
+      alert(errorMessage); // 实际应用中应替换为更友好的UI组件
+    }
   };
 
   // 处理朋友创建完成

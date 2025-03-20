@@ -2,6 +2,11 @@
  * 联系人服务 - 提供联系人相关的API接口
  */
 import { Contact, ContactGroup, ContactsResponse, GroupedContactsResponse } from '@/types/contact';
+import { 
+  ContactListFetchException, 
+  ContactGroupFetchException, 
+  ContactDetailFetchException 
+} from '@/errors/service.errors';
 
 /**
  * 联系人服务类
@@ -39,64 +44,79 @@ class ContactService {
    * 获取联系人列表
    */
   public async getContacts(): Promise<ContactsResponse> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 按拼音排序
-    const sortedContacts = [...this.mockContacts].sort((a, b) => {
-      if (!a.pinyin || !b.pinyin) return 0;
-      return a.pinyin.localeCompare(b.pinyin);
-    });
-    
-    return {
-      contacts: sortedContacts,
-      total: sortedContacts.length
-    };
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 按拼音排序
+      const sortedContacts = [...this.mockContacts].sort((a, b) => {
+        if (!a.pinyin || !b.pinyin) return 0;
+        return a.pinyin.localeCompare(b.pinyin);
+      });
+      
+      return {
+        contacts: sortedContacts,
+        total: sortedContacts.length
+      };
+    } catch (error) {
+      console.error('获取联系人列表失败:', error);
+      throw new ContactListFetchException();
+    }
   }
   
   /**
    * 获取按字母分组的联系人
    */
   public async getGroupedContacts(): Promise<GroupedContactsResponse> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 先按拼音排序
-    const sortedContacts = [...this.mockContacts].sort((a, b) => {
-      if (!a.pinyin || !b.pinyin) return 0;
-      return a.pinyin.localeCompare(b.pinyin);
-    });
-    
-    // 分组
-    const groups: ContactGroup[] = [];
-    let currentLetter = '';
-    
-    sortedContacts.forEach(contact => {
-      const firstLetter = contact.pinyin?.[0].toUpperCase() || '#';
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (currentLetter !== firstLetter) {
-        currentLetter = firstLetter;
-        groups.push({ letter: firstLetter, contacts: [contact] });
-      } else {
-        groups[groups.length - 1].contacts.push(contact);
-      }
-    });
-    
-    return {
-      groups,
-      total: sortedContacts.length
-    };
+      // 先按拼音排序
+      const sortedContacts = [...this.mockContacts].sort((a, b) => {
+        if (!a.pinyin || !b.pinyin) return 0;
+        return a.pinyin.localeCompare(b.pinyin);
+      });
+      
+      // 分组
+      const groups: ContactGroup[] = [];
+      let currentLetter = '';
+      
+      sortedContacts.forEach(contact => {
+        const firstLetter = contact.pinyin?.[0].toUpperCase() || '#';
+        
+        if (currentLetter !== firstLetter) {
+          currentLetter = firstLetter;
+          groups.push({ letter: firstLetter, contacts: [contact] });
+        } else {
+          groups[groups.length - 1].contacts.push(contact);
+        }
+      });
+      
+      return {
+        groups,
+        total: sortedContacts.length
+      };
+    } catch (error) {
+      console.error('获取分组联系人失败:', error);
+      throw new ContactGroupFetchException();
+    }
   }
   
   /**
    * 根据ID获取联系人详情
    */
   public async getContactById(id: string): Promise<Contact | null> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const contact = this.mockContacts.find(contact => contact.id === id);
-    return contact || null;
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const contact = this.mockContacts.find(contact => contact.id === id);
+      return contact || null;
+    } catch (error) {
+      console.error(`获取联系人 ${id} 详情失败:`, error);
+      throw new ContactDetailFetchException(id);
+    }
   }
 }
 

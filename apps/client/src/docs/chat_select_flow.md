@@ -145,7 +145,7 @@ setActiveChat: (chatId) => {
   });
 
   // 激活聊天后，立即加载会话
-  const currentUser = useUserStore.getState().currentUser;
+  const currentUser = useAppStore.getState().currentUser;
   if (currentUser && chatId) {
     get().loadConversation(chatId);
   }
@@ -163,7 +163,7 @@ loadConversation: async (chatId: string) => {
     });
 
     // 获取当前用户
-    const currentUser = useUserStore.getState().currentUser;
+    const currentUser = useAppStore.getState().currentUser;
     if (!currentUser) {
       throw new Error('未登录');
     }

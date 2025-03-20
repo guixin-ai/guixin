@@ -4,7 +4,6 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { enableMapSet } from 'immer';
 import { chatService } from '@/services/chat.service';
 import { ChatItem, ChatMessage } from '@/types/chat';
 import { 
@@ -12,9 +11,6 @@ import {
   ChatListInitFailedException, 
   ChatMessagesInitFailedException 
 } from '@/errors/chat.errors';
-
-// 启用 MapSet 支持 Set 数据结构
-enableMapSet();
 
 // 聊天状态接口
 export interface ChatState {

@@ -2,6 +2,7 @@
  * 用户服务 - 提供与用户相关的操作方法
  */
 import { User } from '../types';
+import { UserInfoFetchException } from '@/errors/service.errors';
 
 /**
  * 用户服务类
@@ -34,10 +35,15 @@ class UserService {
    * @returns 当前用户信息
    */
   async getCurrentUser(): Promise<User> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    return this.mockUser;
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      return this.mockUser;
+    } catch (error) {
+      console.error('获取当前用户信息失败:', error);
+      throw new UserInfoFetchException();
+    }
   }
 }
 

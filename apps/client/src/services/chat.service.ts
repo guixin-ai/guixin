@@ -2,6 +2,11 @@
  * 聊天服务 - 提供聊天相关的API接口
  */
 import { ChatItem, ChatMessage, ChatsResponse } from '@/types/chat';
+import { 
+  ChatFetchException, 
+  ChatDetailFetchException, 
+  ChatMessagesFetchException 
+} from '@/errors/service.errors';
 
 /**
  * 聊天服务类
@@ -150,24 +155,34 @@ class ChatService {
    * 获取聊天列表
    */
   public async getChats(): Promise<ChatsResponse> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    return {
-      chats: this.mockChats,
-      total: this.mockChats.length
-    };
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      return {
+        chats: this.mockChats,
+        total: this.mockChats.length
+      };
+    } catch (error) {
+      console.error('获取聊天列表失败:', error);
+      throw new ChatFetchException();
+    }
   }
   
   /**
    * 根据ID获取聊天详情
    */
   public async getChatById(id: string): Promise<ChatItem | null> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const chat = this.mockChats.find(chat => chat.id === id);
-    return chat || null;
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const chat = this.mockChats.find(chat => chat.id === id);
+      return chat || null;
+    } catch (error) {
+      console.error(`获取聊天 ${id} 详情失败:`, error);
+      throw new ChatDetailFetchException(id);
+    }
   }
 
   /**
@@ -176,17 +191,22 @@ class ChatService {
    * @returns 按时间排序的聊天消息数组
    */
   public async getChatMessages(chatId: string): Promise<ChatMessage[]> {
-    // 模拟API请求延迟
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
-    // 获取聊天消息
-    const messages = this.mockChatMessages[chatId] || [];
-    
-    // 按时间排序（这里假设timestamp是时间字符串，实际可能需要转换为Date进行排序）
-    return [...messages].sort((a, b) => {
-      // 简单模拟时间排序，实际应用中应该将timestamp转为Date对象后比较
-      return a.timestamp.localeCompare(b.timestamp);
-    });
+    try {
+      // 模拟API请求延迟
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      // 获取聊天消息
+      const messages = this.mockChatMessages[chatId] || [];
+      
+      // 按时间排序（这里假设timestamp是时间字符串，实际可能需要转换为Date进行排序）
+      return [...messages].sort((a, b) => {
+        // 简单模拟时间排序，实际应用中应该将timestamp转为Date对象后比较
+        return a.timestamp.localeCompare(b.timestamp);
+      });
+    } catch (error) {
+      console.error(`获取聊天 ${chatId} 消息失败:`, error);
+      throw new ChatMessagesFetchException(chatId);
+    }
   }
 }
 

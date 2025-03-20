@@ -4,14 +4,24 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { AppInitFailedException } from '@/errors/app.errors';
+import { UserNotFoundException, UserFetchFailedException } from '@/errors/user.errors';
+import { userService } from '@/services';
+import { User } from '@/types';
 
 // 应用状态接口
 export interface AppState {
   // 应用是否已初始化
   initialized: boolean;
+  
+  // 当前用户
+  currentUser: User | null;
 
   // 初始化应用
   initialize: () => Promise<void>;
+  
+  // 获取当前用户
+  fetchCurrentUser: () => Promise<User | null>;
 }
 
 // 创建应用状态存储
@@ -19,6 +29,7 @@ export const useAppStore = create(
   immer<AppState>(set => ({
     // 初始状态
     initialized: false,
+    currentUser: null,
 
     // 初始化应用
     initialize: async () => {
@@ -30,12 +41,35 @@ export const useAppStore = create(
       }
       
       try {
+        // 获取当前用户
+        await state.fetchCurrentUser();
+        
         // 标记为已初始化
         set(state => {
           state.initialized = true;
         });
       } catch (error) {
         console.error('应用初始化失败:', error);
+        throw new AppInitFailedException(error);
+      }
+    },
+    
+    // 获取当前用户
+    fetchCurrentUser: async () => {
+      try {
+        const user = await userService.getCurrentUser();
+        if (!user) {
+          throw new UserNotFoundException();
+        }
+        
+        set(state => {
+          state.currentUser = user;
+        });
+        
+        return user;
+      } catch (error) {
+        console.error('获取当前用户失败:', error);
+        throw new UserFetchFailedException(error);
       }
     }
   }))
@@ -43,3 +77,9 @@ export const useAppStore = create(
 
 // 导出应用状态钩子
 export const useApp = () => useAppStore();
+
+// 导出用户状态钩子，保持与之前 useUser 钩子的兼容性
+export const useUser = () => {
+  const { currentUser, fetchCurrentUser } = useAppStore();
+  return { currentUser, fetchCurrentUser };
+};

@@ -6,7 +6,10 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { contactService } from '@/services/contact.service';
 import { Contact, ContactGroup } from '@/types/contact';
-
+import {
+  ContactNotFoundException,
+  ContactListInitFailedException
+} from '@/errors/contact.errors';
 
 // 联系人状态接口
 export interface ContactState {
@@ -75,6 +78,7 @@ export const useContactStore = create(
         });
       } catch (error) {
         console.error('获取联系人列表失败:', error);
+        throw error; // 重新抛出异常，让调用方处理
       }
     },
 
@@ -86,10 +90,19 @@ export const useContactStore = create(
         if (localContact) return localContact;
         
         // 如果本地没有，则调用服务获取
-        return await contactService.getContactById(id);
+        const contact = await contactService.getContactById(id);
+        if (!contact) {
+          throw new ContactNotFoundException(id);
+        }
+        return contact;
       } catch (error) {
         console.error('获取联系人详情失败:', error);
-        return null;
+        // 重新抛出异常，让调用方处理
+        if (error instanceof ContactNotFoundException) {
+          throw error;
+        }
+        // 其他错误包装后抛出
+        throw new ContactNotFoundException(id);
       }
     },
 
@@ -116,13 +129,13 @@ export const useContactStore = create(
     // 获取分组联系人 - 仅从服务端获取联系人数据
     getGroupedContacts: async () => {
       try {
-        await contactService.getContacts().then(response => {
-          set(state => {
-            state.contacts = response.contacts;
-          });
+        const response = await contactService.getContacts();
+        set(state => {
+          state.contacts = response.contacts;
         });
       } catch (error) {
         console.error('获取分组联系人失败:', error);
+        throw error; // 重新抛出异常，让调用方处理
       }
     },
     
@@ -148,6 +161,7 @@ export const useContactStore = create(
         // 标记为已初始化（在fetchAllContacts中已经设置了）
       } catch (error) {
         console.error('联系人模型初始化失败:', error);
+        throw new ContactListInitFailedException(error);
       }
     },
   }))

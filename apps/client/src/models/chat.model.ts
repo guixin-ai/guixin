@@ -419,7 +419,7 @@ export const useChatStore = create(
               members.push({
                 id: contactId,
                 name: contactDetail.name,
-                avatar: contactDetail.avatar || contactDetail.name.charAt(0),
+                avatar: contactDetail.avatar,
                 username: `@${contactDetail.name}`
               });
             } catch (error) {

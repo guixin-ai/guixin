@@ -10,15 +10,12 @@ export interface Contact {
   pinyin?: string;
 }
 
-// 联系人详情类型（包含更多信息）
-export interface ContactDetail extends Contact {
-  description?: string;
-  personality?: string;
-  background?: string;
-  expertise?: string[];
-  phoneNumber?: string;
-  email?: string;
-  isAI?: boolean;
+// 联系人详情类型（独立的，不继承自Contact）
+export interface ContactDetail {
+  id: string;          // 必须字段
+  name: string;        // 必须字段
+  description?: string; // 设定描述
+  avatar: string;      // 头像
 }
 
 // 按字母分组的联系人

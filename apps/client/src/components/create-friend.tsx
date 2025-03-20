@@ -133,6 +133,15 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
         avatar: avatarChar,
         pinyin: pinyinFirstLetter + values.name, // 确保排序正确
       });
+      
+      // 添加联系人详情
+      const { addContactDetail } = useContactStore.getState();
+      addContactDetail({
+        id: newId,
+        name: values.name,
+        avatar: avatarChar,
+        description: values.description
+      });
 
       // 调用完成回调
       if (onComplete) {

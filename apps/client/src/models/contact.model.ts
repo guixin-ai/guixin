@@ -26,6 +26,7 @@ export interface ContactState {
   fetchContactDetail: (id: string) => Promise<ContactDetail | null>;
   searchContacts: (query: string) => Contact[];
   addContact: (contact: Contact) => void;
+  addContactDetail: (detail: ContactDetail) => void;
   getGroupedContacts: () => Promise<void>;
   getContacts: () => Promise<Contact[]>;
   getContactDetail: (id: string) => Promise<ContactDetail | null>;
@@ -96,13 +97,21 @@ export const useContactStore = create(
             throw new ContactNotFoundException(id);
           }
           
+          // 确保contactDetail包含所有必需字段
+          const contactDetail = response.contact;
+          
+          // 验证必需字段
+          if (!contactDetail.id || !contactDetail.name || !contactDetail.avatar) {
+            throw new Error(`联系人详情缺少必需字段: id=${contactDetail.id}, name=${contactDetail.name}, avatar=${contactDetail.avatar}`);
+          }
+          
           // 更新到详情缓存
           set(state => {
-            state.contactDetails[id] = response.contact;
+            state.contactDetails[id] = contactDetail;
             state.initializedDetailIds[id] = true;
           });
           
-          return response.contact;
+          return contactDetail;
         } catch (error) {
           console.error('获取联系人详情失败:', error);
           // 重新抛出异常，让调用方处理
@@ -123,12 +132,39 @@ export const useContactStore = create(
       // 添加新联系人
       addContact: (contact: Contact) => {
         set(state => {
+          // 添加到联系人列表
           state.contacts.push(contact);
           // 按拼音重新排序
           state.contacts.sort((a, b) => {
             if (!a.pinyin || !b.pinyin) return 0;
             return a.pinyin.localeCompare(b.pinyin);
           });
+          
+          // 同时添加联系人详情
+          state.contactDetails[contact.id] = {
+            id: contact.id,
+            name: contact.name,
+            avatar: contact.avatar,
+            description: `联系人 ${contact.name}` // 提供一个默认描述
+          };
+          
+          // 标记为已初始化
+          state.initializedDetailIds[contact.id] = true;
+        });
+      },
+
+      // 添加联系人详情
+      addContactDetail: (detail: ContactDetail) => {
+        // 验证必要字段
+        if (!detail.id || !detail.name || !detail.avatar) {
+          throw new Error(`联系人详情缺少必需字段: id=${detail.id}, name=${detail.name}, avatar=${detail.avatar}`);
+        }
+        
+        set(state => {
+          // 添加到详情缓存
+          state.contactDetails[detail.id] = detail;
+          // 标记为已初始化
+          state.initializedDetailIds[detail.id] = true;
         });
       },
 

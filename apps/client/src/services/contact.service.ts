@@ -32,75 +32,56 @@ class ContactService {
     'a1': { 
       id: 'a1', 
       name: '阿里巴巴', 
-      avatar: '阿', 
-      pinyin: 'alibaba',
-      phoneNumber: '13812345678',
-      email: 'alibaba@example.com'
+      avatar: '阿',
+      description: '中国著名电商企业'
     },
     'a2': { 
       id: 'a2', 
       name: '阿童木', 
-      avatar: '阿', 
-      pinyin: 'atom',
-      description: '经典动漫角色',
-      background: '未来世界的机器人小孩'
+      avatar: '阿',
+      description: '经典动漫角色'
     },
     'b1': { 
       id: 'b1', 
       name: '白起', 
-      avatar: '白', 
-      pinyin: 'baiqi',
-      phoneNumber: '13987654321'
+      avatar: '白',
+      description: '古代著名将领'
     },
     'b2': { 
       id: 'b2', 
       name: '班主任', 
-      avatar: '班', 
-      pinyin: 'banzhuren',
-      phoneNumber: '13876543210',
-      email: 'teacher@school.edu'
+      avatar: '班',
+      description: '学校老师'
     },
     'c1': { 
       id: 'c1', 
       name: '陈奕迅', 
-      avatar: '陈', 
-      pinyin: 'chenyixun',
-      description: '香港著名歌手',
-      expertise: ['唱歌', '演戏']
+      avatar: '陈',
+      description: '香港著名歌手'
     },
     'l1': { 
       id: 'l1', 
       name: '老婆', 
-      avatar: '老', 
-      pinyin: 'laopo',
-      phoneNumber: '13800001111',
+      avatar: '老',
       description: '最爱的人'
     },
     'w1': { 
       id: 'w1', 
       name: '王小波', 
-      avatar: '王', 
-      pinyin: 'wangxiaobo',
-      description: '著名作家',
-      background: '黄金时代的作者'
+      avatar: '王',
+      description: '著名作家'
     },
     'z1': { 
       id: 'z1', 
       name: '张三', 
-      avatar: '张', 
-      pinyin: 'zhangsan',
-      phoneNumber: '13900001234'
+      avatar: '张',
+      description: '普通联系人'
     },
     'ai-123': {
       id: 'ai-123',
       name: '智能助手',
       avatar: '智',
-      pinyin: 'zhinengzhushou',
-      description: '一个聪明的AI助手，可以解答各种问题',
-      personality: '友善、耐心、专业',
-      background: '由先进的大语言模型训练而成',
-      expertise: ['数学', '编程', '写作', '历史'],
-      isAI: true
+      description: '一个聪明的AI助手，可以解答各种问题'
     }
   };
   

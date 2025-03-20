@@ -31,7 +31,9 @@ pub fn run() {
             current_user: Mutex::new(current_user),
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_app_version
+        ])
         .run(tauri::generate_context!())
         .expect("运行应用失败");
 }

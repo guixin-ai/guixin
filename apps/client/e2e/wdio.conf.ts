@@ -39,7 +39,7 @@ export const config: WebdriverIO.Config = {
   // https://saucelabs.com/platform/platform-configurator
   capabilities: [
     {
-      maxInstances: 1,
+      // maxInstances: 1,
       hostname: '127.0.0.1',
       port: 4444,
       // @ts-expect-error types for tauri capabilities are not available
@@ -101,7 +101,7 @@ export const config: WebdriverIO.Config = {
     timeout: 60000,
   },
 
-  // onPrepare: () => spawnSync('pnpm', ['tauri:build']),
+  onPrepare: () => spawnSync('pnpm', ['tauri:build']),
   beforeSession: () =>
     (tauriDriver = spawn(path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver'), [], {
       stdio: [null, process.stdout, process.stderr],

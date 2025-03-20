@@ -151,7 +151,7 @@ const ChatsPage = () => {
       <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900">
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-white">微信</h1>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-white" data-testid="app-logo">硅信</h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300">

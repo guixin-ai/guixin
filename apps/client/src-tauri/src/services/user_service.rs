@@ -56,7 +56,7 @@ impl UserService {
     }
 
     // 获取默认用户，如果不存在则创建
-    pub fn get_default_user(conn: &mut DbConnection) -> ServiceResult<User> {
+    pub fn get_default_user(conn: &mut DbConnection) -> Result<User> {
         // 尝试获取第一个用户
         let default_user = users::table
             .select(User::as_select())

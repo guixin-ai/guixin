@@ -76,25 +76,35 @@ impl UserRepository {
         is_ai: Option<bool>,
     ) -> Result<User, RepositoryError> {
         let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
-
+        let now = Utc::now().naive_utc();
+        
         let target = users::table.filter(users::id.eq(id));
-
-        let mut updates = diesel::update(target);
-
+        
+        // 根据提供的字段更新
         if let Some(name) = name {
-            updates = updates.set(users::name.eq(name));
+            diesel::update(target.clone())
+                .set(users::name.eq(name))
+                .execute(&mut conn)
+                .map_err(RepositoryError::DatabaseError)?;
         }
-
+        
         if let Some(description) = description {
-            updates = updates.set(users::description.eq(description));
+            diesel::update(target.clone())
+                .set(users::description.eq(description))
+                .execute(&mut conn)
+                .map_err(RepositoryError::DatabaseError)?;
         }
-
+        
         if let Some(is_ai) = is_ai {
-            updates = updates.set(users::is_ai.eq(is_ai));
+            diesel::update(target.clone())
+                .set(users::is_ai.eq(is_ai))
+                .execute(&mut conn)
+                .map_err(RepositoryError::DatabaseError)?;
         }
-
-        updates
-            .set(users::updated_at.eq(Utc::now().naive_utc()))
+        
+        // 更新时间
+        diesel::update(target)
+            .set(users::updated_at.eq(now))
             .execute(&mut conn)
             .map_err(RepositoryError::DatabaseError)?;
 

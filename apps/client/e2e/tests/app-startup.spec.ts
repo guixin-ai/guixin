@@ -15,4 +15,25 @@ describe('应用启动测试', () => {
 
     await expect(appLogo).toHaveText('硅信');
   });
+
+  it('应该存在全局对象__STORES__和__TAURI_INTERNALS__', async () => {
+    // 检查全局对象是否存在
+    const hasStores = await browser.execute(() => {
+      return typeof (window as any).__STORES__ !== 'undefined';
+    });
+
+    const hasTauriInternals = await browser.execute(() => {
+      return typeof (window as any).__TAURI_INTERNALS__ !== 'undefined';
+    });
+
+    // 输出调试信息
+    console.log('全局对象状态:', {
+      __STORES__: hasStores,
+      __TAURI_INTERNALS__: hasTauriInternals,
+    });
+
+    // 断言检查
+    await expect(hasStores).toBe(true);
+    await expect(hasTauriInternals).toBe(true);
+  });
 });

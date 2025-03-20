@@ -44,7 +44,7 @@ export const config: WebdriverIO.Config = {
       port: 4444,
       // @ts-expect-error types for tauri capabilities are not available
       'tauri:options': {
-        application: './src-tauri/target/release/tauri-app.exe',
+        application: './src-tauri/target/debug/tauri-app.exe',
         appArgs: [],
         webviewOptions: {},
       },

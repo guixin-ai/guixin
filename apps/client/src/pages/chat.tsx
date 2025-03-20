@@ -38,7 +38,7 @@ import {
   OllamaModelNotFoundError,
   OllamaModelLoadError,
 } from '@/errors/ollama.errors';
-import ChatInfoPage from './chat-info';
+import ChatInfoPage from '../components/chat-info';
 
 // 联系人类型
 interface Contact {

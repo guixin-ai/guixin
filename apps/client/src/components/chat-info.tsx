@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
 } from 'lucide-react';
-import { Button } from '../components/ui/button';
+import { Button } from './ui/button';
 import { useChat } from '../models/chat.model';
 import { ChatDetail, ChatMember } from '@/types/chat';
 import { ChatNotFoundException, ChatDetailInitFailedException } from '@/errors/chat.errors';
-import DelayedLoading from '../components/delayed-loading';
+import DelayedLoading from './delayed-loading';
 
 interface ChatInfoPageProps {
   // 回调函数，用于返回上一级界面

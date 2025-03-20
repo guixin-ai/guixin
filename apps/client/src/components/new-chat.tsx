@@ -40,7 +40,7 @@ const groupContactsByInitial = (contacts: Contact[]) => {
 };
 
 const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
-  const { contacts, initialized, initialize } = useContact();
+  const { contacts, initializedList, initializeList } = useContact();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,9 +50,9 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
   useEffect(() => {
     const loadContacts = async () => {
       setLoading(true);
-      if (!initialized) {
+      if (!initializedList) {
         try {
-          await initialize();
+          await initializeList();
         } catch (error) {
           console.error('初始化联系人列表失败:', error);
         }
@@ -61,7 +61,7 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
     };
 
     loadContacts();
-  }, [initialize, initialized]);
+  }, [initializeList, initializedList]);
 
   // 格式化联系人数据
   useEffect(() => {

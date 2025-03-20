@@ -8,7 +8,7 @@ import DelayedLoading from '../../components/delayed-loading';
 
 const ContactsPage = () => {
   const navigate = useNavigate();
-  const { searchContacts, getGroups, initialize } = useContactStore();
+  const { searchContacts, getGroups, initializeList } = useContactStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -17,7 +17,7 @@ const ContactsPage = () => {
   useEffect(() => {
     const initContacts = async () => {
       try {
-        await initialize();
+        await initializeList();
         setLoading(false);
       } catch (error) {
         console.error('初始化联系人数据失败:', error);
@@ -26,7 +26,7 @@ const ContactsPage = () => {
     };
 
     initContacts();
-  }, [initialize]);
+  }, [initializeList]);
 
   // 从计算属性获取分组数据
   const groups = getGroups();

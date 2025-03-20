@@ -5,27 +5,35 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { contactService } from '@/services/contact.service';
-import { Contact, ContactGroup } from '@/types/contact';
-import { ContactNotFoundException, ContactListInitFailedException } from '@/errors/contact.errors';
+import { Contact, ContactGroup, ContactDetail } from '@/types/contact';
+import { ContactNotFoundException, ContactListInitFailedException, ContactDetailInitFailedException } from '@/errors/contact.errors';
 import { devtools } from 'zustand/middleware';
 
 // 联系人状态接口
 export interface ContactState {
   // 联系人列表
   contacts: Contact[];
-  // 是否已初始化
-  initialized: boolean;
+  // 联系人详情，以联系人ID为键
+  contactDetails: Record<string, ContactDetail>;
+  // 是否已初始化联系人列表
+  initializedList: boolean;
+  // 已初始化的联系人详情ID集合
+  initializedDetailIds: Record<string, boolean>;
 
   // 操作方法
   fetchAllContacts: () => Promise<void>;
   fetchContactById: (id: string) => Promise<Contact | null>;
+  fetchContactDetail: (id: string) => Promise<ContactDetail | null>;
   searchContacts: (query: string) => Contact[];
   addContact: (contact: Contact) => void;
   getGroupedContacts: () => Promise<void>;
   getGroups: () => ContactGroup[];
+  getContacts: () => Contact[];
+  getContactDetail: (id: string) => ContactDetail | null;
 
   // 初始化方法
-  initialize: () => Promise<void>;
+  initializeList: () => Promise<void>;
+  initializeContactDetail: (id: string) => Promise<ContactDetail | null>;
 }
 
 // 示例数据
@@ -63,7 +71,9 @@ export const useContactStore = create(
     immer<ContactState>((set, get) => ({
       // 初始状态
       contacts: initialContacts,
-      initialized: false,
+      contactDetails: {},
+      initializedList: false,
+      initializedDetailIds: {},
 
       // 获取所有联系人
       fetchAllContacts: async () => {
@@ -73,7 +83,7 @@ export const useContactStore = create(
 
           set(state => {
             state.contacts = response.contacts;
-            state.initialized = true;
+            state.initializedList = true;
           });
         } catch (error) {
           console.error('获取联系人列表失败:', error);
@@ -81,19 +91,43 @@ export const useContactStore = create(
         }
       },
 
-      // 根据ID获取联系人
+      // 根据ID获取联系人基本信息
       fetchContactById: async (id: string) => {
         try {
-          // 先从本地状态查找
-          const localContact = get().contacts.find(contact => contact.id === id);
-          if (localContact) return localContact;
-
-          // 如果本地没有，则调用服务获取
+          // 从服务获取联系人基本信息
           const contact = await contactService.getContactById(id);
           if (!contact) {
             throw new ContactNotFoundException(id);
           }
+          
           return contact;
+        } catch (error) {
+          console.error('获取联系人基本信息失败:', error);
+          // 重新抛出异常，让调用方处理
+          if (error instanceof ContactNotFoundException) {
+            throw error;
+          }
+          // 其他错误包装后抛出
+          throw new ContactNotFoundException(id);
+        }
+      },
+      
+      // 根据ID获取联系人详情信息
+      fetchContactDetail: async (id: string) => {
+        try {
+          // 从服务获取联系人详情
+          const response = await contactService.getContactDetail(id);
+          if (!response) {
+            throw new ContactNotFoundException(id);
+          }
+          
+          // 更新到详情缓存
+          set(state => {
+            state.contactDetails[id] = response.contact;
+            state.initializedDetailIds[id] = true;
+          });
+          
+          return response.contact;
         } catch (error) {
           console.error('获取联系人详情失败:', error);
           // 重新抛出异常，让调用方处理
@@ -136,31 +170,59 @@ export const useContactStore = create(
         }
       },
 
-      // 获取计算后的分组数据
+      // 获取计算后的分组数据 - 直接返回内存数据
       getGroups: () => {
         const { contacts } = get();
         return groupContactsByPinyin(contacts);
       },
+      
+      // 获取联系人列表 - 直接返回内存数据
+      getContacts: () => {
+        return get().contacts;
+      },
+      
+      // 获取联系人详情 - 直接返回内存数据
+      getContactDetail: (id: string) => {
+        return get().contactDetails[id] || null;
+      },
 
-      // 初始化方法
-      initialize: async () => {
+      // 初始化联系人列表
+      initializeList: async () => {
         const state = get();
 
         // 如果已经初始化，则直接返回
-        if (state.initialized) {
+        if (state.initializedList) {
           return;
         }
 
         try {
           // 调用fetchAllContacts获取联系人列表
           await get().fetchAllContacts();
-
-          // 标记为已初始化（在fetchAllContacts中已经设置了）
         } catch (error) {
-          console.error('联系人模型初始化失败:', error);
+          console.error('联系人列表初始化失败:', error);
           throw new ContactListInitFailedException(error);
         }
       },
+      
+      // 初始化联系人详情
+      initializeContactDetail: async (id: string) => {
+        const state = get();
+        
+        // 如果已经初始化该联系人详情，则直接返回缓存数据
+        if (state.initializedDetailIds[id]) {
+          return state.contactDetails[id] || null;
+        }
+        
+        try {
+          // 直接调用服务获取联系人详情
+          const contactDetail = await get().fetchContactDetail(id);
+          return contactDetail;
+        } catch (error) {
+          console.error(`初始化联系人 ${id} 的详情失败:`, error);
+          // 抛出自定义异常
+          throw new ContactDetailInitFailedException(id, error);
+        }
+      }
     })),
     {
       name: 'contact',

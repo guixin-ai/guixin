@@ -33,15 +33,15 @@ export interface ChatState {
   fetchAllChats: () => Promise<void>;
   searchChats: (query: string) => ChatItem[];
   addChat: (chat: ChatItem) => void;
-  getChatList: () => Promise<ChatItem[]>;
+  getChatList: () => ChatItem[];
   
   // 聊天消息相关方法
-  getChatMessages: (chatId: string) => Promise<ChatMessage[]>;
+  getChatMessages: (chatId: string) => ChatMessage[];
   addChatMessage: (chatId: string, message: ChatMessage) => void;
   updateChatMessage: (chatId: string, messageId: string, content: string) => void;
 
   // 聊天详情相关方法
-  getChatDetail: (chatId: string) => Promise<ChatDetail | null>;
+  getChatDetail: (chatId: string) => ChatDetail | null;
   
   // 初始化方法
   initializeChatList: () => Promise<ChatItem[]>;
@@ -78,16 +78,9 @@ export const useChatStore = create(
         }
       },
 
-      // 获取聊天列表（统一的方法）
-      getChatList: async () => {
-        // 如果列表已初始化，直接返回缓存数据
-        const state = get();
-        if (state.initializedChatList) {
-          return state.chats;
-        }
-
-        // 如果未初始化，调用初始化方法
-        return await get().initializeChatList();
+      // 获取聊天列表（直接返回内存数据）
+      getChatList: () => {
+        return get().chats;
       },
 
       // 搜索聊天
@@ -104,28 +97,14 @@ export const useChatStore = create(
         });
       },
 
-      // 获取聊天消息
-      getChatMessages: async (chatId: string) => {
-        // 如果该聊天已初始化，直接返回缓存数据
-        const state = get();
-        if (state.initializedChatIds[chatId]) {
-          return state.chatMessages[chatId] || [];
-        }
-
-        // 如果未初始化，则调用初始化方法
-        return await get().initializeChatMessages(chatId);
+      // 获取聊天消息（直接返回内存数据）
+      getChatMessages: (chatId: string) => {
+        return get().chatMessages[chatId] || [];
       },
 
-      // 获取聊天详情
-      getChatDetail: async (chatId: string) => {
-        // 如果该聊天详情已初始化，直接返回缓存数据
-        const state = get();
-        if (state.initializedChatDetailIds[chatId]) {
-          return state.chatDetails[chatId] || null;
-        }
-
-        // 如果未初始化，则调用初始化方法
-        return await get().initializeChatDetail(chatId);
+      // 获取聊天详情（直接返回内存数据）
+      getChatDetail: (chatId: string) => {
+        return get().chatDetails[chatId] || null;
       },
 
       // 添加新消息

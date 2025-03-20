@@ -2,22 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit2, Phone, Video, MessageSquare, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { useContactStore } from '../models/contact.model';
+import { ContactDetail } from '@/types/contact';
+import { ContactNotFoundException, ContactDetailInitFailedException } from '@/errors/contact.errors';
 
-// 联系人详细信息类型
-interface ContactDetail {
-  id: string;
-  name: string;
-  avatar: string;
-  description?: string;
-  personality?: string;
-  background?: string;
-  expertise?: string[];
-  phoneNumber?: string;
-  email?: string;
-  isAI?: boolean;
-}
-
-// 模拟联系人数据
+// 模拟联系人数据 - 如果实际使用API，则可移除这部分
 const mockContacts: Record<string, ContactDetail> = {
   'a1': { 
     id: 'a1', 
@@ -61,19 +50,50 @@ const mockContacts: Record<string, ContactDetail> = {
 const ContactDetailPage = () => {
   const { contactId } = useParams<{ contactId: string }>();
   const navigate = useNavigate();
+  const { initializeContactDetail } = useContactStore();
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editField, setEditField] = useState<keyof ContactDetail | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [loading, setLoading] = useState(true);
   
   // 加载联系人数据
   useEffect(() => {
     if (contactId) {
-      // 在真实应用中，这里会从API获取联系人详情
-      const contactData = mockContacts[contactId] || null;
-      setContact(contactData);
+      const loadContactData = async () => {
+        setLoading(true);
+        
+        try {
+          // 初始化联系人详情
+          const contactDetail = await initializeContactDetail(contactId);
+          
+          if (contactDetail) {
+            setContact(contactDetail);
+          } else {
+            // 如果API没有返回数据，可以回退到模拟数据
+            // 在实际生产环境中，这一部分可以改为显示"联系人不存在"
+            const mockContact = mockContacts[contactId] || null;
+            setContact(mockContact);
+          }
+        } catch (error) {
+          console.error('加载联系人详情失败:', error);
+          if (error instanceof ContactNotFoundException) {
+            console.error(`联系人未找到: ${error.message}`);
+          } else if (error instanceof ContactDetailInitFailedException) {
+            console.error(`联系人详情初始化失败: ${error.message}`);
+          }
+          
+          // 回退到模拟数据
+          const mockContact = mockContacts[contactId] || null;
+          setContact(mockContact);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadContactData();
     }
-  }, [contactId]);
+  }, [contactId, initializeContactDetail]);
   
   // 返回上一页
   const handleBack = () => {
@@ -118,6 +138,14 @@ const ContactDetailPage = () => {
       navigate(`/video-call/${contact.id}`);
     }
   };
+  
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-gray-500">正在加载联系人信息...</p>
+      </div>
+    );
+  }
   
   if (!contact) {
     return (

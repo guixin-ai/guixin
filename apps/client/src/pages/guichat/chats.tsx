@@ -15,7 +15,7 @@ import NewChat from '../../components/new-chat';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
-  const { chats, searchChats, getChatList } = useChatStore();
+  const { chats, searchChats, initializeChatList } = useChatStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showNewChat, setShowNewChat] = useState(false);
@@ -24,7 +24,7 @@ const ChatsPage = () => {
   useEffect(() => {
     const loadChats = async () => {
       try {
-        await getChatList();
+        await initializeChatList();
         setLoading(false);
       } catch (error) {
         console.error('加载聊天列表失败:', error);
@@ -36,7 +36,7 @@ const ChatsPage = () => {
     };
 
     loadChats();
-  }, [getChatList]);
+  }, [initializeChatList]);
 
   // 过滤后的聊天列表
   const filteredChats = searchQuery ? searchChats(searchQuery) : chats;

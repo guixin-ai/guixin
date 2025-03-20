@@ -123,8 +123,8 @@ const ChatPage = () => {
       setIsMessagesInitialized(false);
 
       try {
-        // 获取聊天详情
-        const chatDetail = await getChatDetail(chatId);
+        // 初始化聊天详情
+        const chatDetail = await initializeChatDetail(chatId);
 
         // 如果没有找到，抛出异常
         if (!chatDetail) {
@@ -139,8 +139,8 @@ const ChatPage = () => {
           isAI: chatDetail.isAI || false,
         });
 
-        // 获取聊天消息并转换为VirtuosoMessageItem
-        const chatMessages = await getChatMessages(chatId);
+        // 初始化聊天消息并转换为VirtuosoMessageItem
+        const chatMessages = await initializeChatMessages(chatId);
         const virtuosoMessages = chatMessages.map(convertToVirtuosoMessage);
         setInitialMessages(virtuosoMessages);
 
@@ -162,7 +162,7 @@ const ChatPage = () => {
     };
 
     loadChatData();
-  }, [chatId, getChatDetail, getChatMessages]);
+  }, [chatId, initializeChatDetail, initializeChatMessages]);
 
   // 返回聊天列表
   const handleBack = () => {

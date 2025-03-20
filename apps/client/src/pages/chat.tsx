@@ -92,7 +92,7 @@ const ChatPage = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 使用聊天模型的状态和方法
-  const { initialize, fetchChatById, initializeChatMessages, addChatMessage, getChatMessages } =
+  const { initialize, fetchChatById, initializeChatMessages, addChatMessage, updateChatMessage, getChatMessages } =
     useChat();
 
   // 转换ChatMessage为VirtuosoMessageItem
@@ -166,7 +166,7 @@ const ChatPage = () => {
     if (showChatInfo) {
       setShowChatInfo(false);
     } else {
-      navigate('/chats');
+      navigate('/guichat/chats');
     }
   };
 
@@ -195,6 +195,17 @@ const ChatPage = () => {
     // 直接添加到UI组件
     if (virtuosoRef.current && isMessagesInitialized) {
       virtuosoRef.current.data.append([aiMessage]);
+    }
+
+    // 同步到模型层 - 初始添加空消息
+    if (chatId) {
+      const chatAiMessage: ChatMessage = {
+        id: responseId,
+        content: '',
+        isSelf: false,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      addChatMessage(chatId, chatAiMessage);
     }
 
     try {
@@ -237,33 +248,49 @@ const ChatPage = () => {
         (chunk: OllamaChatResponse) => {
           // 处理每个响应块
           if (chunk.message?.content && typeof chunk.message.content === 'string') {
+            // 维护一个局部变量记录当前的消息内容
+            let currentContent = '';
+            
             // 更新UI显示
             if (virtuosoRef.current && isMessagesInitialized) {
               virtuosoRef.current.data.map(msg => {
                 if (msg.key === responseId) {
+                  currentContent = msg.content + chunk.message.content;
                   return {
                     ...msg,
-                    content: msg.content + chunk.message.content,
+                    content: currentContent,
                   };
                 }
                 return msg;
               }, 'smooth');
             }
+            
+            // 同步更新到模型层 - 使用updateChatMessage更新已有消息
+            if (chatId) {
+              updateChatMessage(chatId, responseId, currentContent);
+            }
           }
         },
         (fullResponse: OllamaMessage) => {
           // 完成时处理
+          const finalContent = fullResponse.content as string;
+          
           if (virtuosoRef.current && isMessagesInitialized) {
             virtuosoRef.current.data.map(msg => {
               if (msg.key === responseId) {
                 return {
                   ...msg,
-                  content: fullResponse.content as string,
+                  content: finalContent,
                   isStreaming: false,
                 };
               }
               return msg;
             });
+          }
+          
+          // 同步最终完整的响应到模型层 - 使用updateChatMessage更新最终内容
+          if (chatId) {
+            updateChatMessage(chatId, responseId, finalContent);
           }
 
           setIsAIResponding(false);
@@ -302,17 +329,25 @@ const ChatPage = () => {
       }
 
       // 更新UI显示错误信息
+      let finalErrorContent = '';
+      
       if (virtuosoRef.current && isMessagesInitialized) {
         virtuosoRef.current.data.map(msg => {
           if (msg.key === responseId) {
+            finalErrorContent = isAborted ? msg.content + errorMessage : errorMessage;
             return {
               ...msg,
-              content: isAborted ? msg.content + errorMessage : errorMessage,
+              content: finalErrorContent,
               isStreaming: false,
             };
           }
           return msg;
         });
+      }
+      
+      // 更新模型层中的错误消息
+      if (chatId) {
+        updateChatMessage(chatId, responseId, finalErrorContent);
       }
 
       setIsAIResponding(false);
@@ -354,6 +389,17 @@ const ChatPage = () => {
     // 保存用户输入，然后清空输入框
     const currentInput = inputValue;
     setInputValue('');
+
+    // 将用户消息同步到模型层
+    if (chatId) {
+      const chatMessage: ChatMessage = {
+        id: userMessageId,
+        content: currentInput,
+        isSelf: true,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      addChatMessage(chatId, chatMessage);
+    }
 
     // 延迟1秒后开始生成AI回复
     setTimeout(() => {

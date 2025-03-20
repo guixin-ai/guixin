@@ -28,14 +28,12 @@ const ChatsPage = () => {
         setLoading(false);
       }
     };
-    
+
     initChats();
   }, [initialize]);
 
   // 过滤后的聊天列表
-  const filteredChats = searchQuery 
-    ? searchChats(searchQuery)
-    : chats;
+  const filteredChats = searchQuery ? searchChats(searchQuery) : chats;
 
   // 打开聊天详情
   const handleChatClick = (chatId: string) => {
@@ -66,22 +64,14 @@ const ChatsPage = () => {
   );
 
   return (
-    <DelayedLoading
-      loading={loading}
-      blurBackground={true}
-      loadingComponent={loadingComponent}
-    >
+    <DelayedLoading loading={loading}>
       <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
         {/* 头部 */}
         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900">
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white">微信</h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-gray-600 dark:text-gray-300"
-              >
+              <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300">
                 <Plus size={24} />
               </Button>
             </DropdownMenuTrigger>
@@ -97,11 +87,14 @@ const ChatsPage = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        
+
         {/* 搜索栏 */}
         <div className="px-4 pb-2 bg-gray-50 dark:bg-gray-900">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <Search
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={18}
+            />
             <input
               type="text"
               placeholder="搜索"
@@ -111,7 +104,7 @@ const ChatsPage = () => {
             />
           </div>
         </div>
-        
+
         {/* 聊天列表 */}
         <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800">
           {filteredChats.length > 0 && (
@@ -135,7 +128,7 @@ const ChatsPage = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* 聊天信息 */}
                     <div className="ml-3 flex-1 min-w-0">
                       <div className="flex justify-between">
@@ -162,4 +155,4 @@ const ChatsPage = () => {
   );
 };
 
-export default ChatsPage; 
+export default ChatsPage;

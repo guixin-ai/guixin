@@ -4,46 +4,141 @@ use uuid::Uuid;
 
 use super::error::{RepositoryError, RepositoryResult};
 use crate::db::DbPool;
-use crate::models::{Message, MessageWithDetails, NewMessage};
-use crate::schema::messages;
+use crate::models::{Message, MessageWithDetails, NewMessage, MessageDetails, User};
+use crate::schema::{messages, users};
 
-pub struct MessageRepository {
-    pool: DbPool,
-}
+pub struct MessageRepository;
 
 impl MessageRepository {
-    pub fn new(pool: DbPool) -> Self {
-        Self { pool }
-    }
+    // 创建消息
+    pub fn create(
+        pool: &DbPool,
+        content: String,
+        chat_id: &str,
+        sender_id: &str,
+    ) -> Result<Message, RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
 
-    // 创建新消息
-    pub fn create(&self, new_message: NewMessage) -> RepositoryResult<Message> {
-        let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
+        let new_message = NewMessage {
+            id: Uuid::new_v4().to_string(),
+            content,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+            chat_id: chat_id.to_string(),
+            sender_id: sender_id.to_string(),
+        };
 
         diesel::insert_into(messages::table)
             .values(&new_message)
             .execute(&mut conn)
             .map_err(RepositoryError::DatabaseError)?;
 
-        messages::table
+        let message = messages::table
             .filter(messages::id.eq(&new_message.id))
+            .select(Message::as_select())
             .first(&mut conn)
-            .map_err(RepositoryError::DatabaseError)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(message)
     }
 
-    // 根据ID查找消息
-    pub fn find_by_id(&self, id: &str) -> RepositoryResult<Message> {
-        let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
+    // 获取消息
+    pub fn get(pool: &DbPool, id: &str) -> Result<Message, RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
 
-        messages::table
+        let message = messages::table
             .filter(messages::id.eq(id))
+            .select(Message::as_select())
             .first(&mut conn)
-            .map_err(|e| match e {
-                diesel::result::Error::NotFound => {
-                    RepositoryError::NotFound(format!("消息 ID: {}", id))
-                }
-                _ => RepositoryError::DatabaseError(e),
-            })
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(message)
+    }
+
+    // 获取消息详情
+    pub fn get_details(pool: &DbPool, id: &str) -> Result<MessageDetails, RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
+
+        let message = Self::get(pool, id)?;
+        
+        let sender = users::table
+            .filter(users::id.eq(&message.sender_id))
+            .select(User::as_select())
+            .first(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(message.to_details(sender))
+    }
+
+    // 获取聊天的所有消息
+    pub fn get_by_chat(pool: &DbPool, chat_id: &str) -> Result<Vec<Message>, RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
+
+        let messages_list = messages::table
+            .filter(messages::chat_id.eq(chat_id))
+            .order(messages::created_at.asc())
+            .select(Message::as_select())
+            .load(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(messages_list)
+    }
+
+    // 获取聊天的所有消息详情
+    pub fn get_details_by_chat(pool: &DbPool, chat_id: &str) -> Result<Vec<MessageDetails>, RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
+
+        let messages_list = Self::get_by_chat(pool, chat_id)?;
+        
+        let mut message_details = Vec::new();
+        
+        for message in messages_list {
+            let sender = users::table
+                .filter(users::id.eq(&message.sender_id))
+                .select(User::as_select())
+                .first(&mut conn)
+                .map_err(RepositoryError::DatabaseError)?;
+                
+            message_details.push(message.to_details(sender));
+        }
+
+        Ok(message_details)
+    }
+
+    // 更新消息内容
+    pub fn update_content(
+        pool: &DbPool,
+        id: &str,
+        content: String,
+    ) -> Result<Message, RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
+
+        diesel::update(messages::table.filter(messages::id.eq(id)))
+            .set((
+                messages::content.eq(content),
+                messages::updated_at.eq(Utc::now().naive_utc()),
+            ))
+            .execute(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        let updated_message = messages::table
+            .filter(messages::id.eq(id))
+            .select(Message::as_select())
+            .first(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(updated_message)
+    }
+
+    // 删除消息
+    pub fn delete(pool: &DbPool, id: &str) -> Result<(), RepositoryError> {
+        let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
+
+        diesel::delete(messages::table.filter(messages::id.eq(id)))
+            .execute(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(())
     }
 
     // 根据会话ID查找消息
@@ -100,13 +195,19 @@ impl MessageRepository {
         self.find_by_id(id)
     }
 
-    // 删除消息
-    pub fn delete(&self, id: &str) -> RepositoryResult<usize> {
+    // 根据ID查找消息
+    pub fn find_by_id(&self, id: &str) -> RepositoryResult<Message> {
         let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
 
-        diesel::delete(messages::table.filter(messages::id.eq(id)))
-            .execute(&mut conn)
-            .map_err(RepositoryError::DatabaseError)
+        messages::table
+            .filter(messages::id.eq(id))
+            .first(&mut conn)
+            .map_err(|e| match e {
+                diesel::result::Error::NotFound => {
+                    RepositoryError::NotFound(format!("消息 ID: {}", id))
+                }
+                _ => RepositoryError::DatabaseError(e),
+            })
     }
 
     // 创建新消息（自动生成ID和时间戳）

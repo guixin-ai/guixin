@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useContactStore } from '../../models/contact.model';
@@ -8,6 +8,7 @@ import DelayedLoading from '../../components/delayed-loading';
 import ContactDetailComponent from '../../components/contact-detail';
 import { useShallow } from 'zustand/react/shallow';
 import NewChat from '../../components/new-chat';
+import CreateFriend from '../../components/create-friend';
 import { useChatStore } from '../../models/chat.model';
 import { ChatItem, ChatDetail as ChatDetailType } from '../../types/chat';
 import { GroupChatCreationFailedException } from '@/errors/chat.errors';
@@ -40,6 +41,12 @@ const groupContactsByPinyin = (contacts: Contact[]): ContactGroup[] => {
 
 const ContactsPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // 从URL查询参数中获取当前模态框和选中的联系人ID
+  const currentModal = searchParams.get('modal');
+  const contactId = searchParams.get('contactId');
+  
   // 使用 useShallow 和选择器获取需要的状态和方法
   const { searchContacts, initializeList, contacts } = useContactStore(
     useShallow(state => ({
@@ -51,10 +58,6 @@ const ContactsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
-  // 新增两个状态，用于控制联系人详情的显示
-  const [showContactDetail, setShowContactDetail] = useState(false);
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [showCreateChat, setShowCreateChat] = useState(false);
 
   // 初始化联系人数据
   useEffect(() => {
@@ -93,16 +96,23 @@ const ContactsPage = () => {
       .filter((group: ContactGroup) => group.contacts.length > 0);
   }, [groupsData, searchQuery]);
 
-  // 导航到联系人详情 - 修改此方法
+  // 导航到联系人详情 - 使用URL参数
   const goToContactDetail = (contactId: string) => {
-    setSelectedContactId(contactId);
-    setShowContactDetail(true);
+    setSearchParams({ modal: 'contact-detail', contactId });
   };
 
-  // 关闭联系人详情
+  // 关闭联系人详情 - 清除URL参数
   const handleCloseContactDetail = () => {
-    setShowContactDetail(false);
-    setSelectedContactId(null);
+    clearModal();
+  };
+
+  // 清除模态框参数
+  const clearModal = () => {
+    // 保留其他可能的查询参数，但删除modal和contactId
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('modal');
+    newParams.delete('contactId');
+    setSearchParams(newParams);
   };
 
   // 打开/关闭下拉菜单
@@ -110,9 +120,9 @@ const ContactsPage = () => {
     setShowDropdown(!showDropdown);
   };
 
-  // 创建群聊 - 更新此方法
+  // 创建群聊 - 更新此方法使用URL参数
   const createGroup = () => {
-    setShowCreateChat(true);
+    setSearchParams({ modal: 'new-chat' });
     setShowDropdown(false);
   };
   
@@ -128,7 +138,7 @@ const ContactsPage = () => {
       
       // 导航到新的聊天页面
       navigate(`/chat/${chatId}`);
-      setShowCreateChat(false);
+      clearModal();
     } catch (error) {
       console.error('创建群聊失败:', error);
       
@@ -146,13 +156,47 @@ const ContactsPage = () => {
   
   // 关闭创建聊天页面
   const handleCloseCreateChat = () => {
-    setShowCreateChat(false);
+    clearModal();
   };
 
   // 添加朋友
   const addFriend = () => {
-    navigate('/create-friend');
+    // 使用URL参数代替直接导航
+    setSearchParams({ modal: 'create-friend' });
     setShowDropdown(false);
+  };
+
+  // 处理朋友创建完成 - 新增此方法
+  const handleFriendCreated = async (contactId?: string) => {
+    if (!contactId) {
+      clearModal();
+      return;
+    }
+    
+    try {
+      // 创建完朋友后，直接创建一个与该朋友的聊天
+      const chatId = await useChatStore.getState().createGroupChat([contactId]);
+      
+      // 导航到新的聊天页面
+      navigate(`/chat/${chatId}`);
+      clearModal();
+    } catch (error) {
+      console.error('创建聊天失败:', error);
+      let errorMessage = '创建聊天失败，请稍后重试';
+      
+      if (error instanceof GroupChatCreationFailedException) {
+        errorMessage = error.message;
+      }
+      
+      // 错误提示
+      alert(errorMessage);
+      clearModal();
+    }
+  };
+
+  // 关闭创建朋友页面
+  const handleCloseCreateFriend = () => {
+    clearModal();
   };
 
   return (
@@ -279,19 +323,27 @@ const ContactsPage = () => {
           ))}
         </div>
 
-        {/* 联系人详情组件 - 条件渲染 */}
-        {showContactDetail && selectedContactId && (
+        {/* 联系人详情组件 - 基于URL参数条件渲染 */}
+        {currentModal === 'contact-detail' && contactId && (
           <ContactDetailComponent
-            contactId={selectedContactId}
+            contactId={contactId}
             onBack={handleCloseContactDetail}
           />
         )}
         
-        {/* 新建聊天组件 - 条件渲染 */}
-        {showCreateChat && (
+        {/* 新建聊天组件 - 基于URL参数条件渲染 */}
+        {currentModal === 'new-chat' && (
           <NewChat
             onBack={handleCloseCreateChat}
             onComplete={handleChatCreated}
+          />
+        )}
+
+        {/* 创建朋友组件 - 基于URL参数条件渲染 */}
+        {currentModal === 'create-friend' && (
+          <CreateFriend
+            onBack={handleCloseCreateFriend}
+            onComplete={handleFriendCreated}
           />
         )}
       </div>

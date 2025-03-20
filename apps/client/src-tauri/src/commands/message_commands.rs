@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{State, command};
 
 use crate::AppState;
-use crate::models::{Message, Conversation};
+use crate::models::{Message, Conversation, MessageWithDetails};
 use crate::services::MessageService;
 use crate::repositories::error::RepositoryError;
 
@@ -13,17 +13,22 @@ pub struct CreateConversationRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct SendMessageRequest {
-    content: String,
-    content_type: String,
-    conversation_id: String,
+    chat_id: String,
     sender_id: String,
-    receiver_ids: Vec<String>,
+    content: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateMessageStatusRequest {
     id: String,
     status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetMessagesRequest {
+    chat_id: String,
+    page: Option<i64>,
+    page_size: Option<i64>,
 }
 
 // 创建会话
@@ -87,49 +92,38 @@ pub fn delete_conversation(
 
 // 发送消息
 #[command]
-pub fn send_conversation_message(
+pub fn send_message(
     state: State<AppState>,
     request: SendMessageRequest,
 ) -> Result<Message, String> {
     let pool = state.db_pool.lock().unwrap();
-    let service = MessageService::new(pool.clone());
-    
-    service.send_message(
-        request.content,
-        request.content_type,
-        request.conversation_id,
-        request.sender_id,
-        request.receiver_ids
-    ).map_err(|e| format!("发送消息失败: {}", e))
+
+    MessageService::send_message(&pool, &request.chat_id, &request.sender_id, &request.content)
+        .map_err(|e| format!("发送消息失败: {}", e))
 }
 
-// 获取会话的所有消息
+// 获取聊天的消息列表
 #[command]
-pub fn get_messages_by_conversation_id(
+pub fn get_chat_messages(
     state: State<AppState>,
-    conversation_id: String,
-) -> Result<Vec<Message>, String> {
+    request: GetMessagesRequest,
+) -> Result<Vec<MessageWithDetails>, String> {
     let pool = state.db_pool.lock().unwrap();
-    let service = MessageService::new(pool.clone());
-    
-    service.get_messages_by_conversation_id(&conversation_id)
+
+    let page = request.page.unwrap_or(1);
+    let page_size = request.page_size.unwrap_or(20);
+
+    MessageService::get_chat_messages(&pool, &request.chat_id, page, page_size)
+        .map_err(|e| format!("获取聊天消息失败: {}", e))
+}
+
+// 根据ID获取消息
+#[command]
+pub fn get_message_by_id(state: State<AppState>, id: String) -> Result<Message, String> {
+    let pool = state.db_pool.lock().unwrap();
+
+    MessageService::get_message_by_id(&pool, &id)
         .map_err(|e| format!("获取消息失败: {}", e))
-}
-
-// 获取消息详情
-#[command]
-pub fn get_message_by_id(
-    state: State<AppState>,
-    id: String,
-) -> Result<Message, String> {
-    let pool = state.db_pool.lock().unwrap();
-    let service = MessageService::new(pool.clone());
-    
-    service.get_message_by_id(&id)
-        .map_err(|e| match e {
-            RepositoryError::NotFound(_) => format!("消息不存在: {}", id),
-            _ => format!("获取消息失败: {}", e),
-        })
 }
 
 // 更新消息状态
@@ -150,17 +144,10 @@ pub fn update_conversation_message_status(
 
 // 删除消息
 #[command]
-pub fn delete_message(
-    state: State<AppState>,
-    id: String,
-) -> Result<bool, String> {
+pub fn delete_message(state: State<AppState>, id: String) -> Result<bool, String> {
     let pool = state.db_pool.lock().unwrap();
-    let service = MessageService::new(pool.clone());
-    
-    service.delete_message(&id)
+
+    MessageService::delete_message(&pool, &id)
         .map(|_| true)
-        .map_err(|e| match e {
-            RepositoryError::NotFound(_) => format!("消息不存在: {}", id),
-            _ => format!("删除消息失败: {}", e),
-        })
+        .map_err(|e| format!("删除消息失败: {}", e))
 } 

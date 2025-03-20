@@ -1,14 +1,21 @@
+use anyhow::anyhow;
+
 use crate::db::DbPool;
 use crate::models::{
     Chat, ChatParticipant, ChatWithDetails, Message, MessageReceipt, MessageWithDetails, NewChat,
-    NewChatParticipant,
+    NewChatParticipant, User,
 };
-use crate::repositories::chat_participant_repository::ChatParticipantRepository;
-use crate::repositories::chat_repository::ChatRepository;
-use crate::repositories::conversation_repository::ConversationRepository;
-use crate::repositories::error::{RepositoryError, RepositoryResult};
-use crate::repositories::message_receipt_repository::MessageReceiptRepository;
-use crate::repositories::message_repository::MessageRepository;
+use crate::repositories::{
+    chat_participant_repository::ChatParticipantRepository,
+    chat_repository::ChatRepository,
+    conversation_repository::ConversationRepository,
+    error::{RepositoryError, RepositoryResult},
+    message_receipt_repository::MessageReceiptRepository,
+    message_repository::MessageRepository,
+    user_repository::UserRepository,
+};
+
+use super::ServiceResult;
 
 pub struct ChatService {
     chat_repository: ChatRepository,
@@ -29,19 +36,122 @@ impl ChatService {
         }
     }
 
-    // 创建新聊天
-    pub fn create_chat(&self, title: String, chat_type: String) -> RepositoryResult<Chat> {
-        self.chat_repository.create_with_defaults(title, chat_type)
+    // 创建聊天
+    pub fn create_chat(pool: &DbPool) -> ServiceResult<Chat> {
+        let chat = ChatRepository::create(pool)?;
+        Ok(chat)
+    }
+
+    // 获取聊天
+    pub fn get_chat(pool: &DbPool, id: &str) -> ServiceResult<Chat> {
+        let chat = ChatRepository::get(pool, id)?;
+        Ok(chat)
+    }
+
+    // 获取聊天详情
+    pub fn get_chat_details(pool: &DbPool, id: &str) -> ServiceResult<ChatWithDetails> {
+        let chat_details = ChatRepository::get_details(pool, id)?;
+        Ok(chat_details)
     }
 
     // 获取所有聊天
-    pub fn get_all_chats(&self) -> RepositoryResult<Vec<Chat>> {
-        self.chat_repository.find_all()
+    pub fn get_all_chats(pool: &DbPool) -> ServiceResult<Vec<Chat>> {
+        let chats = ChatRepository::get_all(pool)?;
+        Ok(chats)
     }
 
-    // 根据ID获取聊天
-    pub fn get_chat_by_id(&self, id: &str) -> RepositoryResult<Chat> {
-        self.chat_repository.find_by_id(id)
+    // 获取用户的所有聊天
+    pub fn get_user_chats(pool: &DbPool, user_id: &str) -> ServiceResult<Vec<Chat>> {
+        // 验证用户是否存在
+        UserRepository::get(pool, user_id)
+            .map_err(|e| anyhow!("查找用户失败: {}", e))?;
+
+        let chats = ChatRepository::get_by_user(pool, user_id)?;
+        Ok(chats)
+    }
+
+    // 删除聊天
+    pub fn delete_chat(pool: &DbPool, id: &str) -> ServiceResult<()> {
+        // 验证聊天是否存在
+        ChatRepository::get(pool, id)
+            .map_err(|e| anyhow!("查找聊天失败: {}", e))?;
+
+        ChatRepository::delete(pool, id)?;
+        Ok(())
+    }
+
+    // 添加聊天参与者
+    pub fn add_chat_participant(pool: &DbPool, chat_id: &str, user_id: &str) -> ServiceResult<()> {
+        // 验证聊天是否存在
+        ChatRepository::get(pool, chat_id)
+            .map_err(|e| anyhow!("查找聊天失败: {}", e))?;
+
+        // 验证用户是否存在
+        UserRepository::get(pool, user_id)
+            .map_err(|e| anyhow!("查找用户失败: {}", e))?;
+
+        // 检查是否已存在
+        match ChatParticipantRepository::create(pool, chat_id, user_id) {
+            Ok(_) => Ok(()),
+            Err(RepositoryError::AlreadyExists(_)) => Ok(()),
+            Err(e) => Err(anyhow!("添加聊天参与者失败: {}", e)),
+        }
+    }
+
+    // 获取聊天参与者
+    pub fn get_chat_participants(pool: &DbPool, chat_id: &str) -> ServiceResult<Vec<User>> {
+        // 验证聊天是否存在
+        ChatRepository::get(pool, chat_id)
+            .map_err(|e| anyhow!("查找聊天失败: {}", e))?;
+
+        let users = ChatParticipantRepository::get_users_by_chat(pool, chat_id)?;
+        Ok(users)
+    }
+
+    // 移除聊天参与者
+    pub fn remove_chat_participant(pool: &DbPool, chat_id: &str, user_id: &str) -> ServiceResult<()> {
+        // 验证聊天是否存在
+        ChatRepository::get(pool, chat_id)
+            .map_err(|e| anyhow!("查找聊天失败: {}", e))?;
+
+        // 验证用户是否存在
+        UserRepository::get(pool, user_id)
+            .map_err(|e| anyhow!("查找用户失败: {}", e))?;
+
+        ChatParticipantRepository::remove_from_chat(pool, chat_id, user_id)?;
+        Ok(())
+    }
+
+    // 创建个人聊天（双人聊天）
+    pub fn create_individual_chat(pool: &DbPool, user_id: &str, other_user_id: &str) -> ServiceResult<Chat> {
+        // 验证用户是否存在
+        UserRepository::get(pool, user_id)
+            .map_err(|e| anyhow!("查找发起用户失败: {}", e))?;
+
+        // 验证另一个用户是否存在
+        UserRepository::get(pool, other_user_id)
+            .map_err(|e| anyhow!("查找目标用户失败: {}", e))?;
+
+        // 创建聊天
+        let chat = ChatRepository::create(pool)?;
+
+        // 添加发起用户
+        match ChatParticipantRepository::create(pool, &chat.id, user_id) {
+            Ok(_) => (),
+            Err(e) => return Err(anyhow!("添加发起用户失败: {}", e)),
+        }
+
+        // 添加目标用户
+        match ChatParticipantRepository::create(pool, &chat.id, other_user_id) {
+            Ok(_) => (),
+            Err(e) => {
+                // 如果添加失败，需要删除前面创建的聊天
+                let _ = ChatRepository::delete(pool, &chat.id);
+                return Err(anyhow!("添加目标用户失败: {}", e));
+            }
+        }
+
+        Ok(chat)
     }
 
     // 根据类型获取聊天
@@ -77,50 +187,6 @@ impl ChatService {
         chat.type_ = chat_type;
 
         self.chat_repository.update(id, chat)
-    }
-
-    // 删除聊天
-    pub fn delete_chat(&self, id: &str) -> RepositoryResult<usize> {
-        // 检查聊天是否存在
-        self.chat_repository.find_by_id(id)?;
-
-        self.chat_repository.delete(id)
-    }
-
-    // 添加聊天参与者
-    pub fn add_participant(
-        &self,
-        chat_id: String,
-        user_id: String,
-        role: String,
-    ) -> RepositoryResult<ChatParticipant> {
-        // 检查聊天是否存在
-        self.chat_repository.find_by_id(&chat_id)?;
-
-        // 检查用户是否已经在聊天中
-        let existing = self
-            .participant_repository
-            .find_by_chat_and_user(&chat_id, &user_id);
-        if existing.is_ok() {
-            return Err(RepositoryError::AlreadyExists(format!(
-                "用户 {} 已经在聊天 {} 中",
-                user_id, chat_id
-            )));
-        }
-
-        self.participant_repository
-            .create_with_defaults(chat_id, user_id, role)
-    }
-
-    // 获取聊天参与者
-    pub fn get_participants(&self, chat_id: &str) -> RepositoryResult<Vec<ChatParticipant>> {
-        self.participant_repository.find_by_chat_id(chat_id)
-    }
-
-    // 移除聊天参与者
-    pub fn remove_participant(&self, chat_id: &str, user_id: &str) -> RepositoryResult<usize> {
-        self.participant_repository
-            .remove_from_chat(chat_id, user_id)
     }
 
     // 更新聊天的最后消息信息
@@ -170,37 +236,6 @@ impl ChatService {
     ) -> RepositoryResult<ChatParticipant> {
         self.participant_repository
             .update_last_read_message(chat_id, user_id, message_id)
-    }
-
-    /// 创建单聊（一对一聊天）
-    ///
-    /// 该方法在一个事务中完成以下操作：
-    /// 1. 创建新的聊天记录
-    /// 2. 添加两个参与者（发起者和接收者）
-    /// 3. 创建会话记录
-    /// 4. 如果提供了初始消息，则创建消息和消息接收记录
-    ///
-    /// # 参数
-    /// * `initiator_id` - 发起聊天的用户ID
-    /// * `receiver_id` - 接收聊天的用户ID
-    /// * `title` - 聊天标题，通常是接收者的名称或自定义标题
-    /// * `initial_message` - 可选的初始消息内容
-    ///
-    /// # 返回
-    /// 成功创建的聊天记录
-    pub fn create_individual_chat(
-        &self,
-        initiator_id: String,
-        receiver_id: String,
-        title: String,
-        initial_message: Option<String>,
-    ) -> RepositoryResult<Chat> {
-        self.chat_repository.create_individual_chat(
-            &initiator_id,
-            &receiver_id,
-            title,
-            initial_message,
-        )
     }
 
     /// 发送消息

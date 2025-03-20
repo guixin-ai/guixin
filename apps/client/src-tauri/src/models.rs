@@ -75,9 +75,6 @@ pub struct NewAttachment {
 pub struct ChatParticipant {
     pub id: String,
     pub joined_at: NaiveDateTime,
-    pub role: String,
-    pub unread_count: i32,
-    pub last_read_message_id: Option<String>,
     pub chat_id: String,
     pub user_id: String,
 }
@@ -87,9 +84,6 @@ pub struct ChatParticipant {
 pub struct NewChatParticipant {
     pub id: String,
     pub joined_at: NaiveDateTime,
-    pub role: String,
-    pub unread_count: i32,
-    pub last_read_message_id: Option<String>,
     pub chat_id: String,
     pub user_id: String,
 }
@@ -99,14 +93,6 @@ pub struct NewChatParticipant {
 #[diesel(table_name = chats)]
 pub struct Chat {
     pub id: String,
-    pub title: String,
-    pub type_: String,
-    pub last_message_id: Option<String>,
-    pub last_message_content: Option<String>,
-    pub last_message_time: Option<NaiveDateTime>,
-    pub last_message_sender_id: Option<String>,
-    pub last_message_sender_name: Option<String>,
-    pub last_message_type: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -115,14 +101,6 @@ pub struct Chat {
 #[diesel(table_name = chats)]
 pub struct NewChat {
     pub id: String,
-    pub title: String,
-    pub type_: String,
-    pub last_message_id: Option<String>,
-    pub last_message_content: Option<String>,
-    pub last_message_time: Option<NaiveDateTime>,
-    pub last_message_sender_id: Option<String>,
-    pub last_message_sender_name: Option<String>,
-    pub last_message_type: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -131,32 +109,27 @@ pub struct NewChat {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatWithDetails {
     pub id: String,
-    pub title: String,
-    pub type_: String,
-    pub last_message_id: Option<String>,
-    pub last_message_content: Option<String>,
-    pub last_message_time: Option<NaiveDateTime>,
-    pub last_message_sender_name: Option<String>,
-    pub last_message_type: Option<String>,
-    pub unread_count: i32,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub last_message: Option<MessageDetails>,
+    pub participants: Vec<UserDetails>,
 }
 
-impl From<Chat> for ChatWithDetails {
-    fn from(chat: Chat) -> Self {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserDetails {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub is_ai: bool,
+}
+
+impl From<User> for UserDetails {
+    fn from(user: User) -> Self {
         Self {
-            id: chat.id,
-            title: chat.title,
-            type_: chat.type_,
-            last_message_id: chat.last_message_id,
-            last_message_content: chat.last_message_content,
-            last_message_time: chat.last_message_time,
-            last_message_sender_name: chat.last_message_sender_name,
-            last_message_type: chat.last_message_type,
-            unread_count: 0, // 需要从 ChatParticipant 中获取
-            created_at: chat.created_at,
-            updated_at: chat.updated_at,
+            id: user.id,
+            name: user.name,
+            description: user.description,
+            is_ai: user.is_ai,
         }
     }
 }
@@ -271,17 +244,15 @@ pub struct NewMessageReceipt {
     pub receiver_id: String,
 }
 
-// Message 模型 - 修改
+// Message 模型
 #[derive(Queryable, Selectable, Debug, Serialize, Deserialize)]
 #[diesel(table_name = messages)]
 pub struct Message {
     pub id: String,
     pub content: String,
-    pub content_type: String,
-    pub status: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub conversation_id: String,
+    pub chat_id: String,
     pub sender_id: String,
 }
 
@@ -290,28 +261,32 @@ pub struct Message {
 pub struct NewMessage {
     pub id: String,
     pub content: String,
-    pub content_type: String,
-    pub status: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub conversation_id: String,
+    pub chat_id: String,
     pub sender_id: String,
 }
 
-// 带有详细信息的消息结构体，包含发送者信息、接收状态和附件
+// 消息详情
 #[derive(Debug, Serialize, Deserialize)]
-pub struct MessageWithDetails {
+pub struct MessageDetails {
     pub id: String,
     pub content: String,
-    pub content_type: String,
-    pub status: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
-    pub conversation_id: String,
-    pub sender_id: String,
-    pub sender_name: Option<String>,
-    pub receipts: Vec<MessageReceipt>,
-    pub attachments: Vec<Attachment>,
+    pub sender: UserDetails,
+}
+
+impl Message {
+    pub fn to_details(self, sender: User) -> MessageDetails {
+        MessageDetails {
+            id: self.id,
+            content: self.content,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            sender: sender.into(),
+        }
+    }
 }
 
 // User 模型
@@ -320,17 +295,8 @@ pub struct MessageWithDetails {
 pub struct User {
     pub id: String,
     pub name: String,
-    pub email: Option<String>,
-    pub avatar_url: Option<String>,
     pub description: Option<String>,
     pub is_ai: bool,
-    pub cloud_id: Option<String>,
-    pub sync_enabled: bool,
-    pub last_sync_time: Option<NaiveDateTime>,
-    pub theme: String,
-    pub language: String,
-    pub font_size: i32,
-    pub custom_settings: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -340,17 +306,8 @@ pub struct User {
 pub struct NewUser {
     pub id: String,
     pub name: String,
-    pub email: Option<String>,
-    pub avatar_url: Option<String>,
     pub description: Option<String>,
     pub is_ai: bool,
-    pub cloud_id: Option<String>,
-    pub sync_enabled: bool,
-    pub last_sync_time: Option<NaiveDateTime>,
-    pub theme: String,
-    pub language: String,
-    pub font_size: i32,
-    pub custom_settings: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }

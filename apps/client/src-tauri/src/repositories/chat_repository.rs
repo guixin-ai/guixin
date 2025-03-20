@@ -21,64 +21,84 @@ impl ChatRepository {
     }
 
     // 创建新聊天
-    pub fn create(&self, new_chat: NewChat) -> RepositoryResult<Chat> {
+    pub fn create(&self) -> RepositoryResult<Chat> {
         let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
+
+        let new_chat = NewChat {
+            id: Uuid::new_v4().to_string(),
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
 
         diesel::insert_into(chats::table)
             .values(&new_chat)
             .execute(&mut conn)
             .map_err(RepositoryError::DatabaseError)?;
 
-        chats::table
+        let chat = chats::table
             .filter(chats::id.eq(&new_chat.id))
+            .select(Chat::as_select())
             .first(&mut conn)
-            .map_err(RepositoryError::DatabaseError)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(chat)
     }
 
     // 根据ID查找聊天
     pub fn find_by_id(&self, id: &str) -> RepositoryResult<Chat> {
         let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
 
-        chats::table
+        let chat = chats::table
             .filter(chats::id.eq(id))
+            .select(Chat::as_select())
             .first(&mut conn)
             .map_err(|e| match e {
                 diesel::result::Error::NotFound => {
                     RepositoryError::NotFound(format!("聊天 ID: {}", id))
                 }
                 _ => RepositoryError::DatabaseError(e),
-            })
+            })?;
+
+        Ok(chat)
     }
 
     // 查找所有聊天
     pub fn find_all(&self) -> RepositoryResult<Vec<Chat>> {
         let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
 
-        chats::table
-            .load::<Chat>(&mut conn)
-            .map_err(RepositoryError::DatabaseError)
+        let chats_list = chats::table
+            .select(Chat::as_select())
+            .load(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(chats_list)
     }
 
     // 根据类型查找聊天
     pub fn find_by_type(&self, chat_type: &str) -> RepositoryResult<Vec<Chat>> {
         let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
 
-        chats::table
+        let chats_list = chats::table
             .filter(chats::type_.eq(chat_type))
-            .load::<Chat>(&mut conn)
-            .map_err(RepositoryError::DatabaseError)
+            .select(Chat::as_select())
+            .load(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(chats_list)
     }
 
     // 根据用户ID查找聊天
     pub fn find_by_user_id(&self, user_id: &str) -> RepositoryResult<Vec<Chat>> {
         let mut conn = self.pool.get().map_err(RepositoryError::PoolError)?;
 
-        chats::table
-            .inner_join(chat_participants::table)
+        let chats_list = chat_participants::table
+            .inner_join(chats::table.on(chats::id.eq(chat_participants::chat_id)))
             .filter(chat_participants::user_id.eq(user_id))
-            .select(chats::all_columns)
-            .load::<Chat>(&mut conn)
-            .map_err(RepositoryError::DatabaseError)
+            .select(Chat::as_select())
+            .load(&mut conn)
+            .map_err(RepositoryError::DatabaseError)?;
+
+        Ok(chats_list)
     }
 
     // 根据用户ID查找聊天，并附带最后一条消息和未读数量

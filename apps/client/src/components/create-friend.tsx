@@ -19,7 +19,7 @@ import { useContactStore } from '@/models/contact.model';
 // 组件Props类型
 interface CreateFriendProps {
   onBack: () => void;
-  onComplete?: () => void;
+  onComplete?: (contactId?: string) => void;
 }
 
 // 表单字段验证模式
@@ -145,7 +145,7 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
 
       // 调用完成回调
       if (onComplete) {
-        onComplete();
+        onComplete(newId);
       } else {
         onBack();
       }

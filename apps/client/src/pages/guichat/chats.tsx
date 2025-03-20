@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Plus, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
@@ -18,6 +18,11 @@ import { ChatItem, ChatDetail } from '../../types/chat';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // 从URL查询参数中获取模态框状态
+  const currentModal = searchParams.get('modal');
+  
   // 使用 useShallow 和选择器获取需要的状态和方法
   const { searchChats, chats, initializeChatList } = useChatStore(
     useShallow(state => ({
@@ -28,8 +33,6 @@ const ChatsPage = () => {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showNewChat, setShowNewChat] = useState(false);
-  const [showCreateFriend, setShowCreateFriend] = useState(false);
 
   // 初始化聊天数据
   useEffect(() => {
@@ -60,12 +63,12 @@ const ChatsPage = () => {
 
   // 发起聊天处理函数
   const handleCreateChat = () => {
-    setShowNewChat(true);
+    setSearchParams({ modal: 'new-chat' });
   };
 
   // 创造朋友
   const handleCreateFriend = () => {
-    setShowCreateFriend(true);
+    setSearchParams({ modal: 'create-friend' });
   };
 
   // 处理聊天创建
@@ -80,7 +83,8 @@ const ChatsPage = () => {
       
       // 导航到新的聊天页面
       navigate(`/chat/${chatId}`);
-      setShowNewChat(false);
+      // 清除modal参数
+      clearModal();
     } catch (error) {
       console.error('创建群聊失败:', error);
       
@@ -97,18 +101,49 @@ const ChatsPage = () => {
   };
 
   // 处理朋友创建完成
-  const handleFriendCreated = () => {
-    setShowCreateFriend(false);
+  const handleFriendCreated = async (contactId?: string) => {
+    if (!contactId) {
+      clearModal();
+      return;
+    }
+    
+    try {
+      // 创建完朋友后，直接创建一个与该朋友的聊天
+      const chatId = await useChatStore.getState().createGroupChat([contactId]);
+      
+      // 导航到新的聊天页面
+      navigate(`/chat/${chatId}`);
+      clearModal();
+    } catch (error) {
+      console.error('创建聊天失败:', error);
+      let errorMessage = '创建聊天失败，请稍后重试';
+      
+      if (error instanceof GroupChatCreationFailedException) {
+        errorMessage = error.message;
+      }
+      
+      // 错误提示
+      alert(errorMessage);
+      clearModal();
+    }
+  };
+
+  // 清除模态框参数
+  const clearModal = () => {
+    // 保留其他可能的查询参数
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('modal');
+    setSearchParams(newParams);
   };
 
   // 关闭新建聊天页面
   const handleCloseNewChat = () => {
-    setShowNewChat(false);
+    clearModal();
   };
 
   // 关闭创建朋友页面
   const handleCloseCreateFriend = () => {
-    setShowCreateFriend(false);
+    clearModal();
   };
 
   return (
@@ -198,16 +233,16 @@ const ChatsPage = () => {
           )}
         </div>
 
-        {/* 新建聊天组件 - 条件渲染 */}
-        {showNewChat && (
+        {/* 新建聊天组件 - 基于URL参数条件渲染 */}
+        {currentModal === 'new-chat' && (
           <NewChat
             onBack={handleCloseNewChat}
             onComplete={handleChatCreated}
           />
         )}
 
-        {/* 创造朋友组件 - 条件渲染 */}
-        {showCreateFriend && (
+        {/* 创造朋友组件 - 基于URL参数条件渲染 */}
+        {currentModal === 'create-friend' && (
           <CreateFriend
             onBack={handleCloseCreateFriend}
             onComplete={handleFriendCreated}

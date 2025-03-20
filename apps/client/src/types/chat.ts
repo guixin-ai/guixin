@@ -28,6 +28,7 @@ export interface ChatMember {
   avatar: string;
   isAI?: boolean;
   username?: string;
+  description?: string; // 系统提示词/描述字段
 }
 
 // 聊天消息类型

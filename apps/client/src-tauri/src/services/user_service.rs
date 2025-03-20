@@ -1,63 +1,92 @@
-use crate::db::DbPool;
-use crate::models::{NewUser, User};
-use crate::repositories::error::{RepositoryError, RepositoryResult};
-use crate::repositories::user_repository::UserRepository;
-use crate::schema::users;
 use diesel::prelude::*;
+use uuid::Uuid;
+use chrono::Utc;
+use anyhow::{anyhow, Result};
 
-pub struct UserService {
-    repository: UserRepository,
-}
+use crate::db::{DbConnection, DbPool};
+use crate::models::{User, NewUser};
+use crate::schema::users;
+use crate::repositories::user_repository::UserRepository;
+
+use super::ServiceResult;
+
+pub struct UserService;
 
 impl UserService {
-    pub fn new(pool: DbPool) -> Self {
-        Self {
-            repository: UserRepository::new(pool),
-        }
+    // 创建用户
+    pub fn create_user(
+        pool: &DbPool,
+        name: String,
+        description: Option<String>,
+        is_ai: Option<bool>,
+    ) -> ServiceResult<User> {
+        let is_ai = is_ai.unwrap_or(false);
+        let user = UserRepository::create(pool, name, description, is_ai)?;
+        Ok(user)
     }
 
-    // 获取默认用户（静态方法）
-    pub fn get_default_user(conn: &mut diesel::SqliteConnection) -> RepositoryResult<User> {
-        // 直接使用Diesel查询默认用户
-        users::table
-            .filter(users::id.eq("default-user"))
-            .first::<User>(conn)
-            .map_err(|e| match e {
-                diesel::result::Error::NotFound => {
-                    RepositoryError::NotFound(format!("默认用户不存在"))
-                }
-                _ => RepositoryError::DatabaseError(e),
-            })
-    }
-
-    // 创建新用户
-    pub fn create_user(&self, name: String, email: Option<String>) -> RepositoryResult<User> {
-        self.repository.create_with_defaults(name, email)
+    // 获取用户
+    pub fn get_user(pool: &DbPool, id: &str) -> ServiceResult<User> {
+        let user = UserRepository::get(pool, id)?;
+        Ok(user)
     }
 
     // 获取所有用户
-    pub fn get_all_users(&self) -> RepositoryResult<Vec<User>> {
-        self.repository.find_all()
-    }
-
-    // 根据ID获取用户
-    pub fn get_user_by_id(&self, id: &str) -> RepositoryResult<User> {
-        self.repository.find_by_id(id)
+    pub fn get_all_users(pool: &DbPool) -> ServiceResult<Vec<User>> {
+        let users = UserRepository::get_all(pool)?;
+        Ok(users)
     }
 
     // 更新用户
-    pub fn update_user(&self, id: &str, user: User) -> RepositoryResult<User> {
-        // 检查用户是否存在
-        self.repository.find_by_id(id)?;
-
-        self.repository.update(id, user)
+    pub fn update_user(
+        pool: &DbPool,
+        id: &str,
+        name: Option<String>,
+        description: Option<String>,
+        is_ai: Option<bool>,
+    ) -> ServiceResult<User> {
+        let user = UserRepository::update(pool, id, name, description, is_ai)?;
+        Ok(user)
     }
 
     // 删除用户
-    pub fn delete_user(&self, id: &str) -> RepositoryResult<usize> {
-        // 检查用户是否存在
-        self.repository.find_by_id(id)?;
+    pub fn delete_user(pool: &DbPool, id: &str) -> ServiceResult<()> {
+        UserRepository::delete(pool, id)?;
+        Ok(())
+    }
 
-        self.repository.delete(id)
+    // 获取默认用户，如果不存在则创建
+    pub fn get_default_user(conn: &mut DbConnection) -> ServiceResult<User> {
+        // 尝试获取第一个用户
+        let default_user = users::table
+            .select(User::as_select())
+            .first::<User>(conn)
+            .optional()
+            .map_err(|e| anyhow!("查询用户失败: {}", e))?;
+
+        if let Some(user) = default_user {
+            return Ok(user);
+        }
+
+        // 如果没有用户，创建一个默认用户
+        let new_user = NewUser {
+            id: Uuid::new_v4().to_string(),
+            name: "默认用户".to_string(),
+            description: Some("系统创建的默认用户".to_string()),
+            is_ai: false,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        diesel::insert_into(users::table)
+            .values(&new_user)
+            .execute(conn)
+            .map_err(|e| anyhow!("创建默认用户失败: {}", e))?;
+
+        users::table
+            .filter(users::id.eq(&new_user.id))
+            .select(User::as_select())
+            .first(conn)
+            .map_err(|e| anyhow!("获取新创建的默认用户失败: {}", e))
     }
 }

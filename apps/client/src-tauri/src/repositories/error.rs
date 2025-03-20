@@ -6,7 +6,7 @@ pub enum RepositoryError {
     DatabaseError(#[from] diesel::result::Error),
 
     #[error("连接池错误: {0}")]
-    PoolError(#[from] r2d2::Error),
+    ConnectionError(#[from] r2d2::Error),
 
     #[error("实体未找到: {0}")]
     NotFound(String),

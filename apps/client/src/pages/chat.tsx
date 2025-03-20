@@ -42,6 +42,7 @@ import {
 import ChatInfoPage from '../components/chat-info';
 import NewChat from '../components/new-chat';
 import { useShallow } from 'zustand/react/shallow';
+import MessageItemContent, { VirtuosoMessageItem } from '../components/message-item';
 
 // 联系人类型
 interface Contact {
@@ -49,15 +50,6 @@ interface Contact {
   name: string;
   avatar: string;
   isAI?: boolean;
-}
-
-// 虚拟消息类型
-interface VirtuosoMessageItem {
-  key: string;
-  content: string;
-  isSelf: boolean;
-  timestamp: string;
-  isStreaming?: boolean;
 }
 
 // 随机短语，用于模拟打字效果
@@ -100,6 +92,11 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
+  
+  // 添加AI队列相关状态
+  const [aiQueue, setAiQueue] = useState<ChatMember[]>([]);
+  const [currentAiIndex, setCurrentAiIndex] = useState(0);
+  const [isAiQueueProcessing, setIsAiQueueProcessing] = useState(false);
 
   // 添加AbortController引用
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -115,6 +112,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       addChatMessage: state.addChatMessage,
       updateChatMessage: state.updateChatMessage,
       getChatDetail: state.getChatDetail,
+      getChatMessages: state.getChatMessages,
       addChatMember: state.addChatMember,
     }))
   );
@@ -127,6 +125,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     addChatMessage,
     updateChatMessage,
     getChatDetail,
+    getChatMessages,
     addChatMember,
   } = chatStore;
 
@@ -208,6 +207,11 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       console.log('取消当前生成...');
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
+      
+      // 重置AI队列处理状态
+      setIsAiQueueProcessing(false);
+      setCurrentAiIndex(0);
+      setAiQueue([]);
     }
   };
 
@@ -242,8 +246,33 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     setShowNewChat(false);
   };
 
+  // 准备AI队列
+  const prepareAIQueue = async () => {
+    // 从模型层直接获取聊天详情
+    const chatDetail = chatDetails[chatId];
+    
+    // 如果模型层中没有聊天详情，尝试获取
+    if (!chatDetail || !chatDetail.members) {
+      const refreshedDetail = await getChatDetail(chatId);
+      if (!refreshedDetail || !refreshedDetail.members) return [];
+      
+      // 过滤出所有AI成员
+      const aiMembers = refreshedDetail.members.filter(member => member.isAI);
+      return aiMembers;
+    }
+    
+    // 过滤出所有AI成员
+    const aiMembers = chatDetail.members.filter(member => member.isAI);
+    
+    // 如果没有AI成员，返回空数组
+    if (aiMembers.length === 0) return [];
+    
+    // 返回AI成员队列
+    return aiMembers;
+  };
+
   // 使用Ollama生成AI回复
-  const generateAIResponse = async (responseId: string) => {
+  const generateAIResponse = async (responseId: string, aiMember: ChatMember) => {
     setIsAIResponding(true);
 
     try {
@@ -251,13 +280,19 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       const MODEL_NAME = 'gemma3:1b';
 
       // 准备聊天历史 - 在添加空消息前获取最新的消息列表
-      const latestMessages = await useChatStore.getState().getChatMessages(chatId);
+      const latestMessages = await getChatMessages(chatId);
       const chatHistory: OllamaMessage[] = latestMessages.map(msg => ({
         role: msg.isSelf ? 'user' : 'assistant',
         content: msg.content,
       }));
 
-      // 注意：不需要再次添加用户消息，因为它已经包含在latestMessages中
+      // 创建虚拟联系人对象用于显示
+      const aiContact: Contact = {
+        id: aiMember.id,
+        name: aiMember.name,
+        avatar: aiMember.avatar,
+        isAI: true,
+      };
 
       // 创建初始空回复
       const aiMessage: VirtuosoMessageItem = {
@@ -266,6 +301,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
         isSelf: false,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isStreaming: true,
+        senderId: aiMember.id,
       };
 
       // 直接添加到UI组件
@@ -286,11 +322,23 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       abortControllerRef.current = new AbortController();
       const signal = abortControllerRef.current.signal;
 
+      // 准备系统提示词（如果有）
+      const systemMessages: OllamaMessage[] = [];
+      if (aiMember.description) {
+        systemMessages.push({
+          role: 'system',
+          content: aiMember.description
+        });
+      }
+
+      // 合并系统消息和聊天历史
+      const allMessages = [...systemMessages, ...chatHistory];
+
       // 使用服务层提供的可中断流方法
       await ollamaService.chatStream(
         {
           model: MODEL_NAME,
-          messages: chatHistory,
+          messages: allMessages,
           stream: true,
           options: {
             temperature: 0.7,
@@ -345,6 +393,9 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           setIsAIResponding(false);
           // 清除当前的AbortController
           abortControllerRef.current = null;
+          
+          // 处理AI队列中的下一个AI
+          processNextAI();
         }
       );
     } catch (error: any) {
@@ -399,7 +450,60 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
 
       setIsAIResponding(false);
       abortControllerRef.current = null;
+      
+      // 如果发生错误，也尝试处理下一个AI（除非是被用户中断的）
+      if (!isAborted) {
+        processNextAI();
+      } else {
+        // 如果是被用户中断，重置队列
+        setIsAiQueueProcessing(false);
+        setCurrentAiIndex(0);
+        setAiQueue([]);
+      }
     }
+  };
+
+  // 启动AI队列处理
+  const startAIQueueProcessing = async () => {
+    // 如果已经在处理队列，则不再重复启动
+    if (isAiQueueProcessing) return;
+    
+    // 准备AI队列
+    const aiMembers = await prepareAIQueue();
+    if (aiMembers.length === 0) return;
+    
+    setAiQueue(aiMembers);
+    setCurrentAiIndex(0);
+    setIsAiQueueProcessing(true);
+    
+    // 开始处理第一个AI
+    const firstAI = aiMembers[0];
+    const responseId = `ai-${firstAI.id}-${Date.now()}`;
+    generateAIResponse(responseId, firstAI);
+  };
+
+  // 处理队列中的下一个AI
+  const processNextAI = () => {
+    // 如果队列为空或当前索引已超出范围，结束处理
+    if (aiQueue.length === 0 || currentAiIndex >= aiQueue.length - 1) {
+      setIsAiQueueProcessing(false);
+      setCurrentAiIndex(0);
+      setAiQueue([]);
+      return;
+    }
+    
+    // 移动到下一个AI
+    const nextIndex = currentAiIndex + 1;
+    setCurrentAiIndex(nextIndex);
+    
+    // 获取下一个AI并生成回复
+    const nextAI = aiQueue[nextIndex];
+    const responseId = `ai-${nextAI.id}-${Date.now()}`;
+    
+    // 短暂延迟后开始下一个AI的回复，使界面有时间更新
+    setTimeout(() => {
+      generateAIResponse(responseId, nextAI);
+    }, 500);
   };
 
   // 发送消息
@@ -408,7 +512,6 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     if (!inputValue.trim() || isAIResponding) return;
 
     const userMessageId = `user-${Date.now()}`;
-    const aiResponseId = `ai-${Date.now()}`;
 
     // 创建用户消息
     const userMessage: VirtuosoMessageItem = {
@@ -446,9 +549,9 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
     addChatMessage(chatId, chatMessage);
 
-    // 延迟1秒后开始生成AI回复
+    // 延迟1秒后开始AI队列处理
     setTimeout(() => {
-      generateAIResponse(aiResponseId);
+      startAIQueueProcessing();
     }, 1000);
 
     // 保持输入框焦点
@@ -473,47 +576,6 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   // 打开聊天信息设置
   const handleOpenChatInfo = () => {
     setShowChatInfo(true);
-  };
-
-  // 消息项渲染组件 - 使用Gemini风格
-  const MessageItemContent = ({ data }: { data: VirtuosoMessageItem }) => {
-    const ownMessage = data.isSelf;
-
-    return (
-      <div className="py-4">
-        <div className={`flex ${ownMessage ? 'justify-end' : 'justify-start'}`}>
-          {/* 对方消息 */}
-          {!data.isSelf && contact && (
-            <div className="flex items-start max-w-[80%]">
-              <div className="w-8 h-8 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold text-xs mr-2 mt-1">
-                {contact.avatar}
-              </div>
-              <div>
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-gray-800 dark:text-white">
-                  {data.content}
-                  {data.isStreaming && (
-                    <span className="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse"></span>
-                  )}
-                </div>
-                <div className="text-left mt-1">
-                  <span className="text-xs text-gray-500">{data.timestamp}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 自己的消息 */}
-          {data.isSelf && (
-            <div className="max-w-[80%]">
-              <div className="bg-blue-600 rounded-lg p-3 text-white">{data.content}</div>
-              <div className="flex justify-end items-center mt-1">
-                <span className="text-xs text-gray-500">{data.timestamp}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
   };
 
   // 聊天页面（包括未找到聊天的情况）
@@ -557,7 +619,13 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
                 ref={virtuosoRef}
                 className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
                 computeItemKey={({ data }) => data.key}
-                ItemContent={MessageItemContent}
+                ItemContent={({ data }) => (
+                  <MessageItemContent 
+                    data={data} 
+                    contact={contact}
+                    aiMembers={chatDetails[chatId]?.members || []}
+                  />
+                )}
                 initialData={initialMessages}
                 initialLocation={{ index: 'LAST', align: 'end' }}
               />

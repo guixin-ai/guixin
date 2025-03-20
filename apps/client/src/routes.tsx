@@ -4,7 +4,6 @@ import GuiChatLayout from './pages/guichat';
 import GuiChatChats from './pages/guichat/chats';
 import GuiChatContacts from './pages/guichat/contacts';
 import GuiChatChat from './pages/chat';
-import GuiChatNewChat from './pages/new-chat';
 import GuiChatCreateFriend from './pages/create-friend';
 import GuiChatContactDetail from './pages/contact-detail';
 import NotFoundPage from './pages/not-found';
@@ -64,11 +63,6 @@ const routes: RouteObject[] = [
         // 聊天详情页，显示与特定联系人的聊天记录
         path: '/chat/:chatId',
         element: <GuiChatChat />,
-      },
-      {
-        // 新建聊天页，用于选择联系人开始新聊天
-        path: '/new-chat',
-        element: <GuiChatNewChat />,
       },
       {
         // 创建AI朋友页，用于创建新的AI联系人

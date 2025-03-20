@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, Plus, UserPlus, Users } from 'lucide-react';
+import { Search, Plus, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   DropdownMenu,
@@ -11,12 +11,14 @@ import {
 import { useChatStore } from '../../models/chat.model';
 import { ChatListInitFailedException } from '@/errors/chat.errors';
 import DelayedLoading from '../../components/delayed-loading';
+import NewChat from '../../components/new-chat';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
   const { chats, searchChats, getChatList } = useChatStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showNewChat, setShowNewChat] = useState(false);
 
   // 初始化聊天数据
   useEffect(() => {
@@ -44,14 +46,9 @@ const ChatsPage = () => {
     navigate(`/chat/${chatId}`);
   };
 
-  // 新建聊天
-  const handleNewChat = () => {
-    navigate('/new-chat');
-  };
-
-  // 发起群聊
-  const handleCreateGroupChat = () => {
-    navigate('/new-chat?group=true');
+  // 发起聊天处理函数
+  const handleCreateChat = () => {
+    setShowNewChat(true);
   };
 
   // 创造朋友
@@ -59,13 +56,18 @@ const ChatsPage = () => {
     navigate('/create-friend');
   };
 
-  // 加载中状态UI组件
-  const loadingComponent = (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 items-center justify-center">
-      <div className="w-8 h-8 border-2 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
-      <p className="mt-2 text-sm text-gray-500">加载中...</p>
-    </div>
-  );
+  // 处理聊天创建
+  const handleChatCreated = (contactIds: string[]) => {
+    // 这里实际应用中会创建聊天并获取群ID
+    const chatId = `chat-${Date.now()}`;
+    navigate(`/chat/${chatId}`);
+    setShowNewChat(false);
+  };
+
+  // 关闭新建聊天页面
+  const handleCloseNewChat = () => {
+    setShowNewChat(false);
+  };
 
   return (
     <DelayedLoading loading={loading}>
@@ -80,9 +82,9 @@ const ChatsPage = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={handleCreateGroupChat}>
+              <DropdownMenuItem onClick={handleCreateChat}>
                 <Users size={16} className="mr-2 text-green-500" />
-                <span>发起群聊</span>
+                <span>发起聊天</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleCreateFriend}>
                 <UserPlus size={16} className="mr-2 text-blue-500" />
@@ -152,8 +154,15 @@ const ChatsPage = () => {
               ))}
             </ul>
           )}
-          {/* 空白状态 - 不显示任何内容 */}
         </div>
+
+        {/* 新建聊天组件 - 条件渲染 */}
+        {showNewChat && (
+          <NewChat
+            onBack={handleCloseNewChat}
+            onCreateChat={handleChatCreated}
+          />
+        )}
       </div>
     </DelayedLoading>
   );

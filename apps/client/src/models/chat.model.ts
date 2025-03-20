@@ -223,6 +223,7 @@ export const useChatStore = create(
     })),
     {
       name: 'chat',
+      enabled: process.env.NODE_ENV === 'development',
     }
   )
 );

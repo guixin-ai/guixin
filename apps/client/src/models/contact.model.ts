@@ -164,6 +164,7 @@ export const useContactStore = create(
     })),
     {
       name: 'contact',
+      enabled: process.env.NODE_ENV === 'development',
     }
   )
 );

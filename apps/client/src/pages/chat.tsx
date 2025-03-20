@@ -23,11 +23,11 @@ import {
   VirtuosoMessage,
   VirtuosoMessageListMethods,
 } from '../components/lib/virtuoso-message/virtuoso-message';
-import { 
-  ollamaService, 
-  OllamaChatResponse, 
+import {
+  ollamaService,
+  OllamaChatResponse,
   OllamaMessage,
-  ChatStreamOptions
+  ChatStreamOptions,
 } from '../services/ollama.service';
 import {
   OllamaBaseError,
@@ -35,7 +35,7 @@ import {
   OllamaStreamAbortedError,
   OllamaServiceUnavailableError,
   OllamaModelNotFoundError,
-  OllamaModelLoadError
+  OllamaModelLoadError,
 } from '@/errors/ollama.errors';
 
 // 联系人类型
@@ -92,8 +92,14 @@ const ChatPage = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 使用聊天模型的状态和方法
-  const { initialize, fetchChatById, initializeChatMessages, addChatMessage, updateChatMessage, getChatMessages } =
-    useChat();
+  const {
+    initialize,
+    fetchChatById,
+    initializeChatMessages,
+    addChatMessage,
+    updateChatMessage,
+    getChatMessages,
+  } = useChat();
 
   // 转换ChatMessage为VirtuosoMessageItem
   const convertToVirtuosoMessage = (message: ChatMessage): VirtuosoMessageItem => {
@@ -250,7 +256,7 @@ const ChatPage = () => {
           if (chunk.message?.content && typeof chunk.message.content === 'string') {
             // 维护一个局部变量记录当前的消息内容
             let currentContent = '';
-            
+
             // 更新UI显示
             if (virtuosoRef.current && isMessagesInitialized) {
               virtuosoRef.current.data.map(msg => {
@@ -264,7 +270,7 @@ const ChatPage = () => {
                 return msg;
               }, 'smooth');
             }
-            
+
             // 同步更新到模型层 - 使用updateChatMessage更新已有消息
             if (chatId) {
               updateChatMessage(chatId, responseId, currentContent);
@@ -274,7 +280,7 @@ const ChatPage = () => {
         (fullResponse: OllamaMessage) => {
           // 完成时处理
           const finalContent = fullResponse.content as string;
-          
+
           if (virtuosoRef.current && isMessagesInitialized) {
             virtuosoRef.current.data.map(msg => {
               if (msg.key === responseId) {
@@ -287,7 +293,7 @@ const ChatPage = () => {
               return msg;
             });
           }
-          
+
           // 同步最终完整的响应到模型层 - 使用updateChatMessage更新最终内容
           if (chatId) {
             updateChatMessage(chatId, responseId, finalContent);
@@ -330,7 +336,7 @@ const ChatPage = () => {
 
       // 更新UI显示错误信息
       let finalErrorContent = '';
-      
+
       if (virtuosoRef.current && isMessagesInitialized) {
         virtuosoRef.current.data.map(msg => {
           if (msg.key === responseId) {
@@ -344,7 +350,7 @@ const ChatPage = () => {
           return msg;
         });
       }
-      
+
       // 更新模型层中的错误消息
       if (chatId) {
         updateChatMessage(chatId, responseId, finalErrorContent);
@@ -416,7 +422,7 @@ const ChatPage = () => {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault(); // 阻止默认行为，防止输入框换行
-      
+
       // 只有在AI没有响应时才发送消息
       if (!isAIResponding) {
         handleSend();
@@ -619,10 +625,11 @@ const ChatPage = () => {
           {isMessagesInitialized ? (
             <VirtuosoMessage<VirtuosoMessageItem, null>
               ref={virtuosoRef}
-              className="flex-1 bg-gray-100 dark:bg-gray-900"
+              className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
               computeItemKey={({ data }) => data.key}
               ItemContent={MessageItemContent}
               initialData={initialMessages}
+              initialLocation={{ index: 'LAST', align: 'end' }}
             />
           ) : (
             <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>

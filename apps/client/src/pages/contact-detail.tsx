@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { useContactStore } from '../models/contact.model';
 import { ContactDetail } from '@/types/contact';
 import { ContactNotFoundException, ContactDetailInitFailedException } from '@/errors/contact.errors';
+import { useShallow } from 'zustand/react/shallow';
 
 // 模拟联系人数据 - 如果实际使用API，则可移除这部分
 const mockContacts: Record<string, ContactDetail> = {
@@ -50,8 +51,13 @@ const mockContacts: Record<string, ContactDetail> = {
 const ContactDetailPage = () => {
   const { contactId } = useParams<{ contactId: string }>();
   const navigate = useNavigate();
-  const { initializeContactDetail } = useContactStore();
-  const [contact, setContact] = useState<ContactDetail | null>(null);
+  // 使用 useShallow 和选择器获取需要的状态和方法
+  const { initializeContactDetail, contactDetails } = useContactStore(
+    useShallow(state => ({
+      initializeContactDetail: state.initializeContactDetail,
+      contactDetails: state.contactDetails
+    }))
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [editField, setEditField] = useState<keyof ContactDetail | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -65,16 +71,8 @@ const ContactDetailPage = () => {
         
         try {
           // 初始化联系人详情
-          const contactDetail = await initializeContactDetail(contactId);
-          
-          if (contactDetail) {
-            setContact(contactDetail);
-          } else {
-            // 如果API没有返回数据，可以回退到模拟数据
-            // 在实际生产环境中，这一部分可以改为显示"联系人不存在"
-            const mockContact = mockContacts[contactId] || null;
-            setContact(mockContact);
-          }
+          await initializeContactDetail(contactId);
+          setLoading(false);
         } catch (error) {
           console.error('加载联系人详情失败:', error);
           if (error instanceof ContactNotFoundException) {
@@ -82,11 +80,6 @@ const ContactDetailPage = () => {
           } else if (error instanceof ContactDetailInitFailedException) {
             console.error(`联系人详情初始化失败: ${error.message}`);
           }
-          
-          // 回退到模拟数据
-          const mockContact = mockContacts[contactId] || null;
-          setContact(mockContact);
-        } finally {
           setLoading(false);
         }
       };
@@ -94,6 +87,11 @@ const ContactDetailPage = () => {
       loadContactData();
     }
   }, [contactId, initializeContactDetail]);
+  
+  // 获取联系人详情（从模型层或模拟数据）
+  const contact = contactId ? (
+    contactDetails[contactId] || mockContacts[contactId] || null
+  ) : null;
   
   // 返回上一页
   const handleBack = () => {
@@ -110,13 +108,11 @@ const ContactDetailPage = () => {
   // 保存编辑
   const handleSave = () => {
     if (contact && editField) {
-      setContact({
-        ...contact,
-        [editField]: editValue
-      });
+      // 将更新的数据应用到本地状态，后续可以加入与后端同步的逻辑
+      // TODO: 需要在模型层添加更新联系人详情的方法
+      setIsEditing(false);
+      setEditField(null);
     }
-    setIsEditing(false);
-    setEditField(null);
   };
   
   // 取消编辑

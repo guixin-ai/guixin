@@ -11,8 +11,9 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { useChat } from '../models/chat.model';
-import { ChatMessage } from '@/types/chat';
+import { useChatStore } from '../models/chat.model';
+import { useContactStore } from '../models/contact.model';
+import { ChatMessage, ChatMember } from '@/types/chat';
 import {
   ChatNotFoundException,
   ChatListInitFailedException,
@@ -39,6 +40,8 @@ import {
   OllamaModelLoadError,
 } from '@/errors/ollama.errors';
 import ChatInfoPage from '../components/chat-info';
+import NewChat from '../components/new-chat';
+import { useShallow } from 'zustand/react/shallow';
 
 // 联系人类型
 interface Contact {
@@ -87,22 +90,39 @@ const ChatPage = () => {
   const [isMessagesInitialized, setIsMessagesInitialized] = useState(false);
   const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
   const [showChatInfo, setShowChatInfo] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
 
   // 添加AbortController引用
   const abortControllerRef = useRef<AbortController | null>(null);
   // 添加输入框引用，用于保持焦点
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 使用聊天模型的状态和方法
-  const {
-    initializeChatList,
-    initializeChatDetail,
-    initializeChatMessages,
-    addChatMessage,
-    updateChatMessage,
-    getChatMessages,
-    getChatDetail,
-  } = useChat();
+  // 使用 useShallow 和选择器获取需要的状态和方法
+  const chatStore = useChatStore(
+    useShallow(state => ({
+      chatDetails: state.chatDetails,
+      initializeChatDetail: state.initializeChatDetail,
+      initializeChatMessages: state.initializeChatMessages,
+      addChatMessage: state.addChatMessage,
+      updateChatMessage: state.updateChatMessage,
+      getChatDetail: state.getChatDetail,
+      addChatMember: state.addChatMember
+    }))
+  );
+  
+  // 使用析构来简化后续访问
+  const { 
+    chatDetails, 
+    initializeChatDetail, 
+    initializeChatMessages, 
+    addChatMessage, 
+    updateChatMessage, 
+    getChatDetail, 
+    addChatMember 
+  } = chatStore;
+
+  // 使用联系人模型获取联系人详情 - 方法不需要重新创建
+  const getContactDetail = useContactStore(state => state.getContactDetail);
 
   // 转换ChatMessage为VirtuosoMessageItem
   const convertToVirtuosoMessage = (message: ChatMessage): VirtuosoMessageItem => {
@@ -166,7 +186,9 @@ const ChatPage = () => {
 
   // 返回聊天列表
   const handleBack = () => {
-    if (showChatInfo) {
+    if (showNewChat) {
+      setShowNewChat(false);
+    } else if (showChatInfo) {
       setShowChatInfo(false);
     } else {
       navigate('/guichat/chats');
@@ -180,6 +202,39 @@ const ChatPage = () => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+  };
+
+  // 显示添加成员组件
+  const handleAddMember = () => {
+    setShowChatInfo(false);
+    setShowNewChat(true);
+  };
+
+  // 处理选择联系人
+  const handleSelectContacts = async (contactIds: string[]) => {
+    if (!chatId) return;
+
+    // 获取聊天详情
+    const chatDetail = await getChatDetail(chatId);
+    if (!chatDetail) return;
+
+    // 为每个选择的联系人ID添加到聊天成员中
+    for (const contactId of contactIds) {
+      // 获取联系人详情
+      const contactDetail = await getContactDetail(contactId);
+      if (contactDetail) {
+        const member: ChatMember = {
+          id: contactDetail.id,
+          name: contactDetail.name,
+          avatar: contactDetail.avatar || contactDetail.name.charAt(0),
+          username: `@${contactDetail.name}`,
+        };
+        addChatMember(chatId, member);
+      }
+    }
+
+    // 关闭新聊天组件
+    setShowNewChat(false);
   };
 
   // 使用Ollama生成AI回复
@@ -607,12 +662,24 @@ const ChatPage = () => {
                 <ChatInfoPage 
                   onBack={() => setShowChatInfo(false)} 
                   chatId={chatId}
+                  onAddMember={handleAddMember}
                 />
               ) : (
                 (() => {
                   throw new ChatNotFoundException('未指定聊天ID');
                 })()
               )}
+            </div>
+          )}
+
+          {/* 新聊天组件 - 条件渲染且浮动在上面 */}
+          {showNewChat && chatId && (
+            <div className="absolute inset-0 z-10 bg-white dark:bg-black">
+              <NewChat
+                onBack={() => setShowNewChat(false)}
+                onComplete={handleSelectContacts}
+                preSelectedContactIds={chatDetails[chatId]?.members?.map((member: ChatMember) => member.id) || []}
+              />
             </div>
           )}
         </div>

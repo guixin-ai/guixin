@@ -1,47 +1,88 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, MoreVertical, UserPlus, Users } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useContactStore } from '../../models/contact.model';
-import { ContactGroup } from '../../types/contact';
+import { Contact, ContactGroup } from '../../types/contact';
 import DelayedLoading from '../../components/delayed-loading';
+import { useShallow } from 'zustand/react/shallow';
+
+// 按拼音首字母分组联系人的函数
+const groupContactsByPinyin = (contacts: Contact[]): ContactGroup[] => {
+  // 创建一个Map用于存储分组
+  const groupMap = new Map<string, Contact[]>();
+
+  // 遍历联系人，按拼音首字母分组
+  contacts.forEach(contact => {
+    // 获取拼音首字母，如果没有拼音则使用#
+    const firstLetter = contact.pinyin ? contact.pinyin.charAt(0).toUpperCase() : '#';
+
+    // 获取或创建该字母的分组
+    const group = groupMap.get(firstLetter) || [];
+    group.push(contact);
+    groupMap.set(firstLetter, group);
+  });
+
+  // 将Map转换为数组并排序
+  const groups: ContactGroup[] = Array.from(groupMap.entries()).map(([letter, contacts]) => ({
+    letter,
+    contacts,
+  }));
+
+  // 按字母顺序排序
+  return groups.sort((a, b) => a.letter.localeCompare(b.letter));
+};
 
 const ContactsPage = () => {
   const navigate = useNavigate();
-  const { searchContacts, getGroups, initializeList } = useContactStore();
+  // 使用 useShallow 和选择器获取需要的状态和方法
+  const { searchContacts, initializeList, contacts } = useContactStore(
+    useShallow(state => ({
+      searchContacts: state.searchContacts,
+      initializeList: state.initializeList,
+      contacts: state.contacts
+    }))
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 初始化联系人数据
   useEffect(() => {
-    const initContacts = async () => {
+    const loadContacts = async () => {
       try {
+        // 直接调用初始化方法
         await initializeList();
         setLoading(false);
       } catch (error) {
-        console.error('初始化联系人数据失败:', error);
+        console.error('加载联系人数据失败:', error);
         setLoading(false);
       }
     };
 
-    initContacts();
+    loadContacts();
   }, [initializeList]);
 
-  // 从计算属性获取分组数据
-  const groups = getGroups();
+  // 使用useMemo来计算分组数据 - 计算属性
+  const groupsData = useMemo(() => {
+    return groupContactsByPinyin(contacts);
+  }, [contacts]);
 
-  // 搜索过滤
-  const filteredGroups = searchQuery
-    ? groups
-        .map(group => ({
-          ...group,
-          contacts: group.contacts.filter(contact =>
-            contact.name.toLowerCase().includes(searchQuery.toLowerCase())
-          ),
-        }))
-        .filter(group => group.contacts.length > 0)
-    : groups;
+  // 搜索过滤 - 也使用useMemo计算
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery) {
+      return groupsData;
+    }
+    
+    return groupsData
+      .map((group: ContactGroup) => ({
+        ...group,
+        contacts: group.contacts.filter((contact: Contact) =>
+          contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ),
+      }))
+      .filter((group: ContactGroup) => group.contacts.length > 0);
+  }, [groupsData, searchQuery]);
 
   // 导航到联系人详情
   const goToContactDetail = (contactId: string) => {
@@ -122,7 +163,7 @@ const ContactsPage = () => {
         {/* 联系人列表 */}
         <div className="flex-1 overflow-y-auto">
           {filteredGroups.length > 0 &&
-            filteredGroups.map(group => (
+            filteredGroups.map((group: ContactGroup) => (
               <div key={group.letter} id={group.letter}>
                 {/* 字母索引 */}
                 <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 sticky top-0">
@@ -130,7 +171,7 @@ const ContactsPage = () => {
                 </div>
 
                 {/* 联系人 */}
-                {group.contacts.map(contact => (
+                {group.contacts.map((contact: Contact) => (
                   <button
                     key={contact.id}
                     className="flex items-center w-full p-4 border-b border-gray-100 dark:border-gray-800 last:border-b-0 bg-white dark:bg-black"

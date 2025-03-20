@@ -12,10 +12,18 @@ import { useChatStore } from '../../models/chat.model';
 import { ChatListInitFailedException } from '@/errors/chat.errors';
 import DelayedLoading from '../../components/delayed-loading';
 import NewChat from '../../components/new-chat';
+import { useShallow } from 'zustand/react/shallow';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
-  const { chats, searchChats, initializeChatList } = useChatStore();
+  // 使用 useShallow 和选择器获取需要的状态和方法
+  const { searchChats, chats, initializeChatList } = useChatStore(
+    useShallow(state => ({
+      searchChats: state.searchChats,
+      chats: state.chats,
+      initializeChatList: state.initializeChatList
+    }))
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showNewChat, setShowNewChat] = useState(false);
@@ -24,6 +32,7 @@ const ChatsPage = () => {
   useEffect(() => {
     const loadChats = async () => {
       try {
+        // 直接调用初始化方法
         await initializeChatList();
         setLoading(false);
       } catch (error) {
@@ -160,7 +169,7 @@ const ChatsPage = () => {
         {showNewChat && (
           <NewChat
             onBack={handleCloseNewChat}
-            onCreateChat={handleChatCreated}
+            onComplete={handleChatCreated}
           />
         )}
       </div>

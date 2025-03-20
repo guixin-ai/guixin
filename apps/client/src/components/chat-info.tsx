@@ -4,7 +4,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { useChat } from '../models/chat.model';
+import { useChatStore } from '../models/chat.model';
 import { ChatDetail, ChatMember } from '@/types/chat';
 import { ChatNotFoundException, ChatDetailInitFailedException } from '@/errors/chat.errors';
 import DelayedLoading from './delayed-loading';
@@ -14,14 +14,16 @@ interface ChatInfoPageProps {
   onBack: () => void;
   // 聊天ID参数
   chatId: string;
+  // 添加成员回调
+  onAddMember?: () => void;
 }
 
-const ChatInfoPage = ({ onBack, chatId }: ChatInfoPageProps) => {
+const ChatInfoPage = ({ onBack, chatId, onAddMember }: ChatInfoPageProps) => {
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 使用聊天模型
-  const { getChatDetail } = useChat();
+  // 使用聊天模型 - 只选择需要的方法
+  const getChatDetail = useChatStore(state => state.getChatDetail);
 
   // 加载聊天数据
   useEffect(() => {
@@ -58,6 +60,12 @@ const ChatInfoPage = ({ onBack, chatId }: ChatInfoPageProps) => {
     initializeData();
   }, [chatId, getChatDetail]);
 
+  const handleAddMember = () => {
+    if (onAddMember) {
+      onAddMember();
+    }
+  };
+
   return (
     <DelayedLoading loading={loading}>
       <div className="flex flex-col h-screen bg-gray-900 text-white">
@@ -88,7 +96,7 @@ const ChatInfoPage = ({ onBack, chatId }: ChatInfoPageProps) => {
                   <span className="text-xs text-gray-400">{member.username}</span>
                 </div>
               ))}
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center cursor-pointer" onClick={handleAddMember}>
                 <div className="w-14 h-14 rounded-md border border-dashed border-gray-600 flex items-center justify-center text-gray-400 mb-1">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, User, Check } from 'lucide-react';
 import { Button } from './ui/button';
-import { useContact } from '../models/contact.model';
+import { useContactStore } from '../models/contact.model';
 import { Contact as ContactType } from '@/types/contact';
 import DelayedLoading from './delayed-loading';
+import { useShallow } from 'zustand/react/shallow';
 
 // 联系人类型(本地使用)
 interface Contact {
@@ -17,7 +18,8 @@ interface Contact {
 // 组件Props类型
 interface NewChatProps {
   onBack: () => void;
-  onCreateChat: (contactIds: string[]) => void;
+  onComplete?: (contactIds: string[]) => void;
+  preSelectedContactIds?: string[]; // 已经选中的联系人ID列表
 }
 
 // 按首字母分组联系人
@@ -39,10 +41,19 @@ const groupContactsByInitial = (contacts: Contact[]) => {
     }));
 };
 
-const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
-  const { contacts, initializedList, initializeList } = useContact();
+const NewChat = ({ onBack, onComplete, preSelectedContactIds = [] }: NewChatProps) => {
+  // 使用 useShallow 包裹选择器函数，确保只在内容真正变化时才更新
+  const { contacts, initializedList, initializeList } = useContactStore(
+    useShallow(state => ({
+      contacts: state.contacts,
+      initializedList: state.initializedList,
+      initializeList: state.initializeList
+    }))
+  );
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
+  const [disabledContactIds, setDisabledContactIds] = useState<string[]>(preSelectedContactIds || []);
   const [loading, setLoading] = useState(true);
   const [formattedContacts, setFormattedContacts] = useState<Contact[]>([]);
   
@@ -86,6 +97,11 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
   
   // 选择联系人
   const handleSelectContact = (contact: Contact) => {
+    // 如果联系人ID在禁用列表中，不执行任何操作
+    if (disabledContactIds.includes(contact.id)) {
+      return;
+    }
+    
     const isSelected = selectedContacts.some(c => c.id === contact.id);
     
     if (isSelected) {
@@ -95,10 +111,11 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
     }
   };
   
-  // 创建聊天
-  const handleCreateChat = () => {
-    if (selectedContacts.length > 0) {
-      onCreateChat(selectedContacts.map(contact => contact.id));
+  // 完成选择
+  const handleComplete = () => {
+    if (selectedContacts.length > 0 && onComplete) {
+      const contactIds = selectedContacts.map(contact => contact.id);
+      onComplete(contactIds);
     }
   };
   
@@ -123,7 +140,7 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
           <Button 
             variant="ghost"
             className="text-white absolute right-4"
-            onClick={handleCreateChat}
+            onClick={handleComplete}
           >
             完成
           </Button>
@@ -165,17 +182,22 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
                   <ul>
                     {group.contacts.map(contact => {
                       const isSelected = selectedContacts.some(c => c.id === contact.id);
+                      const isDisabled = disabledContactIds.includes(contact.id);
                       
                       return (
                         <li
                           key={contact.id}
-                          className="px-4 py-3 cursor-pointer border-b border-gray-800"
+                          className={`px-4 py-3 border-b border-gray-800 ${isDisabled ? 'opacity-70' : 'cursor-pointer'}`}
                           onClick={() => handleSelectContact(contact)}
                         >
                           <div className="flex items-center">
                             {/* 选择圆圈 */}
-                            <div className={`w-6 h-6 rounded-full border ${isSelected ? 'bg-green-500 border-green-500 flex items-center justify-center' : 'border-gray-600'}`}>
-                              {isSelected && (
+                            <div className={`w-6 h-6 rounded-full border ${
+                              isDisabled ? 'bg-gray-500 border-gray-500 flex items-center justify-center' : 
+                              isSelected ? 'bg-green-500 border-green-500 flex items-center justify-center' : 
+                              'border-gray-600'
+                            }`}>
+                              {(isSelected || isDisabled) && (
                                 <Check size={14} className="text-white" />
                               )}
                             </div>
@@ -190,6 +212,9 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
                               <span className="font-medium text-white">
                                 {contact.name}
                               </span>
+                              {isDisabled && (
+                                <span className="ml-2 text-xs text-gray-400">已在聊天中</span>
+                              )}
                             </div>
                           </div>
                         </li>
@@ -222,7 +247,7 @@ const NewChat = ({ onBack, onCreateChat }: NewChatProps) => {
           <Button 
             variant="default"
             className="w-full bg-gray-800 hover:bg-gray-700 text-white"
-            onClick={handleCreateChat}
+            onClick={handleComplete}
           >
             完成
           </Button>

@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { contactService } from '@/services/contact.service';
-import { Contact, ContactGroup, ContactDetail } from '@/types/contact';
+import { Contact, ContactDetail } from '@/types/contact';
 import { ContactNotFoundException, ContactListInitFailedException, ContactDetailInitFailedException } from '@/errors/contact.errors';
 import { devtools } from 'zustand/middleware';
 
@@ -27,9 +27,9 @@ export interface ContactState {
   searchContacts: (query: string) => Contact[];
   addContact: (contact: Contact) => void;
   getGroupedContacts: () => Promise<void>;
-  getGroups: () => ContactGroup[];
-  getContacts: () => Contact[];
-  getContactDetail: (id: string) => ContactDetail | null;
+  getContacts: () => Promise<Contact[]>;
+  getContactDetail: (id: string) => Promise<ContactDetail | null>;
+  getContactById: (id: string) => Promise<Contact | null>;
 
   // 初始化方法
   initializeList: () => Promise<void>;
@@ -38,32 +38,6 @@ export interface ContactState {
 
 // 示例数据
 const initialContacts: Contact[] = [];
-
-// 按拼音首字母分组联系人
-const groupContactsByPinyin = (contacts: Contact[]): ContactGroup[] => {
-  // 创建一个Map用于存储分组
-  const groupMap = new Map<string, Contact[]>();
-
-  // 遍历联系人，按拼音首字母分组
-  contacts.forEach(contact => {
-    // 获取拼音首字母，如果没有拼音则使用#
-    const firstLetter = contact.pinyin ? contact.pinyin.charAt(0).toUpperCase() : '#';
-
-    // 获取或创建该字母的分组
-    const group = groupMap.get(firstLetter) || [];
-    group.push(contact);
-    groupMap.set(firstLetter, group);
-  });
-
-  // 将Map转换为数组并排序
-  const groups: ContactGroup[] = Array.from(groupMap.entries()).map(([letter, contacts]) => ({
-    letter,
-    contacts,
-  }));
-
-  // 按字母顺序排序
-  return groups.sort((a, b) => a.letter.localeCompare(b.letter));
-};
 
 // 创建联系人状态存储
 export const useContactStore = create(
@@ -169,21 +143,61 @@ export const useContactStore = create(
           throw error; // 重新抛出异常，让调用方处理
         }
       },
+      
+      // 获取联系人列表 - 检查初始化状态并返回数据
+      getContacts: async () => {
+        const state = get();
+        
+        // 如果已经初始化，则直接返回缓存数据
+        if (state.initializedList) {
+          return state.contacts;
+        }
+        
+        // 如果未初始化，则调用初始化方法
+        try {
+          await get().initializeList();
+          return get().contacts;
+        } catch (error) {
+          console.error(`获取联系人列表失败: ${error}`);
+          return [];
+        }
+      },
+      
+      // 获取联系人详情 - 判断是否已初始化并返回数据
+      getContactDetail: async (id: string) => {
+        const state = get();
+        
+        // 如果已经初始化，则直接返回缓存数据
+        if (state.initializedDetailIds[id]) {
+          return state.contactDetails[id] || null;
+        }
+        
+        // 如果未初始化，则调用初始化方法
+        try {
+          return await get().initializeContactDetail(id);
+        } catch (error) {
+          console.error(`获取联系人详情失败: ${error}`);
+          return null;
+        }
+      },
 
-      // 获取计算后的分组数据 - 直接返回内存数据
-      getGroups: () => {
-        const { contacts } = get();
-        return groupContactsByPinyin(contacts);
-      },
-      
-      // 获取联系人列表 - 直接返回内存数据
-      getContacts: () => {
-        return get().contacts;
-      },
-      
-      // 获取联系人详情 - 直接返回内存数据
-      getContactDetail: (id: string) => {
-        return get().contactDetails[id] || null;
+      // 根据ID获取联系人 - 检查初始化状态并返回数据
+      getContactById: async (id: string) => {
+        const state = get();
+        
+        // 如果已经初始化，则直接返回缓存数据
+        if (state.initializedList) {
+          return state.contacts.find(contact => contact.id === id) || null;
+        }
+        
+        // 如果未初始化，则调用初始化方法
+        try {
+          await get().initializeList();
+          return get().contacts.find(contact => contact.id === id) || null;
+        } catch (error) {
+          console.error(`获取联系人失败: ${error}`);
+          return null;
+        }
       },
 
       // 初始化联系人列表
@@ -230,6 +244,3 @@ export const useContactStore = create(
     }
   )
 );
-
-// 导出联系人状态钩子
-export const useContact = () => useContactStore();

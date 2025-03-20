@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { devtools } from 'zustand/middleware';
 import { chatService } from '@/services/chat.service';
-import { ChatItem, ChatMessage, ChatDetail } from '@/types/chat';
+import { ChatItem, ChatMessage, ChatDetail, ChatMember } from '@/types/chat';
 import {
   ChatNotFoundException,
   ChatListInitFailedException,
@@ -33,15 +33,17 @@ export interface ChatState {
   fetchAllChats: () => Promise<void>;
   searchChats: (query: string) => ChatItem[];
   addChat: (chat: ChatItem) => void;
-  getChatList: () => ChatItem[];
+  getChatList: () => Promise<ChatItem[]>;
   
   // 聊天消息相关方法
-  getChatMessages: (chatId: string) => ChatMessage[];
+  getChatMessages: (chatId: string) => Promise<ChatMessage[]>;
   addChatMessage: (chatId: string, message: ChatMessage) => void;
   updateChatMessage: (chatId: string, messageId: string, content: string) => void;
 
   // 聊天详情相关方法
-  getChatDetail: (chatId: string) => ChatDetail | null;
+  getChatDetail: (chatId: string) => Promise<ChatDetail | null>;
+  updateChatMembers: (chatId: string, members: ChatMember[]) => void;
+  addChatMember: (chatId: string, member: ChatMember) => void;
   
   // 初始化方法
   initializeChatList: () => Promise<ChatItem[]>;
@@ -78,9 +80,22 @@ export const useChatStore = create(
         }
       },
 
-      // 获取聊天列表（直接返回内存数据）
-      getChatList: () => {
-        return get().chats;
+      // 获取聊天列表（检查初始化状态并返回数据）
+      getChatList: async () => {
+        const state = get();
+        
+        // 如果已经初始化，则直接返回聊天列表
+        if (state.initializedChatList) {
+          return state.chats;
+        }
+        
+        // 如果未初始化，则调用初始化方法
+        try {
+          return await get().initializeChatList();
+        } catch (error) {
+          console.error(`获取聊天列表失败: ${error}`);
+          return [];
+        }
       },
 
       // 搜索聊天
@@ -97,14 +112,78 @@ export const useChatStore = create(
         });
       },
 
-      // 获取聊天消息（直接返回内存数据）
-      getChatMessages: (chatId: string) => {
-        return get().chatMessages[chatId] || [];
+      // 获取聊天消息（检查初始化状态并返回数据）
+      getChatMessages: async (chatId: string) => {
+        const state = get();
+        
+        // 如果已经初始化，则直接返回缓存数据
+        if (state.initializedChatIds[chatId]) {
+          return state.chatMessages[chatId] || [];
+        }
+        
+        // 如果未初始化，则调用初始化方法
+        try {
+          return await get().initializeChatMessages(chatId);
+        } catch (error) {
+          console.error(`获取聊天消息失败: ${error}`);
+          return [];
+        }
       },
 
-      // 获取聊天详情（直接返回内存数据）
-      getChatDetail: (chatId: string) => {
-        return get().chatDetails[chatId] || null;
+      // 获取聊天详情（检查初始化状态并返回数据）
+      getChatDetail: async (chatId: string) => {
+        const state = get();
+        
+        // 如果已经初始化，则直接返回缓存数据
+        if (state.initializedChatDetailIds[chatId]) {
+          return state.chatDetails[chatId] || null;
+        }
+        
+        // 如果未初始化，则调用初始化方法
+        try {
+          return await get().initializeChatDetail(chatId);
+        } catch (error) {
+          console.error(`获取聊天详情失败: ${error}`);
+          return null;
+        }
+      },
+
+      // 更新聊天成员列表
+      updateChatMembers: (chatId: string, members: ChatMember[]) => {
+        set(state => {
+          // 如果缓存中没有该聊天的详情，直接返回
+          if (!state.chatDetails[chatId]) {
+            return;
+          }
+
+          // 更新聊天成员列表
+          state.chatDetails[chatId].members = members;
+        });
+      },
+
+      // 添加聊天成员
+      addChatMember: (chatId: string, member: ChatMember) => {
+        set(state => {
+          // 如果缓存中没有该聊天的详情，直接返回
+          if (!state.chatDetails[chatId]) {
+            return;
+          }
+
+          // 确保members数组存在
+          if (!state.chatDetails[chatId].members) {
+            state.chatDetails[chatId].members = [];
+          }
+
+          // 检查成员是否已存在
+          const memberExists = state.chatDetails[chatId].members!.some(
+            m => m.id === member.id
+          );
+          
+          // 如果成员不存在，则添加
+          if (!memberExists) {
+            state.chatDetails[chatId].members!.push(member);
+          }
+        });
       },
 
       // 添加新消息
@@ -269,6 +348,3 @@ export const useChatStore = create(
     }
   )
 );
-
-// 导出聊天状态钩子
-export const useChat = () => useChatStore();

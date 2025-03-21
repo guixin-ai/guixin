@@ -62,7 +62,7 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
             {/* 头像 - 使用新的ChatListAvatar组件 */}
             <div className="relative w-12 h-12">
               <ChatListAvatar 
-                avatars={[chat.avatar]} 
+                avatars={chat.avatar} 
                 testId={`${testId}-avatar`}
               />
               {/* 未读消息提示 - 只有当未读数大于0时才显示 */}

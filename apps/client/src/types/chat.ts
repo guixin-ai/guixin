@@ -6,7 +6,7 @@
 export interface ChatItem {
   id: string;
   name: string;
-  avatar: string;
+  avatar: string[];
   lastMessage: string;
   timestamp: string;
   unread?: number;
@@ -16,7 +16,7 @@ export interface ChatItem {
 export interface ChatDetail {
   id: string;
   name: string;
-  avatar: string;
+  avatar: string[];
   isAI?: boolean;
   members?: ChatMember[];
 }

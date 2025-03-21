@@ -320,11 +320,18 @@ export const useChatStore = create(
           throw new GroupChatCreationFailedException('获取联系人详情失败', error);
         }
         
+        // 收集所有成员的头像，用于聊天列表显示
+        const avatars = members.map(member => member.avatar).filter(Boolean);
+        // 如果没有头像，使用默认值
+        if (avatars.length === 0) {
+          avatars.push('聊');
+        }
+        
         // 创建新的聊天列表项
         const newChat: ChatItem = {
           id: chatId,
           name: contactIds.length > 1 ? `群聊 (${members.length})` : members[1]?.name || "新的聊天",
-          avatar: contactIds.length > 1 ? "群" : members[1]?.avatar || "聊",
+          avatar: avatars,
           lastMessage: "还没有消息",
           timestamp: "刚刚",
           unread: 0
@@ -337,7 +344,7 @@ export const useChatStore = create(
         const chatDetail: ChatDetail = {
           id: chatId,
           name: newChat.name,
-          avatar: newChat.avatar,
+          avatar: avatars,
           members: members
         };
         

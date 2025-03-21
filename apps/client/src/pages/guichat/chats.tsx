@@ -214,7 +214,12 @@ const ChatsPage = () => {
           <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800">
             {filteredChats.length > 0 &&
               filteredChats.map(chat => (
-                <ChatListItem key={chat.id} chat={chat} onClick={handleChatClick} />
+                <ChatListItem 
+                  key={chat.id} 
+                  chat={chat} 
+                  onClick={handleChatClick}
+                  onDelete={(chatId) => console.log('删除聊天:', chatId)} 
+                />
               ))}
           </div>
         </div>

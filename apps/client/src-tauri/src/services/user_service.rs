@@ -7,6 +7,7 @@ use crate::db::{DbConnection, DbPool};
 use crate::models::{User, NewUser};
 use crate::schema::users;
 use crate::repositories::user_repository::UserRepository;
+use crate::repositories::user_contact_repository::UserContactRepository;
 
 use super::ServiceResult;
 
@@ -116,5 +117,28 @@ impl UserService {
             .select(User::as_select())
             .first(conn)
             .map_err(|e| anyhow!("获取新创建的AI用户失败: {}", e))
+    }
+
+    // 创建AI用户并添加为联系人
+    pub fn create_ai_user_and_add_as_contact(
+        pool: &DbPool,
+        user_id: &str,
+        name: &str,
+        description: Option<&str>,
+    ) -> Result<User> {
+        // 获取连接
+        let mut conn = pool.get().map_err(|e| anyhow!("获取数据库连接失败: {}", e))?;
+        
+        // 开始事务
+        conn.transaction(|conn| {
+            // 1. 创建AI用户
+            let ai_user = Self::create_ai_user(conn, name, description)?;
+            
+            // 2. 添加为联系人 - 使用同一个事务连接
+            UserContactRepository::create_with_conn(conn, user_id, &ai_user.id)
+                .map_err(|e| anyhow!("添加联系人失败: {}", e))?;
+            
+            Ok(ai_user)
+        })
     }
 }

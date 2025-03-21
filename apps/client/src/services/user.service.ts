@@ -31,6 +31,16 @@ interface UserResponse {
 }
 
 /**
+ * 联系人响应接口
+ */
+interface ContactResponse {
+  id: string;
+  name: string;
+  description?: string;
+  is_ai: boolean;
+}
+
+/**
  * 用户服务类
  */
 class UserService {
@@ -92,6 +102,18 @@ class UserService {
     } catch (error) {
       console.error('创建AI用户失败:', error);
       throw new Error(`创建AI用户失败: ${error}`);
+    }
+  }
+
+  /**
+   * 创建AI用户并添加为联系人
+   */
+  public async createAiContact(name: string, description?: string): Promise<ContactResponse> {
+    try {
+      return await invoke('create_ai_contact', { name, description }) as ContactResponse;
+    } catch (error) {
+      console.error('创建AI联系人失败:', error);
+      throw new Error(`创建AI联系人失败: ${error}`);
     }
   }
 }

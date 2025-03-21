@@ -118,8 +118,8 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
     setIsCreating(true);
     
     try {
-      // 调用userService创建AI用户
-      const aiUser = await userService.createAiUser(values.name, values.description);
+      // 调用userService创建AI联系人
+      const aiContact = await userService.createAiContact(values.name, values.description);
       
       // 获取第一个字符作为头像
       const avatarChar = values.name.charAt(0);
@@ -127,8 +127,8 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
 
       // 添加到聊天列表
       addChat({
-        id: aiUser.id,
-        name: aiUser.name,
+        id: aiContact.id,
+        name: aiContact.name,
         avatar: avatarChar,
         lastMessage: '你好，我是你创建的AI朋友',
         timestamp: '刚刚',
@@ -136,27 +136,27 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
 
       // 添加到联系人列表
       addContact({
-        id: aiUser.id,
-        name: aiUser.name,
+        id: aiContact.id,
+        name: aiContact.name,
         avatar: avatarChar,
-        pinyin: pinyinFirstLetter + aiUser.name, // 确保排序正确
+        pinyin: pinyinFirstLetter + aiContact.name, // 确保排序正确
       });
       
       // 添加联系人详情
       const { addContactDetail } = useContactStore.getState();
       addContactDetail({
-        id: aiUser.id,
-        name: aiUser.name,
+        id: aiContact.id,
+        name: aiContact.name,
         avatar: avatarChar,
-        description: aiUser.description || ''
+        description: aiContact.description || ''
       });
 
       // 显示成功消息
-      toast.success(`成功创建AI朋友 ${aiUser.name}`);
+      toast.success(`成功创建AI朋友 ${aiContact.name}`);
 
       // 调用完成回调
       if (onComplete) {
-        onComplete(aiUser.id);
+        onComplete(aiContact.id);
       } else {
         onBack();
       }

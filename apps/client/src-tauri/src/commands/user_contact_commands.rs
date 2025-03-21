@@ -1,6 +1,7 @@
 use crate::repositories::user_contact_repository::UserContactRepository;
 use crate::repositories::user_repository::UserRepository;
 use crate::repositories::error::RepositoryError;
+use crate::services::user_service::UserService;
 use crate::AppState;
 use tauri::State;
 use serde::{Serialize, Deserialize};
@@ -73,4 +74,34 @@ pub async fn remove_contact(user_id: String, contact_id: String, state: State<'_
     // 删除联系人关系
     UserContactRepository::delete_by_user_and_contact(&pool, &user_id, &contact_id)
         .map_err(|e| e.to_string())
+}
+
+/// 创建AI用户并添加为当前用户的联系人
+/// 
+/// 此命令会创建一个新的AI用户，并将其添加为当前用户的联系人
+#[tauri::command]
+pub async fn create_ai_contact(
+    name: String, 
+    description: Option<String>, 
+    state: State<'_, AppState>
+) -> Result<ContactResponse, String> {
+    // 获取数据库连接池和当前用户
+    let pool = state.db_pool.lock().expect("无法获取数据库连接池");
+    let current_user = state.current_user.lock().expect("无法获取当前用户状态");
+    
+    // 调用服务创建AI用户并添加为联系人
+    let ai_user = UserService::create_ai_user_and_add_as_contact(
+        &pool,
+        &current_user.id,
+        &name,
+        description.as_deref()
+    ).map_err(|e| e.to_string())?;
+    
+    // 返回创建的AI用户信息
+    Ok(ContactResponse {
+        id: ai_user.id,
+        name: ai_user.name,
+        description: ai_user.description,
+        is_ai: ai_user.is_ai,
+    })
 } 

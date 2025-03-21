@@ -38,7 +38,8 @@ pub fn run() {
             commands::get_user_chat_list,
             commands::get_user_contacts,
             commands::add_contact,
-            commands::remove_contact
+            commands::remove_contact,
+            commands::create_ai_contact
         ])
         .run(tauri::generate_context!())
         .expect("运行应用失败");

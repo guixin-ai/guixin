@@ -5,7 +5,7 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 use super::error::{RepositoryError, RepositoryResult};
-use crate::db::DbPool;
+use crate::db::{DbPool, DbConnection};
 use crate::models::{UserContact, NewUserContact};
 use crate::schema::user_contacts::dsl::*;
 
@@ -16,6 +16,11 @@ impl UserContactRepository {
     pub fn create(pool: &DbPool, user_id_val: &str, contact_id_val: &str) -> RepositoryResult<UserContact> {
         let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
         
+        Self::create_with_conn(&mut conn, user_id_val, contact_id_val)
+    }
+    
+    // 使用已有连接创建用户联系人关系
+    pub fn create_with_conn(conn: &mut DbConnection, user_id_val: &str, contact_id_val: &str) -> RepositoryResult<UserContact> {
         let new_user_contact = NewUserContact {
             id: Uuid::new_v4().to_string(),
             user_id: user_id_val.to_string(),
@@ -26,12 +31,12 @@ impl UserContactRepository {
         
         diesel::insert_into(user_contacts)
             .values(&new_user_contact)
-            .execute(&mut conn)
+            .execute(conn)
             .map_err(RepositoryError::DatabaseError)?;
             
         user_contacts
             .filter(id.eq(&new_user_contact.id))
-            .first::<UserContact>(&mut conn)
+            .first::<UserContact>(conn)
             .map_err(RepositoryError::DatabaseError)
     }
 

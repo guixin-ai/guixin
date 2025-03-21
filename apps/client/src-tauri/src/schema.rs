@@ -12,6 +12,9 @@ diesel::table! {
 diesel::table! {
     chats (id) {
         id -> Text,
+        unread_count -> Integer,
+        last_message -> Nullable<Text>,
+        last_message_time -> Nullable<Timestamp>,
         created_at -> Timestamp,
         updated_at -> Timestamp,
     }
@@ -25,6 +28,16 @@ diesel::table! {
         updated_at -> Timestamp,
         chat_id -> Text,
         sender_id -> Text,
+    }
+}
+
+diesel::table! {
+    user_contacts (id) {
+        id -> Text,
+        user_id -> Text,
+        contact_id -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
 
@@ -48,5 +61,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     chat_participants,
     chats,
     messages,
+    user_contacts,
     users,
 );

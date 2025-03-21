@@ -18,6 +18,9 @@ impl ChatRepository {
 
         let new_chat = NewChat {
             id: Uuid::new_v4().to_string(),
+            unread_count: 0, // 初始未读消息为0
+            last_message: None, // 初始没有最后消息
+            last_message_time: None, // 初始没有最后消息时间
             created_at: Utc::now().naive_utc(),
             updated_at: Utc::now().naive_utc(),
         };

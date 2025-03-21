@@ -51,10 +51,6 @@ pub fn get_user_chat_list(
         let chat_participants = ChatParticipantRepository::get_by_chat_id(&pool, &chat.id)
             .map_err(|e| format!("获取聊天参与者失败: {}", e))?;
         
-        // 获取聊天的最后一条消息
-        let messages = MessageRepository::get_by_chat_id(&pool, &chat.id)
-            .map_err(|e| format!("获取聊天消息失败: {}", e))?;
-        
         // 查找非当前用户的参与者作为聊天名称
         let other_participants: Vec<ChatParticipant> = chat_participants
             .into_iter()
@@ -76,27 +72,19 @@ pub fn get_user_chat_list(
             (format!("聊天 {}", chat.id), "?".to_string())
         };
         
-        // 获取最后一条消息和时间信息
-        let (last_message, created_at, updated_at) = if let Some(last_msg) = messages.last() {
-            (
-                Some(last_msg.content.clone()),
-                Some(last_msg.created_at.to_string()),  // 直接使用ISO格式的时间字符串
-                Some(last_msg.updated_at.to_string())
-            )
-        } else {
-            (None, None, None)
-        };
+        // 直接使用聊天对象中存储的最后消息信息
+        let formatted_time = chat.last_message_time.map(|t| t.to_string());
         
         // 添加到结果列表
         chat_list.push(ChatListItemResponse {
             id: chat.id,
             name,
             avatar,
-            last_message,
-            timestamp: None,  // 不再在后端处理时间戳显示格式
-            created_at,       // 传递原始创建时间
-            updated_at,       // 传递原始更新时间
-            unread: Some(0),  // 暂时固定为0，未实现未读消息计数
+            last_message: chat.last_message, // 直接使用存储的最后消息
+            timestamp: formatted_time, // 使用存储的最后消息时间
+            created_at: Some(chat.created_at.to_string()),
+            updated_at: Some(chat.updated_at.to_string()),
+            unread: Some(chat.unread_count), // 使用存储的未读消息数
         });
     }
     

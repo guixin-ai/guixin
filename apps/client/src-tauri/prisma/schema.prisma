@@ -25,15 +25,37 @@ model User {
   // 关系字段
   messages     Message[]    // 发送的消息
   chats        ChatParticipant[] // 参与的聊天
+  
+  // 联系人关系
+  contacts     UserContact[] // 该用户的联系人
 
   @@map("users")
 }
 
-// 聊天模型 - 简化版
-model Chat {
+// 用户联系人关系表
+model UserContact {
   id           String       @id @default(uuid())
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  user         User         @relation(fields: [userId], references: [id])
+  userId       String       @map("user_id")
+  
+  contactId    String       @map("contact_id")
+  
+  @@unique([userId, contactId]) // 确保一个用户对某个联系人只有一个记录
+  @@map("user_contacts")
+}
+
+// 聊天模型 - 简化版
+model Chat {
+  id                 String       @id @default(uuid())
+  unread_count       Int          @default(0) // 未读消息数量
+  last_message       String?      // 最后一条消息的内容
+  last_message_time  DateTime?    // 最后一条消息的时间
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
   
   // 关系字段
   participants ChatParticipant[] // 聊天参与者

@@ -8,6 +8,7 @@
 erDiagram
     User ||--o{ Message : "发送"
     User ||--o{ ChatParticipant : "参与"
+    User ||--o{ UserContact : "拥有"
     Chat ||--o{ ChatParticipant : "包含"
     Chat ||--o{ Message : "包含"
 
@@ -20,8 +21,19 @@ erDiagram
         datetime updatedAt
     }
 
+    UserContact {
+        string id PK
+        datetime createdAt
+        datetime updatedAt
+        string userId FK "User.id"
+        string contactId
+    }
+
     Chat {
         string id PK
+        int unread_count
+        string last_message
+        datetime last_message_time
         datetime createdAt
         datetime updatedAt
     }
@@ -51,6 +63,7 @@ erDiagram
 classDiagram
     User "1" --> "*" Message : 发送
     User "1" --> "*" ChatParticipant : 参与
+    User "1" --> "*" UserContact : 拥有联系人
     Chat "1" --> "*" ChatParticipant : 包含
     Chat "1" --> "*" Message : 包含
 
@@ -63,8 +76,19 @@ classDiagram
         +DateTime updatedAt
     }
 
+    class UserContact {
+        +String id
+        +DateTime createdAt
+        +DateTime updatedAt
+        +String userId
+        +String contactId
+    }
+
     class Chat {
         +String id
+        +Int unread_count
+        +String last_message
+        +DateTime last_message_time
         +DateTime createdAt
         +DateTime updatedAt
     }
@@ -93,6 +117,7 @@ classDiagram
 - **1对多关系 (1:N)**
   - User 与 Message：一个用户可以发送多条消息
   - User 与 ChatParticipant：一个用户可以参与多个聊天
+  - User 与 UserContact：一个用户可以有多个联系人
   - Chat 与 ChatParticipant：一个聊天可以包含多个参与者
   - Chat 与 Message：一个聊天可以包含多条消息
 
@@ -107,19 +132,28 @@ classDiagram
    - 包含基本用户信息
    - 一个用户可以发送多条消息 (`messages`)
    - 一个用户可以参与多个聊天 (`chats`)
+   - 一个用户可以有多个联系人 (`contacts`)
+
+2. **UserContact (用户联系人)**
+   - 表示用户与联系人的关系
+   - 每个记录代表一个用户添加了另一个用户作为联系人
+   - 只存储联系人ID，不存储其他信息
 
 ### 聊天相关
 
-2. **Chat (聊天)**
+3. **Chat (聊天)**
    - 代表一个聊天会话
+   - 包含未读消息数量 (`unread_count`)
+   - 包含最后一条消息内容 (`last_message`)
+   - 包含最后一条消息时间 (`last_message_time`)
    - 包含多个参与者 (`participants`)
    - 包含多条消息 (`messages`)
 
-3. **ChatParticipant (聊天参与者)**
+4. **ChatParticipant (聊天参与者)**
    - 多对多关系表，连接Chat和User
    - 一个用户在一个聊天中只能有一个参与记录
 
-4. **Message (消息)**
+5. **Message (消息)**
    - 包含消息内容
    - 有一个发送者 (`sender`)
    - 属于一个聊天 (`chat`)
@@ -134,6 +168,11 @@ classDiagram
 ### 发送消息流程
 
 1. 在指定Chat中创建Message，指定发送者
+2. 通过触发器自动更新Chat的最后消息信息
+
+### 添加联系人流程
+
+1. 在UserContact表中创建记录，指定user_id和contact_id
 
 ### 获取聊天历史流程
 

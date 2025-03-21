@@ -1,48 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Send,
-  Paperclip,
-  Smile,
-  Image,
-  Mic,
-  MoreVertical,
-  ChevronRight,
-} from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { useChatStore } from '../models/chat.model';
-import { useContactStore } from '../models/contact.model';
-import { ChatMessage, ChatMember } from '@/types/chat';
-import {
-  ChatNotFoundException,
-  ChatListInitFailedException,
-  ChatMessagesInitFailedException,
   ChatDetailInitFailedException,
+  ChatMessagesInitFailedException,
+  ChatNotFoundException,
 } from '@/errors/chat.errors';
+import { aiQueueManager } from '@/services/ai-queue-manager.service';
+import { AIMember } from '@/services/ai-queue.service';
+import { ChatMember, ChatMessage } from '@/types/chat';
+import { ArrowLeft, Mic, MoreVertical, Paperclip, Send, Smile } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
+import ChatInfoPage from '../components/chat-info';
 import DelayedLoading from '../components/delayed-loading';
 import {
   VirtuosoMessage,
   VirtuosoMessageListMethods,
 } from '../components/lib/virtuoso-message/virtuoso-message';
-import {
-  ollamaService,
-  OllamaChatResponse,
-  OllamaMessage,
-  ChatStreamOptions,
-} from '../services/ollama.service';
-import {
-  OllamaBaseError,
-  OllamaConnectionError,
-  OllamaStreamAbortedError,
-  OllamaServiceUnavailableError,
-  OllamaModelNotFoundError,
-  OllamaModelLoadError,
-} from '@/errors/ollama.errors';
-import ChatInfoPage from '../components/chat-info';
-import NewChat from '../components/new-chat';
-import { useShallow } from 'zustand/react/shallow';
 import MessageItemContent, { VirtuosoMessageItem } from '../components/message-item';
+import NewChat from '../components/new-chat';
+import { Button } from '../components/ui/button';
+import { useChatStore } from '../models/chat.model';
+import { useContactStore } from '../models/contact.model';
+import { OllamaMessage } from '../services/ollama.service';
 
 // 联系人类型
 interface Contact {
@@ -50,25 +29,6 @@ interface Contact {
   name: string;
   avatar: string;
   isAI?: boolean;
-}
-
-// 随机短语，用于模拟打字效果
-const randomPhrases = [
-  '我理解你的问题，',
-  '让我思考一下，',
-  '根据我的分析，',
-  '这是一个很好的问题，',
-  '从技术角度来看，',
-  '考虑到你的需求，',
-  '基于最佳实践，',
-  '我认为这个想法不错，',
-  '你提到的内容很有趣，',
-  '这个问题有几个方面需要考虑，',
-];
-
-// 获取随机短语
-function getRandomPhrase() {
-  return randomPhrases[Math.floor(Math.random() * randomPhrases.length)];
 }
 
 // 新增 ChatPageWrapper 组件
@@ -92,14 +52,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
   const [showChatInfo, setShowChatInfo] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
-  
-  // 添加AI队列相关状态
-  const [aiQueue, setAiQueue] = useState<ChatMember[]>([]);
-  const [currentAiIndex, setCurrentAiIndex] = useState(0);
-  const [isAiQueueProcessing, setIsAiQueueProcessing] = useState(false);
 
-  // 添加AbortController引用
-  const abortControllerRef = useRef<AbortController | null>(null);
   // 添加输入框引用，用于保持焦点
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -190,6 +143,113 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     loadChatData();
   }, [chatId, initializeChatDetail, initializeChatMessages]);
 
+  // 注册AI队列服务响应处理器
+  useEffect(() => {
+    // 定义当前聊天的消息处理器
+    const handlers = {
+      // 当AI开始回复时调用
+      onStart: (messageId: string, aiMember: AIMember) => {
+        // 标记AI正在响应
+        setIsAIResponding(true);
+
+        // 在UI中创建一个空消息气泡
+        const aiMessage: VirtuosoMessageItem = {
+          key: messageId,
+          content: '',
+          isSelf: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isStreaming: true,
+          senderId: aiMember.id,
+        };
+
+        // 添加到UI组件
+        if (virtuosoRef.current && isMessagesInitialized) {
+          virtuosoRef.current.data.append([aiMessage]);
+        }
+
+        // 同步到模型层 - 初始添加空消息
+        const chatAiMessage: ChatMessage = {
+          id: messageId,
+          content: '',
+          isSelf: false,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        addChatMessage(chatId, chatAiMessage);
+      },
+
+      // 当收到AI部分回复内容时调用
+      onContent: (messageId: string, content: string, aiMember: AIMember) => {
+        // 更新UI中的消息内容 - 直接使用服务传来的完整内容
+        if (virtuosoRef.current && isMessagesInitialized) {
+          virtuosoRef.current.data.map(msg => {
+            if (msg.key === messageId) {
+              return {
+                ...msg,
+                content: content, // 直接使用服务传来的完整内容，不需要拼接
+              };
+            }
+            return msg;
+          });
+        }
+      },
+
+      // 当AI回复完成时调用
+      onComplete: (messageId: string, fullContent: string, aiMember: AIMember) => {
+        if (virtuosoRef.current && isMessagesInitialized) {
+          virtuosoRef.current.data.map(msg => {
+            if (msg.key === messageId) {
+              return {
+                ...msg,
+                content: fullContent,
+                isStreaming: false,
+              };
+            }
+            return msg;
+          });
+        }
+
+        // 同步最终完整的响应到模型层
+        updateChatMessage(chatId, messageId, fullContent);
+
+        // 取消AI响应状态
+        setIsAIResponding(false);
+      },
+
+      // 当AI回复出错时调用
+      onError: (messageId: string, error: Error, aiMember: AIMember) => {
+        if (virtuosoRef.current && isMessagesInitialized) {
+          virtuosoRef.current.data.map(msg => {
+            if (msg.key === messageId) {
+              return {
+                ...msg,
+                content: error.message,
+                isStreaming: false,
+                isError: true,
+              };
+            }
+            return msg;
+          });
+        }
+
+        // 更新模型层中的错误消息
+        updateChatMessage(chatId, messageId, error.message);
+
+        // 取消AI响应状态
+        setIsAIResponding(false);
+      },
+    };
+
+    // 注册处理器并获取取消注册函数
+    const unregister = aiQueueManager.registerHandlers(chatId, handlers);
+
+    // 组件卸载时取消注册
+    return () => {
+      unregister();
+      // 确保取消当前聊天的所有AI回复
+      aiQueueManager.cancelChat(chatId);
+    };
+  }, [chatId, isMessagesInitialized, addChatMessage, updateChatMessage]);
+
   // 返回聊天列表
   const handleBack = () => {
     if (showNewChat) {
@@ -198,20 +258,6 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       setShowChatInfo(false);
     } else {
       navigate('/guichat/chats');
-    }
-  };
-
-  // 取消当前正在进行的生成
-  const cancelCurrentGeneration = () => {
-    if (abortControllerRef.current) {
-      console.log('取消当前生成...');
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      
-      // 重置AI队列处理状态
-      setIsAiQueueProcessing(false);
-      setCurrentAiIndex(0);
-      setAiQueue([]);
     }
   };
 
@@ -244,266 +290,6 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
 
     // 关闭新聊天组件
     setShowNewChat(false);
-  };
-
-  // 准备AI队列
-  const prepareAIQueue = async () => {
-    // 从模型层直接获取聊天详情
-    const chatDetail = chatDetails[chatId];
-    
-    // 如果模型层中没有聊天详情，尝试获取
-    if (!chatDetail || !chatDetail.members) {
-      const refreshedDetail = await getChatDetail(chatId);
-      if (!refreshedDetail || !refreshedDetail.members) return [];
-      
-      // 过滤出所有AI成员
-      const aiMembers = refreshedDetail.members.filter(member => member.isAI);
-      return aiMembers;
-    }
-    
-    // 过滤出所有AI成员
-    const aiMembers = chatDetail.members.filter(member => member.isAI);
-    
-    // 如果没有AI成员，返回空数组
-    if (aiMembers.length === 0) return [];
-    
-    // 返回AI成员队列
-    return aiMembers;
-  };
-
-  // 使用Ollama生成AI回复
-  const generateAIResponse = async (responseId: string, aiMember: ChatMember) => {
-    setIsAIResponding(true);
-
-    try {
-      // 使用本地Ollama模型 - 这里使用gemma3模型
-      const MODEL_NAME = 'gemma3:1b';
-
-      // 准备聊天历史 - 在添加空消息前获取最新的消息列表
-      const latestMessages = await getChatMessages(chatId);
-      const chatHistory: OllamaMessage[] = latestMessages.map(msg => ({
-        role: msg.isSelf ? 'user' : 'assistant',
-        content: msg.content,
-      }));
-
-      // 创建虚拟联系人对象用于显示
-      const aiContact: Contact = {
-        id: aiMember.id,
-        name: aiMember.name,
-        avatar: aiMember.avatar,
-        isAI: true,
-      };
-
-      // 创建初始空回复
-      const aiMessage: VirtuosoMessageItem = {
-        key: responseId,
-        content: '',
-        isSelf: false,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isStreaming: true,
-        senderId: aiMember.id,
-      };
-
-      // 直接添加到UI组件
-      if (virtuosoRef.current && isMessagesInitialized) {
-        virtuosoRef.current.data.append([aiMessage]);
-      }
-
-      // 同步到模型层 - 初始添加空消息
-      const chatAiMessage: ChatMessage = {
-        id: responseId,
-        content: '',
-        isSelf: false,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      addChatMessage(chatId, chatAiMessage);
-
-      // 创建新的AbortController
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      // 准备系统提示词（如果有）
-      const systemMessages: OllamaMessage[] = [];
-      if (aiMember.description) {
-        systemMessages.push({
-          role: 'system',
-          content: aiMember.description
-        });
-      }
-
-      // 合并系统消息和聊天历史
-      const allMessages = [...systemMessages, ...chatHistory];
-
-      // 使用服务层提供的可中断流方法
-      await ollamaService.chatStream(
-        {
-          model: MODEL_NAME,
-          messages: allMessages,
-          stream: true,
-          options: {
-            temperature: 0.7,
-            top_p: 0.9,
-          },
-        },
-        { signal }, // 传入AbortSignal
-        (chunk: OllamaChatResponse) => {
-          // 处理每个响应块
-          if (chunk.message?.content && typeof chunk.message.content === 'string') {
-            // 维护一个局部变量记录当前的消息内容
-            let currentContent = '';
-
-            // 更新UI显示
-            if (virtuosoRef.current && isMessagesInitialized) {
-              virtuosoRef.current.data.map(msg => {
-                if (msg.key === responseId) {
-                  currentContent = msg.content + chunk.message.content;
-                  return {
-                    ...msg,
-                    content: currentContent,
-                  };
-                }
-                return msg;
-              });
-            }
-
-            // 同步更新到模型层 - 使用updateChatMessage更新已有消息
-            updateChatMessage(chatId, responseId, currentContent);
-          }
-        },
-        (fullResponse: OllamaMessage) => {
-          // 完成时处理
-          const finalContent = fullResponse.content as string;
-
-          if (virtuosoRef.current && isMessagesInitialized) {
-            virtuosoRef.current.data.map(msg => {
-              if (msg.key === responseId) {
-                return {
-                  ...msg,
-                  content: finalContent,
-                  isStreaming: false,
-                };
-              }
-              return msg;
-            });
-          }
-
-          // 同步最终完整的响应到模型层 - 使用updateChatMessage更新最终内容
-          updateChatMessage(chatId, responseId, finalContent);
-
-          setIsAIResponding(false);
-          // 清除当前的AbortController
-          abortControllerRef.current = null;
-          
-          // 处理AI队列中的下一个AI
-          processNextAI();
-        }
-      );
-    } catch (error: any) {
-      // 使用新的异常类型进行处理
-      let errorMessage = '抱歉，我暂时无法回答您的问题。';
-      let isAborted = false;
-
-      if (error instanceof OllamaStreamAbortedError) {
-        // 流被用户中断
-        isAborted = true;
-        errorMessage = '(已中断)';
-      } else if (error instanceof OllamaModelNotFoundError) {
-        // 模型不存在
-        errorMessage = `抱歉，所需的模型 ${error.modelName} 不存在。请确保该模型已安装。`;
-      } else if (error instanceof OllamaModelLoadError) {
-        // 模型加载失败
-        errorMessage = `抱歉，模型 ${error.modelName} 加载失败。请检查模型是否损坏或重新安装。`;
-      } else if (error instanceof OllamaServiceUnavailableError) {
-        // 服务不可用
-        errorMessage = '抱歉，Ollama服务不可用。请确保Ollama服务已启动并正常运行。';
-      } else if (error instanceof OllamaConnectionError) {
-        // 连接错误
-        errorMessage = '抱歉，连接到Ollama服务失败。请检查网络连接和服务状态。';
-      } else if (error instanceof OllamaBaseError) {
-        // 其他Ollama错误
-        errorMessage = `抱歉，Ollama服务出现错误: ${error.message}`;
-      } else {
-        // 未知错误
-        console.error('调用Ollama服务失败:', error);
-        errorMessage = '抱歉，我暂时无法回答您的问题。请检查Ollama服务是否正常运行。';
-      }
-
-      // 更新UI显示错误信息
-      let finalErrorContent = '';
-
-      if (virtuosoRef.current && isMessagesInitialized) {
-        virtuosoRef.current.data.map(msg => {
-          if (msg.key === responseId) {
-            finalErrorContent = isAborted ? msg.content + errorMessage : errorMessage;
-            return {
-              ...msg,
-              content: finalErrorContent,
-              isStreaming: false,
-            };
-          }
-          return msg;
-        });
-      }
-
-      // 更新模型层中的错误消息
-      updateChatMessage(chatId, responseId, finalErrorContent);
-
-      setIsAIResponding(false);
-      abortControllerRef.current = null;
-      
-      // 如果发生错误，也尝试处理下一个AI（除非是被用户中断的）
-      if (!isAborted) {
-        processNextAI();
-      } else {
-        // 如果是被用户中断，重置队列
-        setIsAiQueueProcessing(false);
-        setCurrentAiIndex(0);
-        setAiQueue([]);
-      }
-    }
-  };
-
-  // 启动AI队列处理
-  const startAIQueueProcessing = async () => {
-    // 如果已经在处理队列，则不再重复启动
-    if (isAiQueueProcessing) return;
-    
-    // 准备AI队列
-    const aiMembers = await prepareAIQueue();
-    if (aiMembers.length === 0) return;
-    
-    setAiQueue(aiMembers);
-    setCurrentAiIndex(0);
-    setIsAiQueueProcessing(true);
-    
-    // 开始处理第一个AI
-    const firstAI = aiMembers[0];
-    const responseId = `ai-${firstAI.id}-${Date.now()}`;
-    generateAIResponse(responseId, firstAI);
-  };
-
-  // 处理队列中的下一个AI
-  const processNextAI = () => {
-    // 如果队列为空或当前索引已超出范围，结束处理
-    if (aiQueue.length === 0 || currentAiIndex >= aiQueue.length - 1) {
-      setIsAiQueueProcessing(false);
-      setCurrentAiIndex(0);
-      setAiQueue([]);
-      return;
-    }
-    
-    // 移动到下一个AI
-    const nextIndex = currentAiIndex + 1;
-    setCurrentAiIndex(nextIndex);
-    
-    // 获取下一个AI并生成回复
-    const nextAI = aiQueue[nextIndex];
-    const responseId = `ai-${nextAI.id}-${Date.now()}`;
-    
-    // 短暂延迟后开始下一个AI的回复，使界面有时间更新
-    setTimeout(() => {
-      generateAIResponse(responseId, nextAI);
-    }, 500);
   };
 
   // 发送消息
@@ -549,10 +335,53 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
     addChatMessage(chatId, chatMessage);
 
-    // 延迟1秒后开始AI队列处理
-    setTimeout(() => {
-      startAIQueueProcessing();
-    }, 1000);
+    // 使用aiQueueManager处理AI回复
+    // 1. 准备历史消息
+    getChatMessages(chatId).then(messages => {
+      // 2. 格式化消息为Ollama格式
+      const chatHistory: OllamaMessage[] = messages.map(msg => ({
+        role: msg.isSelf ? 'user' : 'assistant',
+        content: msg.content,
+      }));
+
+      // 3. 初始化aiQueueManager的历史记录 (已包含最新的用户消息)
+      aiQueueManager.updateChatHistory(chatId, chatHistory);
+
+      // 5. 获取聊天中的AI成员
+      const chatDetail = chatDetails[chatId];
+      if (!chatDetail || !chatDetail.members) return;
+
+      // 过滤出所有AI成员
+      const aiMembers = chatDetail.members.filter(member => member.isAI);
+      if (aiMembers.length === 0) return;
+
+      // 6. 为每个AI成员创建回复任务
+      aiMembers.forEach(aiMember => {
+        // 生成唯一消息ID
+        const messageId = `ai-${aiMember.id}-${Date.now()}`;
+
+        // 添加到队列
+        aiQueueManager.addToQueue({
+          chatId,
+          messageId,
+          aiMember: {
+            id: aiMember.id,
+            name: aiMember.name,
+            avatar: aiMember.avatar || aiMember.name.charAt(0),
+            description: aiMember.description,
+            isAI: true,
+          },
+          modelName: 'gemma3:1b', // 可配置
+          options: {
+            temperature: 0.7,
+            top_p: 0.9,
+          },
+        });
+      });
+
+      // 7. 启动队列处理
+      aiQueueManager.startProcessing(chatId);
+    });
 
     // 保持输入框焦点
     if (inputRef.current) {
@@ -576,6 +405,14 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   // 打开聊天信息设置
   const handleOpenChatInfo = () => {
     setShowChatInfo(true);
+  };
+
+  // 修改取消生成函数，使用aiQueueManager
+  const cancelCurrentGeneration = () => {
+    // 取消当前聊天的整个队列
+    aiQueueManager.removeQueue(chatId);
+    // 重置AI响应状态
+    setIsAIResponding(false);
   };
 
   // 聊天页面（包括未找到聊天的情况）
@@ -620,8 +457,8 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
                 className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
                 computeItemKey={({ data }) => data.key}
                 ItemContent={({ data }) => (
-                  <MessageItemContent 
-                    data={data} 
+                  <MessageItemContent
+                    data={data}
                     contact={contact}
                     aiMembers={chatDetails[chatId]?.members || []}
                   />

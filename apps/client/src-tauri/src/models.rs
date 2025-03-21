@@ -31,6 +31,9 @@ pub struct NewUser {
 #[diesel(table_name = chats)]
 pub struct Chat {
     pub id: String,
+    pub unread_count: i32,
+    pub last_message: Option<String>,
+    pub last_message_time: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -39,6 +42,9 @@ pub struct Chat {
 #[diesel(table_name = chats)]
 pub struct NewChat {
     pub id: String,
+    pub unread_count: i32,
+    pub last_message: Option<String>,
+    pub last_message_time: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }

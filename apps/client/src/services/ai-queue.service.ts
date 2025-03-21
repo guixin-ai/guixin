@@ -54,14 +54,14 @@ export enum AIQueueEvents {
   QUEUE_CLEARED = 'queue_cleared',
 }
 
-class AIQueueService extends EventEmitter {
+export class AIQueueService extends EventEmitter {
   private queue: AIQueueItem[] = [];
   private isProcessing: boolean = false;
   private currentItem: AIQueueItem | null = null;
   private responseHandlers: Map<string, AIResponseHandlers> = new Map();
   private DEFAULT_MODEL = 'gemma3:1b';
   
-  // 新增：消息历史缓存，按聊天ID存储
+  // 消息历史缓存，按聊天ID存储
   private chatHistoryCache: Map<string, OllamaMessage[]> = new Map();
 
   constructor() {
@@ -249,8 +249,8 @@ class AIQueueService extends EventEmitter {
             const contentChunk = chunk.message.content;
             fullContent += contentChunk;
             
-            // 通知内容更新
-            handlers.onContent?.(messageId, contentChunk, aiMember);
+            // 通知内容更新，传递完整内容而不是仅传递增量块
+            handlers.onContent?.(messageId, fullContent, aiMember);
           }
         },
         (fullResponse: OllamaMessage) => {
@@ -326,7 +326,4 @@ class AIQueueService extends EventEmitter {
       }, 500); // 短暂延迟，给UI更新时间
     }
   }
-}
-
-// 导出单例实例
-export const aiQueueService = new AIQueueService(); 
+} 

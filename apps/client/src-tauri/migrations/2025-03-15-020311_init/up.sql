@@ -10,9 +10,24 @@ CREATE TABLE users (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 创建用户联系人关系表
+CREATE TABLE user_contacts (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL,
+  contact_id TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users (id),
+  FOREIGN KEY (contact_id) REFERENCES users (id),
+  UNIQUE (user_id, contact_id)
+);
+
 -- 创建聊天表 - 简化版
 CREATE TABLE chats (
   id TEXT PRIMARY KEY NOT NULL,
+  unread_count INTEGER NOT NULL DEFAULT 0,
+  last_message TEXT,
+  last_message_time TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -47,6 +62,12 @@ BEGIN
   UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER update_user_contacts_updated_at
+AFTER UPDATE ON user_contacts
+BEGIN
+  UPDATE user_contacts SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER update_chats_updated_at
 AFTER UPDATE ON chats
 BEGIN
@@ -57,6 +78,16 @@ CREATE TRIGGER update_messages_updated_at
 AFTER UPDATE ON messages
 BEGIN
   UPDATE messages SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- 创建触发器，用于在插入或更新消息时自动更新聊天的最后消息信息
+CREATE TRIGGER update_chat_last_message
+AFTER INSERT ON messages
+BEGIN
+  UPDATE chats 
+  SET last_message = NEW.content,
+      last_message_time = NEW.created_at
+  WHERE id = NEW.chat_id;
 END;
 
 -- 在所有表和触发器创建完成后，添加一个默认用户
@@ -77,6 +108,8 @@ INSERT INTO users (
 );
 
 -- 创建索引以提高查询性能
+CREATE INDEX idx_user_contacts_user_id ON user_contacts(user_id);
+CREATE INDEX idx_user_contacts_contact_id ON user_contacts(contact_id);
 CREATE INDEX idx_chat_participants_user_id ON chat_participants(user_id);
 CREATE INDEX idx_chat_participants_chat_id ON chat_participants(chat_id);
 CREATE INDEX idx_messages_chat_id ON messages(chat_id);

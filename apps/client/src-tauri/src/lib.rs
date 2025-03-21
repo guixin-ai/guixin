@@ -35,11 +35,11 @@ pub fn run() {
             commands::get_app_version,
             commands::create_ai_user,
             commands::get_current_user,
-            commands::get_user_chat_list,
-            commands::get_user_contacts,
-            commands::add_contact,
-            commands::remove_contact,
-            commands::create_ai_contact
+            commands::get_current_user_chat_list,
+            commands::add_current_user_contact,
+            commands::remove_current_user_contact,
+            commands::create_current_user_ai_contact,
+            commands::get_current_user_contacts
         ])
         .run(tauri::generate_context!())
         .expect("运行应用失败");

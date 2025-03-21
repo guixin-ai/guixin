@@ -7,8 +7,7 @@ import {
   ContactGroupFetchException, 
   ContactDetailFetchException 
 } from '@/errors/service.errors';
-import { invoke } from '@tauri-apps/api/core';
-import { userService } from './user.service';
+import { contactCommands, userCommands } from '@/commands';
 import { pinyin } from 'pinyin-pro';
 
 /**
@@ -33,20 +32,12 @@ class ContactService {
   
   /**
    * 获取联系人列表
+   * 从后端全局状态中获取当前用户的联系人
    */
   public async getContacts(): Promise<ContactsResponse> {
     try {
-      const currentUser = await userService.getCurrentUser();
-      
-      // 调用后端API获取当前用户的联系人列表
-      const contactsData = await invoke('get_user_contacts', { 
-        current_user_id: currentUser.id 
-      }) as Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        is_ai: boolean;
-      }>;
+      // 调用指令层获取当前用户的联系人列表
+      const contactsData = await contactCommands.getCurrentUserContacts();
       
       // 转换为前端所需的数据格式
       const contacts = contactsData.map(contact => ({
@@ -67,7 +58,7 @@ class ContactService {
         total: sortedContacts.length
       };
     } catch (error) {
-      console.error('获取联系人列表失败:', error);
+      console.error('获取当前用户联系人列表失败:', error);
       throw new ContactListFetchException();
     }
   }
@@ -130,13 +121,8 @@ class ContactService {
         return null;
       }
       
-      // 从后端获取用户详情数据
-      const userData = await invoke('get_user', { id }) as {
-        id: string;
-        name: string;
-        description: string | null;
-        is_ai: boolean;
-      };
+      // 从指令层获取用户详情数据
+      const userData = await userCommands.getUser(id);
       
       const contactDetail: ContactDetail = {
         id: userData.id,
@@ -159,12 +145,7 @@ class ContactService {
    */
   public async addContact(contactId: string): Promise<void> {
     try {
-      const currentUser = await userService.getCurrentUser();
-      
-      await invoke('add_contact', { 
-        user_id: currentUser.id,
-        contact_id: contactId 
-      });
+      await contactCommands.addCurrentUserContact(contactId);
     } catch (error) {
       console.error('添加联系人失败:', error);
       throw new Error(String(error));
@@ -176,12 +157,7 @@ class ContactService {
    */
   public async removeContact(contactId: string): Promise<void> {
     try {
-      const currentUser = await userService.getCurrentUser();
-      
-      await invoke('remove_contact', {
-        user_id: currentUser.id,
-        contact_id: contactId
-      });
+      await contactCommands.removeCurrentUserContact(contactId);
     } catch (error) {
       console.error('删除联系人失败:', error);
       throw new Error(String(error));

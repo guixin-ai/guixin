@@ -14,10 +14,16 @@ pub struct ContactResponse {
     pub is_ai: bool,
 }
 
+/// 获取当前用户的联系人列表
+/// 
+/// 此命令会从应用状态中获取当前用户ID，不需要显式传递用户ID
 #[tauri::command]
-pub async fn get_user_contacts(current_user_id: String, state: State<'_, AppState>) -> Result<Vec<ContactResponse>, String> {
-    // 获取用户的联系人关系
+pub async fn get_current_user_contacts(state: State<'_, AppState>) -> Result<Vec<ContactResponse>, String> {
     let pool = state.db_pool.lock().expect("无法获取数据库连接池");
+    let current_user = state.current_user.lock().expect("无法获取当前用户状态");
+    let current_user_id = current_user.id.clone();
+    
+    // 获取用户的联系人关系
     let contact_relations = UserContactRepository::get_by_user_id(&pool, &current_user_id)
         .map_err(|e| e.to_string())?;
     
@@ -45,9 +51,14 @@ pub async fn get_user_contacts(current_user_id: String, state: State<'_, AppStat
     Ok(contacts)
 }
 
+/// 为当前用户添加联系人
+/// 
+/// 此命令会从应用状态中获取当前用户ID，不需要显式传递用户ID
 #[tauri::command]
-pub async fn add_contact(user_id: String, contact_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn add_current_user_contact(contact_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let pool = state.db_pool.lock().expect("无法获取数据库连接池");
+    let current_user = state.current_user.lock().expect("无法获取当前用户状态");
+    let user_id = current_user.id.clone();
     
     // 检查联系人是否存在
     match UserRepository::get(&pool, &contact_id) {
@@ -67,9 +78,14 @@ pub async fn add_contact(user_id: String, contact_id: String, state: State<'_, A
         .map_err(|e| e.to_string())
 }
 
+/// 从当前用户的联系人列表中移除联系人
+/// 
+/// 此命令会从应用状态中获取当前用户ID，不需要显式传递用户ID
 #[tauri::command]
-pub async fn remove_contact(user_id: String, contact_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn remove_current_user_contact(contact_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let pool = state.db_pool.lock().expect("无法获取数据库连接池");
+    let current_user = state.current_user.lock().expect("无法获取当前用户状态");
+    let user_id = current_user.id.clone();
     
     // 删除联系人关系
     UserContactRepository::delete_by_user_and_contact(&pool, &user_id, &contact_id)
@@ -80,7 +96,7 @@ pub async fn remove_contact(user_id: String, contact_id: String, state: State<'_
 /// 
 /// 此命令会创建一个新的AI用户，并将其添加为当前用户的联系人
 #[tauri::command]
-pub async fn create_ai_contact(
+pub async fn create_current_user_ai_contact(
     name: String, 
     description: Option<String>, 
     state: State<'_, AppState>

@@ -27,7 +27,7 @@ pub struct ChatListResponse {
 /// 
 /// 返回当前用户参与的所有聊天，包括聊天基本信息和最后一条消息
 #[tauri::command]
-pub fn get_user_chat_list(
+pub fn get_current_user_chat_list(
     state: State<'_, AppState>,
 ) -> Result<ChatListResponse, String> {
     // 获取数据库连接池和当前用户

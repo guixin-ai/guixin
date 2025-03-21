@@ -89,15 +89,6 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
     setEditField(null);
   };
 
-  // 如果联系人数据为空（非加载中状态）
-  if (!loading && !contact) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black text-white">
-        <p className="text-gray-400">联系人不存在</p>
-      </div>
-    );
-  }
-
   // 使用 DelayedLoading 组件包裹主要内容
   return (
     <>
@@ -113,7 +104,7 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
           </div>
 
           {/* 联系人资料列表 */}
-          {contact && (
+          {contact ? (
             <div className="flex-1">
               {/* 头像项 */}
               <div className="flex justify-between items-center p-4 border-b border-gray-800">
@@ -157,6 +148,10 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
                   <ChevronRight size={18} className="text-gray-400" />
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-gray-400">联系人不存在</p>
             </div>
           )}
         </div>

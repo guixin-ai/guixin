@@ -5,6 +5,7 @@ import { useContactStore } from '../models/contact.model';
 import { Contact as ContactType } from '@/types/contact';
 import DelayedLoading from './delayed-loading';
 import { useShallow } from 'zustand/react/shallow';
+import { contactService } from '@/services/contact.service';
 
 // 联系人类型(本地使用)
 interface Contact {
@@ -61,13 +62,19 @@ const NewChat = ({ onBack, onComplete, preSelectedContactIds = [] }: NewChatProp
   useEffect(() => {
     const loadContacts = async () => {
       setLoading(true);
+      
+      // 先检查是否已初始化
       if (!initializedList) {
         try {
-          await initializeList();
+          // 调用服务获取联系人列表
+          const response = await contactService.getContacts();
+          // 调用初始化方法
+          initializeList(response.contacts);
         } catch (error) {
           console.error('初始化联系人列表失败:', error);
         }
       }
+      
       setLoading(false);
     };
 

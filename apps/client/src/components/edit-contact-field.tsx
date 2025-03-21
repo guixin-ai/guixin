@@ -5,6 +5,7 @@ import { useContactStore } from '../models/contact.model';
 import { ContactDetail } from '@/types/contact';
 import { useShallow } from 'zustand/react/shallow';
 import DelayedLoading from './delayed-loading';
+import { contactService } from '@/services/contact.service';
 
 interface EditContactFieldProps {
   contactId: string;
@@ -15,9 +16,10 @@ interface EditContactFieldProps {
 
 const EditContactFieldComponent = ({ contactId, field, onBack, onSaved }: EditContactFieldProps) => {
   // 使用 useShallow 和选择器获取需要的状态和方法
-  const { contactDetails, initializeContactDetail, updateContactDetail } = useContactStore(
+  const { contactDetails, initializedDetailIds, initializeContactDetail, updateContactDetail } = useContactStore(
     useShallow(state => ({
       contactDetails: state.contactDetails,
+      initializedDetailIds: state.initializedDetailIds,
       initializeContactDetail: state.initializeContactDetail,
       updateContactDetail: state.updateContactDetail
     }))
@@ -33,7 +35,19 @@ const EditContactFieldComponent = ({ contactId, field, onBack, onSaved }: EditCo
         setLoading(true);
         
         try {
-          await initializeContactDetail(contactId);
+          // 先检查是否已初始化
+          if (!initializedDetailIds[contactId]) {
+            // 如果未初始化，调用服务获取联系人详情
+            const response = await contactService.getContactDetail(contactId);
+            if (!response) {
+              throw new Error(`联系人 ${contactId} 不存在`);
+            }
+            
+            // 初始化联系人详情
+            initializeContactDetail(contactId, response.contact);
+          }
+          
+          // 从状态获取联系人详情
           const contact = contactDetails[contactId];
           
           if (contact && field in contact) {
@@ -49,7 +63,7 @@ const EditContactFieldComponent = ({ contactId, field, onBack, onSaved }: EditCo
       
       loadContactData();
     }
-  }, [contactId, field, contactDetails, initializeContactDetail]);
+  }, [contactId, field, contactDetails, initializedDetailIds, initializeContactDetail]);
   
   // 保存更改
   const handleSave = async () => {

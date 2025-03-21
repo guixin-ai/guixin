@@ -4,9 +4,8 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { contactService } from '@/services/contact.service';
 import { Contact, ContactDetail } from '@/types/contact';
-import { ContactNotFoundException, ContactListInitFailedException, ContactDetailInitFailedException } from '@/errors/contact.errors';
+import { ContactNotFoundException, ContactDetailInitFailedException } from '@/errors/contact.errors';
 import { devtools } from 'zustand/middleware';
 
 // 联系人状态接口
@@ -21,21 +20,17 @@ export interface ContactState {
   initializedDetailIds: Record<string, boolean>;
 
   // 操作方法
-  fetchAllContacts: () => Promise<void>;
-  fetchContactById: (id: string) => Promise<Contact | null>;
-  fetchContactDetail: (id: string) => Promise<ContactDetail | null>;
   searchContacts: (query: string) => Contact[];
   addContact: (contact: Contact) => void;
   addContactDetail: (detail: ContactDetail) => void;
-  getGroupedContacts: () => Promise<void>;
-  getContacts: () => Promise<Contact[]>;
-  getContactDetail: (id: string) => Promise<ContactDetail | null>;
-  getContactById: (id: string) => Promise<Contact | null>;
-  updateContactDetail: (id: string, updates: Partial<ContactDetail>) => Promise<ContactDetail | null>;
+  getContacts: () => Contact[];
+  getContactDetail: (id: string) => ContactDetail | null;
+  getContactById: (id: string) => Contact | null;
+  updateContactDetail: (id: string, updates: Partial<ContactDetail>) => ContactDetail | null;
 
-  // 初始化方法 - 修改为同步方法，接收联系人列表参数
+  // 初始化方法 - 同步方法，接收联系人列表参数
   initializeList: (contacts: Contact[]) => void;
-  initializeContactDetail: (id: string) => Promise<ContactDetail | null>;
+  initializeContactDetail: (id: string, contactDetail: ContactDetail) => void;
 }
 
 // 示例数据
@@ -50,78 +45,6 @@ export const useContactStore = create(
       contactDetails: {},
       initializedList: false,
       initializedDetailIds: {},
-
-      // 获取所有联系人
-      fetchAllContacts: async () => {
-        try {
-          // 调用服务获取联系人列表
-          const response = await contactService.getContacts();
-
-          set(state => {
-            state.contacts = response.contacts;
-            state.initializedList = true;
-          });
-        } catch (error) {
-          console.error('获取联系人列表失败:', error);
-          throw error; // 重新抛出异常，让调用方处理
-        }
-      },
-
-      // 根据ID获取联系人基本信息
-      fetchContactById: async (id: string) => {
-        try {
-          // 从服务获取联系人基本信息
-          const contact = await contactService.getContactById(id);
-          if (!contact) {
-            throw new ContactNotFoundException(id);
-          }
-          
-          return contact;
-        } catch (error) {
-          console.error('获取联系人基本信息失败:', error);
-          // 重新抛出异常，让调用方处理
-          if (error instanceof ContactNotFoundException) {
-            throw error;
-          }
-          // 其他错误包装后抛出
-          throw new ContactNotFoundException(id);
-        }
-      },
-      
-      // 根据ID获取联系人详情信息
-      fetchContactDetail: async (id: string) => {
-        try {
-          // 从服务获取联系人详情
-          const response = await contactService.getContactDetail(id);
-          if (!response) {
-            throw new ContactNotFoundException(id);
-          }
-          
-          // 确保contactDetail包含所有必需字段
-          const contactDetail = response.contact;
-          
-          // 验证必需字段
-          if (!contactDetail.id || !contactDetail.name || !contactDetail.avatar) {
-            throw new Error(`联系人详情缺少必需字段: id=${contactDetail.id}, name=${contactDetail.name}, avatar=${contactDetail.avatar}`);
-          }
-          
-          // 更新到详情缓存
-          set(state => {
-            state.contactDetails[id] = contactDetail;
-            state.initializedDetailIds[id] = true;
-          });
-          
-          return contactDetail;
-        } catch (error) {
-          console.error('获取联系人详情失败:', error);
-          // 重新抛出异常，让调用方处理
-          if (error instanceof ContactNotFoundException) {
-            throw error;
-          }
-          // 其他错误包装后抛出
-          throw new ContactNotFoundException(id);
-        }
-      },
 
       // 搜索联系人
       searchContacts: (query: string) => {
@@ -167,22 +90,9 @@ export const useContactStore = create(
           state.initializedDetailIds[detail.id] = true;
         });
       },
-
-      // 获取分组联系人 - 仅从服务端获取联系人数据
-      getGroupedContacts: async () => {
-        try {
-          const response = await contactService.getContacts();
-          set(state => {
-            state.contacts = response.contacts;
-          });
-        } catch (error) {
-          console.error('获取分组联系人失败:', error);
-          throw error; // 重新抛出异常，让调用方处理
-        }
-      },
       
-      // 获取联系人列表 - 检查初始化状态并返回数据
-      getContacts: async () => {
+      // 获取联系人列表 - 同步方法，检查初始化状态并返回数据
+      getContacts: () => {
         const state = get();
         
         // 如果已经初始化，则直接返回缓存数据
@@ -194,8 +104,8 @@ export const useContactStore = create(
         return [];
       },
       
-      // 获取联系人详情 - 判断是否已初始化并返回数据
-      getContactDetail: async (id: string) => {
+      // 获取联系人详情 - 同步方法，判断是否已初始化并返回数据
+      getContactDetail: (id: string) => {
         const state = get();
         
         // 如果已经初始化，则直接返回缓存数据
@@ -203,17 +113,12 @@ export const useContactStore = create(
           return state.contactDetails[id] || null;
         }
         
-        // 如果未初始化，则调用初始化方法
-        try {
-          return await get().initializeContactDetail(id);
-        } catch (error) {
-          console.error(`获取联系人详情失败: ${error}`);
-          return null;
-        }
+        // 如果未初始化，则返回null
+        return null;
       },
 
-      // 根据ID获取联系人 - 检查初始化状态并返回数据
-      getContactById: async (id: string) => {
+      // 根据ID获取联系人 - 同步方法，检查初始化状态并返回数据
+      getContactById: (id: string) => {
         const state = get();
         
         // 如果已经初始化，则直接返回缓存数据
@@ -225,7 +130,7 @@ export const useContactStore = create(
         return null;
       },
 
-      // 初始化联系人列表 - 修改为同步方法，接收联系人数据参数
+      // 初始化联系人列表 - 同步方法，接收联系人数据参数
       initializeList: (contacts: Contact[]) => {
         set(state => {
           state.contacts = contacts;
@@ -233,28 +138,16 @@ export const useContactStore = create(
         });
       },
       
-      // 初始化联系人详情
-      initializeContactDetail: async (id: string) => {
-        const state = get();
-        
-        // 如果已经初始化该联系人详情，则直接返回缓存数据
-        if (state.initializedDetailIds[id]) {
-          return state.contactDetails[id] || null;
-        }
-        
-        try {
-          // 直接调用服务获取联系人详情
-          const contactDetail = await get().fetchContactDetail(id);
-          return contactDetail;
-        } catch (error) {
-          console.error(`初始化联系人 ${id} 的详情失败:`, error);
-          // 抛出自定义异常
-          throw new ContactDetailInitFailedException(id, error);
-        }
+      // 初始化联系人详情 - 同步方法，接收详情参数
+      initializeContactDetail: (id: string, contactDetail: ContactDetail) => {
+        set(state => {
+          state.contactDetails[id] = contactDetail;
+          state.initializedDetailIds[id] = true;
+        });
       },
 
-      // 更新联系人详情
-      updateContactDetail: async (id: string, updates: Partial<ContactDetail>) => {
+      // 更新联系人详情 - 同步方法
+      updateContactDetail: (id: string, updates: Partial<ContactDetail>) => {
         const state = get();
         
         // 检查是否已初始化联系人详情
@@ -269,10 +162,7 @@ export const useContactStore = create(
             throw new ContactNotFoundException(id);
           }
           
-          // 在真实应用中，这里应该调用服务端API更新联系人信息
-          // const response = await contactService.updateContactDetail(id, updates);
-          
-          // 暂时只在本地状态更新
+          // 更新本地状态
           const updatedDetail = {
             ...currentDetail,
             ...updates

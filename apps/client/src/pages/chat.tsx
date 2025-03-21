@@ -22,6 +22,7 @@ import { Button } from '../components/ui/button';
 import { useChatStore } from '../models/chat.model';
 import { useContactStore } from '../models/contact.model';
 import { OllamaMessage } from '../services/ollama.service';
+import { chatService } from '@/services/chat.service';
 
 // 联系人类型
 interface Contact {
@@ -60,6 +61,9 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   const chatStore = useChatStore(
     useShallow(state => ({
       chatDetails: state.chatDetails,
+      chatMessages: state.chatMessages,
+      initializedChatDetailIds: state.initializedChatDetailIds,
+      initializedChatIds: state.initializedChatIds,
       initializeChatDetail: state.initializeChatDetail,
       initializeChatMessages: state.initializeChatMessages,
       addChatMessage: state.addChatMessage,
@@ -73,6 +77,9 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   // 使用析构来简化后续访问
   const {
     chatDetails,
+    chatMessages,
+    initializedChatDetailIds,
+    initializedChatIds,
     initializeChatDetail,
     initializeChatMessages,
     addChatMessage,
@@ -102,12 +109,45 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       setIsMessagesInitialized(false);
 
       try {
-        // 初始化聊天详情
-        const chatDetail = await initializeChatDetail(chatId);
-
-        // 如果没有找到，抛出异常
-        if (!chatDetail) {
-          throw new ChatNotFoundException(chatId);
+        // 先检查聊天详情是否已初始化
+        let chatDetail = null;
+        if (initializedChatDetailIds[chatId]) {
+          // 如果已经初始化，则直接使用缓存数据
+          chatDetail = chatDetails[chatId];
+        } else {
+          // 如果未初始化，直接调用服务获取聊天详情
+          const chatItem = await chatService.getChatById(chatId);
+          
+          // 如果没有找到，抛出异常
+          if (!chatItem) {
+            throw new ChatNotFoundException(chatId);
+          }
+          
+          // 转换成详情对象
+          chatDetail = {
+            id: chatItem.id,
+            name: chatItem.name,
+            avatar: chatItem.avatar,
+            isAI: true, // 假设所有聊天都是AI
+            members: [
+              {
+                id: 'current-user',
+                name: '我',
+                avatar: '我',
+                username: '@自如'
+              },
+              {
+                id: chatItem.id,
+                name: chatItem.name,
+                avatar: chatItem.avatar,
+                isAI: true,
+                username: '@自如'
+              }
+            ]
+          };
+          
+          // 调用同步的初始化方法设置数据
+          initializeChatDetail(chatId, chatDetail);
         }
 
         // 设置联系人信息
@@ -118,8 +158,20 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           isAI: chatDetail.isAI || false,
         });
 
-        // 初始化聊天消息并转换为VirtuosoMessageItem
-        const chatMessages = await initializeChatMessages(chatId);
+        // 先检查聊天消息是否已初始化
+        let chatMessages = [];
+        if (initializedChatIds[chatId]) {
+          // 如果已经初始化，则直接使用缓存数据
+          chatMessages = chatStore.chatMessages[chatId] || [];
+        } else {
+          // 如果未初始化，直接调用服务获取聊天消息
+          chatMessages = await chatService.getChatMessages(chatId);
+          
+          // 调用同步的初始化方法设置数据
+          initializeChatMessages(chatId, chatMessages);
+        }
+
+        // 转换为VirtuosoMessageItem
         const virtuosoMessages = chatMessages.map(convertToVirtuosoMessage);
         setInitialMessages(virtuosoMessages);
 
@@ -141,7 +193,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
 
     loadChatData();
-  }, [chatId, initializeChatDetail, initializeChatMessages]);
+  }, [chatId, initializeChatDetail, initializeChatMessages, chatDetails, chatMessages, initializedChatDetailIds, initializedChatIds]);
 
   // 注册AI队列服务响应处理器
   useEffect(() => {

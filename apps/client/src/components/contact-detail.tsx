@@ -7,6 +7,7 @@ import { ContactNotFoundException, ContactDetailInitFailedException } from '@/er
 import { useShallow } from 'zustand/react/shallow';
 import EditContactFieldComponent from './edit-contact-field';
 import DelayedLoading from './delayed-loading';
+import { contactService } from '@/services/contact.service';
 
 interface ContactDetailProps {
   contactId: string;
@@ -15,10 +16,11 @@ interface ContactDetailProps {
 
 const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
   // 使用 useShallow 和选择器获取需要的状态和方法
-  const { initializeContactDetail, contactDetails } = useContactStore(
+  const { initializeContactDetail, contactDetails, initializedDetailIds } = useContactStore(
     useShallow(state => ({
       initializeContactDetail: state.initializeContactDetail,
-      contactDetails: state.contactDetails
+      contactDetails: state.contactDetails,
+      initializedDetailIds: state.initializedDetailIds
     }))
   );
   const [loading, setLoading] = useState(true);
@@ -34,8 +36,18 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
         setLoading(true);
         
         try {
-          // 初始化联系人详情
-          await initializeContactDetail(contactId);
+          // 检查联系人详情是否已经初始化
+          if (!initializedDetailIds[contactId]) {
+            // 如果未初始化，调用服务获取联系人详情
+            const response = await contactService.getContactDetail(contactId);
+            if (!response) {
+              throw new ContactNotFoundException(contactId);
+            }
+            
+            // 调用同步的初始化方法设置详情
+            initializeContactDetail(contactId, response.contact);
+          }
+          
           setLoading(false);
         } catch (error) {
           console.error('加载联系人详情失败:', error);
@@ -50,7 +62,7 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
       
       loadContactData();
     }
-  }, [contactId, initializeContactDetail]);
+  }, [contactId, initializeContactDetail, initializedDetailIds]);
   
   // 获取联系人详情
   const contact = contactId ? contactDetails[contactId] || null : null;

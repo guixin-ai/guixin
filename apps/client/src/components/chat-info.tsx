@@ -8,6 +8,8 @@ import { useChatStore } from '../models/chat.model';
 import { ChatDetail, ChatMember } from '@/types/chat';
 import { ChatNotFoundException, ChatDetailInitFailedException } from '@/errors/chat.errors';
 import DelayedLoading from './delayed-loading';
+import { useShallow } from 'zustand/react/shallow';
+import { chatService } from '@/services/chat.service';
 
 interface ChatInfoPageProps {
   // 回调函数，用于返回上一级界面
@@ -24,8 +26,14 @@ const ChatInfoPage = ({ onBack, chatId, onAddMember, onCreateFriend }: ChatInfoP
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 使用聊天模型 - 只选择需要的方法
-  const getChatDetail = useChatStore(state => state.getChatDetail);
+  // 使用聊天模型 - 获取需要的状态和方法
+  const { chatDetails, initializedChatDetailIds, initializeChatDetail } = useChatStore(
+    useShallow(state => ({
+      chatDetails: state.chatDetails,
+      initializedChatDetailIds: state.initializedChatDetailIds,
+      initializeChatDetail: state.initializeChatDetail
+    }))
+  );
 
   // 加载聊天数据
   useEffect(() => {
@@ -35,8 +43,45 @@ const ChatInfoPage = ({ onBack, chatId, onAddMember, onCreateFriend }: ChatInfoP
       setLoading(true);
 
       try {
-        // 从模型层获取聊天详情
-        const detail = await getChatDetail(chatId);
+        // 检查是否已初始化
+        if (!initializedChatDetailIds[chatId]) {
+          // 如果未初始化，调用服务获取聊天详情
+          const chatItem = await chatService.getChatById(chatId);
+          
+          // 如果没有找到，抛出异常
+          if (!chatItem) {
+            throw new ChatNotFoundException(chatId);
+          }
+          
+          // 转换成详情对象
+          const newChatDetail: ChatDetail = {
+            id: chatItem.id,
+            name: chatItem.name,
+            avatar: chatItem.avatar,
+            isAI: true, // 假设所有聊天都是AI
+            members: [
+              {
+                id: 'current-user',
+                name: '我',
+                avatar: '我',
+                username: '@自如'
+              },
+              {
+                id: chatItem.id,
+                name: chatItem.name,
+                avatar: chatItem.avatar,
+                isAI: true,
+                username: '@自如'
+              }
+            ]
+          };
+          
+          // 调用同步的初始化方法设置数据
+          initializeChatDetail(chatId, newChatDetail);
+        }
+
+        // 从状态中获取聊天详情
+        const detail = chatDetails[chatId];
 
         // 如果没有找到，抛出异常
         if (!detail) {
@@ -60,7 +105,7 @@ const ChatInfoPage = ({ onBack, chatId, onAddMember, onCreateFriend }: ChatInfoP
     };
 
     initializeData();
-  }, [chatId, getChatDetail]);
+  }, [chatId, chatDetails, initializedChatDetailIds, initializeChatDetail]);
 
   const handleAddMember = () => {
     if (onAddMember) {

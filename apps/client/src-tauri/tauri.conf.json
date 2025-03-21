@@ -19,8 +19,14 @@
       }
     ],
     "security": {
-      "csp": null,
-      "capabilities": ["main-capability", "create-contact-capability"]
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost data:; connect-src 'self' ipc: http://ipc.localhost",
+      "capabilities": ["main-capability", "create-contact-capability", "images-capability"],
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": ["$APPDATA/guixin/resources/images/*"]
+        }
+      }
     }
   },
   "bundle": {

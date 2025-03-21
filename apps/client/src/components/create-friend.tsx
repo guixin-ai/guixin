@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -16,8 +16,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useChatStore } from '@/models/chat.model';
 import { useContactStore } from '@/models/contact.model';
 import { userService } from '@/services/user.service';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { imageService } from '@/services/image.service';
 
 // 组件Props类型
 interface CreateFriendProps {
@@ -103,6 +104,9 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
   const { addChat } = useChatStore();
   const { addContact } = useContactStore();
   const [isCreating, setIsCreating] = useState(false);
+  const [avatar, setAvatar] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 初始化表单
   const form = useForm<FormValues>({
@@ -113,6 +117,29 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
     },
   });
 
+  // 触发文件选择
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // 处理文件选择
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const response = await imageService.uploadImage(file);
+      setAvatar(response.url);
+      toast.success('头像上传成功');
+    } catch (error) {
+      toast.error('头像上传失败');
+      console.error(error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // 处理提交
   const onSubmit = async (values: FormValues) => {
     setIsCreating(true);
@@ -121,15 +148,15 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
       // 调用userService创建AI联系人
       const aiContact = await userService.createAiContact(values.name, values.description);
       
-      // 获取第一个字符作为头像
-      const avatarChar = values.name.charAt(0);
+      // 使用上传的头像或第一个字符作为头像
+      const avatarValue = avatar || values.name.charAt(0);
       const pinyinFirstLetter = getFirstPinyin(values.name);
 
       // 添加到聊天列表
       addChat({
         id: aiContact.id,
         name: aiContact.name,
-        avatar: avatarChar,
+        avatar: avatarValue,
         lastMessage: '你好，我是你创建的AI朋友',
         timestamp: '刚刚',
       });
@@ -138,7 +165,7 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
       addContact({
         id: aiContact.id,
         name: aiContact.name,
-        avatar: avatarChar,
+        avatar: avatarValue,
         pinyin: pinyinFirstLetter + aiContact.name, // 确保排序正确
       });
       
@@ -147,7 +174,7 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
       addContactDetail({
         id: aiContact.id,
         name: aiContact.name,
-        avatar: avatarChar,
+        avatar: avatarValue,
         description: aiContact.description || ''
       });
 
@@ -189,6 +216,36 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
       <div className="flex-1 overflow-y-auto p-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* 头像上传 */}
+            <div className="text-center mb-6">
+              <FormLabel className="block mb-2">头像</FormLabel>
+              <div 
+                className="mx-auto w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center bg-gray-100 dark:bg-gray-800 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={handleUploadClick}
+              >
+                {avatar ? (
+                  <img 
+                    src={avatar} 
+                    alt="头像" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Upload className="w-8 h-8 text-gray-400" />
+                )}
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleFileChange} 
+                disabled={isUploading}
+              />
+              <div className="mt-2 text-sm text-gray-500">
+                {isUploading ? '上传中...' : '点击上传头像'}
+              </div>
+            </div>
+            
             {/* 名称 */}
             <FormField
               control={form.control}
@@ -232,7 +289,7 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
             <Button
               type="submit"
               className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-md"
-              disabled={isCreating}
+              disabled={isCreating || isUploading}
             >
               {isCreating ? '创建中...' : '创建智能朋友'}
             </Button>

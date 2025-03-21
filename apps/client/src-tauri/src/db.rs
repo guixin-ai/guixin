@@ -26,6 +26,19 @@ fn get_database_path() -> Result<PathBuf> {
     Ok(db_path)
 }
 
+// 获取应用资源目录路径
+pub fn get_app_resource_path() -> Result<PathBuf> {
+    let data_dir = data_dir().ok_or_else(|| anyhow!("无法确定数据目录"))?;
+    let app_dir = data_dir.join("guixin");
+    let resource_dir = app_dir.join("resources");
+    
+    // 确保资源目录存在
+    std::fs::create_dir_all(&resource_dir)
+        .map_err(|e| anyhow!("无法创建资源目录: {}", e))?;
+    
+    Ok(resource_dir)
+}
+
 // 创建数据库连接池
 pub fn establish_connection() -> Result<DbPool> {
     let database_path = get_database_path()?;

@@ -194,3 +194,11 @@ export const useContactStore = create(
     }
   )
 );
+
+// 将Contact类型中的avatar字段改为string类型
+export interface ContactItem {
+  id: string;
+  name: string;
+  avatar: string; // 修改为string类型，支持字符或图片URL
+  pinyin: string;
+}

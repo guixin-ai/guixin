@@ -7,6 +7,9 @@ import {
   ContactGroupFetchException, 
   ContactDetailFetchException 
 } from '@/errors/service.errors';
+import { invoke } from '@tauri-apps/api/core';
+import { userService } from './user.service';
+import { pinyin } from 'pinyin-pro';
 
 /**
  * 联系人服务类
@@ -14,76 +17,6 @@ import {
 class ContactService {
   // 单例实例
   private static instance: ContactService;
-  
-  // 模拟联系人数据
-  private mockContacts: Contact[] = [
-    { id: 'a1', name: '阿里巴巴', avatar: '阿', pinyin: 'alibaba' },
-    { id: 'a2', name: '阿童木', avatar: '阿', pinyin: 'atom' },
-    { id: 'b1', name: '白起', avatar: '白', pinyin: 'baiqi' },
-    { id: 'b2', name: '班主任', avatar: '班', pinyin: 'banzhuren' },
-    { id: 'c1', name: '陈奕迅', avatar: '陈', pinyin: 'chenyixun' },
-    { id: 'l1', name: '老婆', avatar: '老', pinyin: 'laopo' },
-    { id: 'w1', name: '王小波', avatar: '王', pinyin: 'wangxiaobo' },
-    { id: 'z1', name: '张三', avatar: '张', pinyin: 'zhangsan' },
-  ];
-  
-  // 模拟联系人详情数据
-  private mockContactDetails: Record<string, ContactDetail> = {
-    'a1': { 
-      id: 'a1', 
-      name: '阿里巴巴', 
-      avatar: '阿',
-      description: '中国著名电商企业'
-    },
-    'a2': { 
-      id: 'a2', 
-      name: '阿童木', 
-      avatar: '阿',
-      description: '经典动漫角色'
-    },
-    'b1': { 
-      id: 'b1', 
-      name: '白起', 
-      avatar: '白',
-      description: '古代著名将领'
-    },
-    'b2': { 
-      id: 'b2', 
-      name: '班主任', 
-      avatar: '班',
-      description: '学校老师'
-    },
-    'c1': { 
-      id: 'c1', 
-      name: '陈奕迅', 
-      avatar: '陈',
-      description: '香港著名歌手'
-    },
-    'l1': { 
-      id: 'l1', 
-      name: '老婆', 
-      avatar: '老',
-      description: '最爱的人'
-    },
-    'w1': { 
-      id: 'w1', 
-      name: '王小波', 
-      avatar: '王',
-      description: '著名作家'
-    },
-    'z1': { 
-      id: 'z1', 
-      name: '张三', 
-      avatar: '张',
-      description: '普通联系人'
-    },
-    'ai-123': {
-      id: 'ai-123',
-      name: '智能助手',
-      avatar: '智',
-      description: '一个聪明的AI助手，可以解答各种问题'
-    }
-  };
   
   // 私有构造函数，防止外部实例化
   private constructor() {}
@@ -103,11 +36,28 @@ class ContactService {
    */
   public async getContacts(): Promise<ContactsResponse> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const currentUser = await userService.getCurrentUser();
+      
+      // 调用后端API获取当前用户的联系人列表
+      const contactsData = await invoke('get_user_contacts', { 
+        current_user_id: currentUser.id 
+      }) as Array<{
+        id: string;
+        name: string;
+        description: string | null;
+        is_ai: boolean;
+      }>;
+      
+      // 转换为前端所需的数据格式
+      const contacts = contactsData.map(contact => ({
+        id: contact.id,
+        name: contact.name,
+        avatar: contact.name.charAt(0), // 使用名称首字符作为头像
+        pinyin: this.getPinyin(contact.name), // 获取拼音
+      }));
       
       // 按拼音排序
-      const sortedContacts = [...this.mockContacts].sort((a, b) => {
+      const sortedContacts = [...contacts].sort((a, b) => {
         if (!a.pinyin || !b.pinyin) return 0;
         return a.pinyin.localeCompare(b.pinyin);
       });
@@ -127,21 +77,15 @@ class ContactService {
    */
   public async getGroupedContacts(): Promise<GroupedContactsResponse> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // 先按拼音排序
-      const sortedContacts = [...this.mockContacts].sort((a, b) => {
-        if (!a.pinyin || !b.pinyin) return 0;
-        return a.pinyin.localeCompare(b.pinyin);
-      });
+      const { contacts } = await this.getContacts();
       
       // 分组
       const groups: ContactGroup[] = [];
       let currentLetter = '';
       
-      sortedContacts.forEach(contact => {
-        const firstLetter = contact.pinyin?.[0].toUpperCase() || '#';
+      // 按首字母分组
+      contacts.forEach(contact => {
+        const firstLetter = this.getFirstLetter(contact.name); // 获取首字母
         
         if (currentLetter !== firstLetter) {
           currentLetter = firstLetter;
@@ -153,7 +97,7 @@ class ContactService {
       
       return {
         groups,
-        total: sortedContacts.length
+        total: contacts.length
       };
     } catch (error) {
       console.error('获取分组联系人失败:', error);
@@ -166,10 +110,8 @@ class ContactService {
    */
   public async getContactById(id: string): Promise<Contact | null> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const contact = this.mockContacts.find(contact => contact.id === id);
+      const { contacts } = await this.getContacts();
+      const contact = contacts.find(contact => contact.id === id);
       return contact || null;
     } catch (error) {
       console.error(`获取联系人 ${id} 基本信息失败:`, error);
@@ -182,13 +124,26 @@ class ContactService {
    */
   public async getContactDetail(id: string): Promise<ContactDetailResponse | null> {
     try {
-      // 模拟API请求延迟
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const contact = await this.getContactById(id);
       
-      const contactDetail = this.mockContactDetails[id];
-      if (!contactDetail) {
+      if (!contact) {
         return null;
       }
+      
+      // 从后端获取用户详情数据
+      const userData = await invoke('get_user', { id }) as {
+        id: string;
+        name: string;
+        description: string | null;
+        is_ai: boolean;
+      };
+      
+      const contactDetail: ContactDetail = {
+        id: userData.id,
+        name: userData.name,
+        description: userData.description || undefined,
+        avatar: userData.name.charAt(0)
+      };
       
       return {
         contact: contactDetail
@@ -197,6 +152,74 @@ class ContactService {
       console.error(`获取联系人 ${id} 详情失败:`, error);
       throw new ContactDetailFetchException(id);
     }
+  }
+  
+  /**
+   * 添加联系人
+   */
+  public async addContact(contactId: string): Promise<void> {
+    try {
+      const currentUser = await userService.getCurrentUser();
+      
+      await invoke('add_contact', { 
+        user_id: currentUser.id,
+        contact_id: contactId 
+      });
+    } catch (error) {
+      console.error('添加联系人失败:', error);
+      throw new Error(String(error));
+    }
+  }
+  
+  /**
+   * 删除联系人
+   */
+  public async removeContact(contactId: string): Promise<void> {
+    try {
+      const currentUser = await userService.getCurrentUser();
+      
+      await invoke('remove_contact', {
+        user_id: currentUser.id,
+        contact_id: contactId
+      });
+    } catch (error) {
+      console.error('删除联系人失败:', error);
+      throw new Error(String(error));
+    }
+  }
+  
+  /**
+   * 获取汉字拼音
+   * 使用pinyin-pro包处理中文拼音
+   */
+  private getPinyin(name: string): string {
+    if (!name || name.length === 0) return '';
+    
+    // 获取不带声调的完整拼音，适合排序
+    return pinyin(name, {
+      toneType: 'none',    // 不带声调
+      type: 'array',       // 返回拼音数组
+      nonZh: 'consecutive' // 非中文字符连续输出
+    }).join('').toLowerCase();
+  }
+
+  /**
+   * 获取名称的拼音首字母（用于分组）
+   */
+  private getFirstLetter(name: string): string {
+    if (!name || name.length === 0) return '#';
+    
+    // 获取首字母
+    const firstPinyin = pinyin(name.charAt(0), {
+      pattern: 'first',   // 仅返回首字母
+      toneType: 'none',   // 不带声调
+      nonZh: 'consecutive' // 非中文直接返回
+    });
+    
+    const letter = firstPinyin.toUpperCase();
+    
+    // 检查是否是A-Z的字母，如果不是，归类到#组
+    return /[A-Z]/.test(letter) ? letter : '#';
   }
 }
 

@@ -8,6 +8,16 @@ export interface User {
   isAi?: boolean;
 }
 
+// 从后端API获取的用户信息
+export interface UserInfo {
+  id: string;
+  name: string;
+  description: string | null;
+  is_ai: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // 创建用户请求接口
 export interface CreateUserRequest {
   name: string;

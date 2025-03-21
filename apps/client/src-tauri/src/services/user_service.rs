@@ -89,4 +89,32 @@ impl UserService {
             .first(conn)
             .map_err(|e| anyhow!("获取新创建的默认用户失败: {}", e))
     }
+
+    // 创建AI用户
+    pub fn create_ai_user(
+        conn: &mut DbConnection,
+        name: &str,
+        description: Option<&str>,
+    ) -> Result<User> {
+        // 创建新的AI用户
+        let new_user = NewUser {
+            id: Uuid::new_v4().to_string(),
+            name: name.to_string(),
+            description: description.map(|desc| desc.to_string()),
+            is_ai: true,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+        };
+
+        diesel::insert_into(users::table)
+            .values(&new_user)
+            .execute(conn)
+            .map_err(|e| anyhow!("创建AI用户失败: {}", e))?;
+
+        users::table
+            .filter(users::id.eq(&new_user.id))
+            .select(User::as_select())
+            .first(conn)
+            .map_err(|e| anyhow!("获取新创建的AI用户失败: {}", e))
+    }
 }

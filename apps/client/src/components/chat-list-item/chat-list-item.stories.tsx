@@ -3,7 +3,6 @@ import { ChatListItem } from './chat-list-item';
 import { action } from '@storybook/addon-actions';
 
 const meta = {
-  title: '聊天/ChatListItem',
   component: ChatListItem,
   parameters: {
     layout: 'centered',

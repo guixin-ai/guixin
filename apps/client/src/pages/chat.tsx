@@ -117,12 +117,12 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
         } else {
           // 如果未初始化，直接调用服务获取聊天详情
           const chatItem = await chatService.getChatById(chatId);
-          
+
           // 如果没有找到，抛出异常
           if (!chatItem) {
             throw new ChatNotFoundException(chatId);
           }
-          
+
           // 转换成详情对象
           chatDetail = {
             id: chatItem.id,
@@ -134,18 +134,18 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
                 id: 'current-user',
                 name: '我',
                 avatar: '我',
-                username: '@自如'
+                username: '@自如',
               },
               {
                 id: chatItem.id,
                 name: chatItem.name,
                 avatar: chatItem.avatar,
                 isAI: true,
-                username: '@自如'
-              }
-            ]
+                username: '@自如',
+              },
+            ],
           };
-          
+
           // 调用同步的初始化方法设置数据
           initializeChatDetail(chatId, chatDetail);
         }
@@ -166,7 +166,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
         } else {
           // 如果未初始化，直接调用服务获取聊天消息
           chatMessages = await chatService.getChatMessages(chatId);
-          
+
           // 调用同步的初始化方法设置数据
           initializeChatMessages(chatId, chatMessages);
         }
@@ -193,7 +193,15 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
 
     loadChatData();
-  }, [chatId, initializeChatDetail, initializeChatMessages, chatDetails, chatMessages, initializedChatDetailIds, initializedChatIds]);
+  }, [
+    chatId,
+    initializeChatDetail,
+    initializeChatMessages,
+    chatDetails,
+    chatMessages,
+    initializedChatDetailIds,
+    initializedChatIds,
+  ]);
 
   // 注册AI队列服务响应处理器
   useEffect(() => {
@@ -469,165 +477,162 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
 
   // 聊天页面（包括未找到聊天的情况）
   return (
-    <DelayedLoading loading={loading}>
-      {contact ? (
-        <div className="flex flex-col h-screen bg-white dark:bg-black">
-          {/* 聊天消息页面 - 始终显示 */}
-          <>
-            {/* 头部 */}
-            <div className="flex items-center p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-600 dark:text-gray-300 mr-2"
-                onClick={handleBack}
-              >
-                <ArrowLeft size={20} />
-              </Button>
-
-              <div className="flex-1 text-center">
-                <h2 className="font-medium text-gray-800 dark:text-white">
-                  {contact.name}
-                  {contact.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
-                </h2>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-gray-600 dark:text-gray-300"
-                onClick={handleOpenChatInfo}
-              >
-                <MoreVertical size={20} />
-              </Button>
-            </div>
-
-            {/* 消息区域 - 使用VirtuosoMessage组件 */}
-            {isMessagesInitialized ? (
-              <VirtuosoMessage<VirtuosoMessageItem, null>
-                ref={virtuosoRef}
-                className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
-                computeItemKey={({ data }) => data.key}
-                ItemContent={({ data }) => (
-                  <MessageItemContent
-                    data={data}
-                    contact={contact}
-                    aiMembers={chatDetails[chatId]?.members || []}
-                  />
-                )}
-                initialData={initialMessages}
-                initialLocation={{ index: 'LAST', align: 'end' }}
-              />
-            ) : (
-              <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>
-            )}
-
-            {/* 输入区域 */}
-            <div className="p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1">
+    <>
+      <DelayedLoading loading={loading}>
+        {contact ? (
+          <div className="flex flex-col h-screen bg-white dark:bg-black">
+            {/* 聊天消息页面 - 始终显示 */}
+            <>
+              {/* 头部 */}
+              <div className="flex items-center p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-gray-500"
-                  disabled={isAIResponding}
+                  className="text-gray-600 dark:text-gray-300 mr-2"
+                  onClick={handleBack}
                 >
-                  <Smile size={20} />
+                  <ArrowLeft size={20} />
                 </Button>
 
-                <div className="flex-1 mx-1">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    className="w-full p-2 bg-transparent text-gray-800 dark:text-white focus:outline-none"
-                    placeholder={isAIResponding ? 'AI正在回复中...' : '输入消息...'}
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    disabled={false}
-                  />
+                <div className="flex-1 text-center">
+                  <h2 className="font-medium text-gray-800 dark:text-white">
+                    {contact.name}
+                    {contact.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
+                  </h2>
                 </div>
 
-                <div className="flex items-center">
-                  {!inputValue.trim() && !isAIResponding && (
-                    <>
-                      <Button variant="ghost" size="icon" className="text-gray-500">
-                        <Paperclip size={20} />
-                      </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-600 dark:text-gray-300"
+                  onClick={handleOpenChatInfo}
+                >
+                  <MoreVertical size={20} />
+                </Button>
+              </div>
 
-                      <Button variant="ghost" size="icon" className="text-gray-500">
-                        <Mic size={20} />
-                      </Button>
-                    </>
+              {/* 消息区域 - 使用VirtuosoMessage组件 */}
+              {isMessagesInitialized ? (
+                <VirtuosoMessage<VirtuosoMessageItem, null>
+                  ref={virtuosoRef}
+                  className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
+                  computeItemKey={({ data }) => data.key}
+                  ItemContent={({ data }) => (
+                    <MessageItemContent
+                      data={data}
+                      contact={contact}
+                      aiMembers={chatDetails[chatId]?.members || []}
+                    />
                   )}
+                  initialData={initialMessages}
+                  initialLocation={{ index: 'LAST', align: 'end' }}
+                />
+              ) : (
+                <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>
+              )}
 
-                  {inputValue.trim() && !isAIResponding && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-white bg-green-500 rounded-full p-1.5"
-                      onClick={handleSend}
-                    >
-                      <Send size={18} />
-                    </Button>
-                  )}
+              {/* 输入区域 */}
+              <div className="p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-gray-500"
+                    disabled={isAIResponding}
+                  >
+                    <Smile size={20} />
+                  </Button>
 
-                  {isAIResponding && (
-                    <div className="flex items-center">
-                      <div className="text-gray-500 text-xs mr-2 flex items-center">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                        <div
-                          className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
-                          style={{ animationDelay: '0.2s' }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
-                          style={{ animationDelay: '0.4s' }}
-                        ></div>
-                      </div>
+                  <div className="flex-1 mx-1">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      className="w-full p-2 bg-transparent text-gray-800 dark:text-white focus:outline-none"
+                      placeholder={isAIResponding ? 'AI正在回复中...' : '输入消息...'}
+                      value={inputValue}
+                      onChange={e => setInputValue(e.target.value)}
+                      onKeyDown={handleKeyPress}
+                      disabled={false}
+                    />
+                  </div>
+
+                  <div className="flex items-center">
+                    {!inputValue.trim() && !isAIResponding && (
+                      <>
+                        <Button variant="ghost" size="icon" className="text-gray-500">
+                          <Paperclip size={20} />
+                        </Button>
+
+                        <Button variant="ghost" size="icon" className="text-gray-500">
+                          <Mic size={20} />
+                        </Button>
+                      </>
+                    )}
+
+                    {inputValue.trim() && !isAIResponding && (
                       <Button
                         variant="ghost"
-                        size="sm"
-                        className="text-red-500 text-xs ml-1"
-                        onClick={cancelCurrentGeneration}
+                        size="icon"
+                        className="text-white bg-green-500 rounded-full p-1.5"
+                        onClick={handleSend}
                       >
-                        终止生成
+                        <Send size={18} />
                       </Button>
-                    </div>
-                  )}
+                    )}
+
+                    {isAIResponding && (
+                      <div className="flex items-center">
+                        <div className="text-gray-500 text-xs mr-2 flex items-center">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                          <div
+                            className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
+                            style={{ animationDelay: '0.2s' }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                            style={{ animationDelay: '0.4s' }}
+                          ></div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 text-xs ml-1"
+                          onClick={cancelCurrentGeneration}
+                        >
+                          终止生成
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </>
-
-          {/* 聊天信息组件 - 条件渲染且浮动在上面 */}
-          {showChatInfo && (
-            <div className="absolute inset-0 z-10 bg-white dark:bg-black">
-              <ChatInfoPage
-                onBack={() => setShowChatInfo(false)}
-                chatId={chatId}
-                onAddMember={handleAddMember}
-              />
-            </div>
-          )}
-
-          {/* 新聊天组件 - 条件渲染且浮动在上面 */}
-          {showNewChat && (
-            <div className="absolute inset-0 z-10 bg-white dark:bg-black">
-              <NewChat
-                onBack={() => setShowNewChat(false)}
-                onComplete={handleSelectContacts}
-                preSelectedContactIds={
-                  chatDetails[chatId]?.members?.map((member: ChatMember) => member.id) || []
-                }
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        // 空白页面 - 不显示未找到聊天的提示
-        <div className="h-screen bg-white dark:bg-black"></div>
+            </>
+          </div>
+        ) : (
+          // 空白页面 - 不显示未找到聊天的提示
+          <div className="h-screen bg-white dark:bg-black"></div>
+        )}
+      </DelayedLoading>
+      {/* 聊天信息组件 - 条件渲染且浮动在上面 */}
+      {showChatInfo && (
+        <ChatInfoPage
+          onBack={() => setShowChatInfo(false)}
+          chatId={chatId}
+          onAddMember={handleAddMember}
+        />
       )}
-    </DelayedLoading>
+
+      {/* 新聊天组件 - 条件渲染且浮动在上面 */}
+      {showNewChat && (
+        <NewChat
+          onBack={() => setShowNewChat(false)}
+          onComplete={handleSelectContacts}
+          preSelectedContactIds={
+            chatDetails[chatId]?.members?.map((member: ChatMember) => member.id) || []
+          }
+        />
+      )}
+    </>
   );
 };
 

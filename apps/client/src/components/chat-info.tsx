@@ -121,7 +121,7 @@ const ChatInfoPage = ({ onBack, chatId, onAddMember, onCreateFriend }: ChatInfoP
 
   return (
     <DelayedLoading loading={loading}>
-      <div className="flex flex-col h-screen bg-gray-900 text-white">
+      <div className="fixed inset-0 z-50 flex flex-col h-screen bg-gray-900 text-white">
         {/* 头部 */}
         <div className="flex items-center p-3 bg-gray-900 border-b border-gray-800">
           <Button variant="ghost" size="icon" className="text-gray-300 mr-2" onClick={onBack}>

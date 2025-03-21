@@ -128,41 +128,45 @@ const NewChat = ({ onBack, onComplete, preSelectedContactIds = [] }: NewChatProp
   };
 
   return (
-    <div className="flex flex-col h-full bg-black text-white fixed z-50 inset-0">
-      {/* 头部 */}
-      <div className="flex items-center p-4 border-b border-gray-800">
-        <Button variant="ghost" size="icon" className="text-white mr-2" onClick={onBack}>
-          <ArrowLeft size={20} />
-        </Button>
-
-        <h1 className="text-lg font-medium text-white flex-1 text-center mr-8">发起聊天</h1>
-
-        {selectedContacts.length > 0 && (
-          <Button variant="ghost" className="text-white absolute right-4" onClick={handleComplete}>
-            完成
+    <DelayedLoading loading={loading}>
+      <div className="fixed inset-0 z-50 flex flex-col h-full bg-black text-white">
+        {/* 头部 */}
+        <div className="flex items-center p-4 border-b border-gray-800">
+          <Button variant="ghost" size="icon" className="text-white mr-2" onClick={onBack}>
+            <ArrowLeft size={20} />
           </Button>
-        )}
-      </div>
 
-      {/* 搜索栏 */}
-      <div className="px-4 py-3">
-        <div className="relative">
-          <Search
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-            size={18}
-          />
-          <input
-            type="text"
-            placeholder="搜索"
-            className="w-full h-10 pl-10 pr-4 rounded-lg bg-gray-800 text-white placeholder-gray-500 focus:outline-none"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
+          <h1 className="text-lg font-medium text-white flex-1 text-center mr-8">发起聊天</h1>
+
+          {selectedContacts.length > 0 && (
+            <Button
+              variant="ghost"
+              className="text-white absolute right-4"
+              onClick={handleComplete}
+            >
+              完成
+            </Button>
+          )}
         </div>
-      </div>
 
-      {/* 联系人列表 */}
-      <DelayedLoading loading={loading}>
+        {/* 搜索栏 */}
+        <div className="px-4 py-3">
+          <div className="relative">
+            <Search
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="搜索"
+              className="w-full h-10 pl-10 pr-4 rounded-lg bg-gray-800 text-white placeholder-gray-500 focus:outline-none"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* 联系人列表 */}
         <div className="flex-1 overflow-y-auto">
           {filteredContacts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-4 text-center">
@@ -241,21 +245,21 @@ const NewChat = ({ onBack, onComplete, preSelectedContactIds = [] }: NewChatProp
             </>
           )}
         </div>
-      </DelayedLoading>
 
-      {/* 完成按钮 */}
-      {selectedContacts.length > 0 && (
-        <div className="p-4 border-t border-gray-800">
-          <Button
-            variant="default"
-            className="w-full bg-gray-800 hover:bg-gray-700 text-white"
-            onClick={handleComplete}
-          >
-            完成
-          </Button>
-        </div>
-      )}
-    </div>
+        {/* 完成按钮 */}
+        {selectedContacts.length > 0 && (
+          <div className="p-4 border-t border-gray-800">
+            <Button
+              variant="default"
+              className="w-full bg-gray-800 hover:bg-gray-700 text-white"
+              onClick={handleComplete}
+            >
+              完成
+            </Button>
+          </div>
+        )}
+      </div>
+    </DelayedLoading>
   );
 };
 

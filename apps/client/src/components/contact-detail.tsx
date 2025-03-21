@@ -100,65 +100,67 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
 
   // 使用 DelayedLoading 组件包裹主要内容
   return (
-    <DelayedLoading loading={loading}>
-      <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
-        {/* 头部 */}
-        <div className="flex items-center p-4 border-b border-gray-800">
-          <Button variant="ghost" size="icon" className="text-white mr-2" onClick={onBack}>
-            <ArrowLeft size={20} />
-          </Button>
+    <>
+      <DelayedLoading loading={loading}>
+        <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+          {/* 头部 */}
+          <div className="flex items-center p-4 border-b border-gray-800">
+            <Button variant="ghost" size="icon" className="text-white mr-2" onClick={onBack}>
+              <ArrowLeft size={20} />
+            </Button>
 
-          <h1 className="text-lg font-medium text-white flex-1 text-center">个人资料</h1>
-        </div>
-
-        {/* 联系人资料列表 */}
-        {contact && (
-          <div className="flex-1">
-            {/* 头像项 */}
-            <div className="flex justify-between items-center p-4 border-b border-gray-800">
-              <span className="text-white">头像</span>
-              <div className="h-14 w-14 rounded overflow-hidden">
-                {contact.avatar &&
-                  (typeof contact.avatar === 'string' && contact.avatar.length <= 2 ? (
-                    <div className="w-full h-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-xl font-semibold">
-                      {contact.avatar}
-                    </div>
-                  ) : (
-                    <img
-                      src={typeof contact.avatar === 'string' ? contact.avatar : ''}
-                      alt={contact.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ))}
-              </div>
-            </div>
-
-            {/* 名称项 */}
-            <div
-              className="flex justify-between items-center p-4 border-b border-gray-800"
-              onClick={() => handleEditField('name')}
-            >
-              <span className="text-white">名字</span>
-              <div className="flex items-center">
-                <span className="text-white mr-2">{contact.name}</span>
-                <ChevronRight size={18} className="text-gray-400" />
-              </div>
-            </div>
-
-            {/* 设定描述项 */}
-            <div
-              className="flex justify-between items-center p-4 border-b border-gray-800"
-              onClick={() => handleEditField('description')}
-            >
-              <span className="text-white">设定描述</span>
-              <div className="flex items-center">
-                <span className="text-white mr-2">{contact.description || '添加设定描述'}</span>
-                <ChevronRight size={18} className="text-gray-400" />
-              </div>
-            </div>
+            <h1 className="text-lg font-medium text-white flex-1 text-center">个人资料</h1>
           </div>
-        )}
-      </div>
+
+          {/* 联系人资料列表 */}
+          {contact && (
+            <div className="flex-1">
+              {/* 头像项 */}
+              <div className="flex justify-between items-center p-4 border-b border-gray-800">
+                <span className="text-white">头像</span>
+                <div className="h-14 w-14 rounded overflow-hidden">
+                  {contact.avatar &&
+                    (typeof contact.avatar === 'string' && contact.avatar.length <= 2 ? (
+                      <div className="w-full h-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-xl font-semibold">
+                        {contact.avatar}
+                      </div>
+                    ) : (
+                      <img
+                        src={typeof contact.avatar === 'string' ? contact.avatar : ''}
+                        alt={contact.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ))}
+                </div>
+              </div>
+
+              {/* 名称项 */}
+              <div
+                className="flex justify-between items-center p-4 border-b border-gray-800"
+                onClick={() => handleEditField('name')}
+              >
+                <span className="text-white">名字</span>
+                <div className="flex items-center">
+                  <span className="text-white mr-2">{contact.name}</span>
+                  <ChevronRight size={18} className="text-gray-400" />
+                </div>
+              </div>
+
+              {/* 设定描述项 */}
+              <div
+                className="flex justify-between items-center p-4 border-b border-gray-800"
+                onClick={() => handleEditField('description')}
+              >
+                <span className="text-white">设定描述</span>
+                <div className="flex items-center">
+                  <span className="text-white mr-2">{contact.description || '添加设定描述'}</span>
+                  <ChevronRight size={18} className="text-gray-400" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </DelayedLoading>
       {/* 如果处于编辑模式，则渲染编辑组件 */}
       {editMode && editField && (
         <EditContactFieldComponent
@@ -168,7 +170,7 @@ const ContactDetailComponent = ({ contactId, onBack }: ContactDetailProps) => {
           onSaved={handleEditSaved}
         />
       )}
-    </DelayedLoading>
+    </>
   );
 };
 

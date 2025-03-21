@@ -10,14 +10,36 @@
 
 当前模型包括：
 
-- `User`: 用户模型，包含 id、name、description 和 is_ai 字段（is_ai 用于标识用户是否为AI）
+- `User`: 用户模型，包含用户基本信息
+  - 包含 id、name、avatar_url、description 和 is_ai 字段
+  - avatar_url 存储用户头像的URL
+  - is_ai 用于标识用户是否为AI
+- `Agent`: AI代理模型，与用户一对一关联
+  - 包含 provider (模型提供商)
+  - 包含 model_name (模型名称，如"Llama-3.2")
+  - 包含 system_prompt (系统提示词，控制AI的行为)
+  - 包含多种模型参数:
+    - temperature (控制输出随机性)
+    - top_p (影响token选择的多样性)
+    - top_k (限制每步考虑的token数量)
+    - repeat_penalty (重复惩罚系数)
+    - stop_sequences (停止序列，以逗号分隔)
+    - max_tokens (最大生成token数)
+    - presence_penalty (存在惩罚)
+    - frequency_penalty (频率惩罚)
+  - 一个用户最多关联一个Agent
 - `UserContact`: 用户联系人关系模型，表示用户与其他用户之间的联系人关系
   - 只存储用户ID和联系人ID的简单映射
 - `Chat`: 聊天模型，表示一个聊天会话
+  - 包含聊天名称(`name`)
+  - 包含头像URL数组(`avatar_urls`)，以逗号分隔存储
   - 包含未读消息数量(`unread_count`)
   - 包含最后一条消息内容(`last_message`)
   - 包含最后一条消息时间(`last_message_time`)
 - `ChatParticipant`: 聊天参与者模型，表示用户与聊天的多对多关系
+  - 包含用户在特定聊天中的昵称(`nickname`)
+  - 包含用户在特定聊天中的描述(`description`)
+  - 允许用户在不同聊天中使用不同的昵称和描述
 - `Message`: 消息模型，包含消息内容和发送者信息
 
 这些模型与 Diesel ORM 中定义的模型保持一致，但使用 Prisma 的语法表示。
@@ -31,6 +53,8 @@
 - `update_chats_updated_at`: 在聊天更新时，自动更新更新时间
 - `update_messages_updated_at`: 在消息更新时，自动更新更新时间
 - `update_chat_last_message`: 在新消息插入时，自动更新聊天的最后消息内容和时间
+- `update_agents_updated_at`: 在Agent更新时，自动更新更新时间
+- `update_chat_participants_updated_at`: 在聊天参与者信息更新时，自动更新更新时间
 
 ## 如何使用这个参考
 

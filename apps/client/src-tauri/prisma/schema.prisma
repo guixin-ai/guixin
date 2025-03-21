@@ -17,6 +17,7 @@ datasource db {
 model User {
   id           String       @id @default(uuid())
   name         String       // 用户名称
+  avatar_url   String?      // 用户头像URL
   description  String?      // 用户描述
   is_ai        Boolean      @default(false) // 是否为AI用户
   createdAt    DateTime     @default(now()) @map("created_at")
@@ -28,8 +29,38 @@ model User {
   
   // 联系人关系
   contacts     UserContact[] // 该用户的联系人
+  
+  // Agent关系
+  agent        Agent?        // 用户关联的AI代理
 
   @@map("users")
+}
+
+// AI代理模型
+model Agent {
+  id                String       @id @default(uuid())
+  provider          String       // 模型提供商
+  model_name        String       // 模型名称
+  system_prompt     String?      // 系统提示词，控制AI的行为和角色
+  
+  // 模型参数
+  temperature       Float?       @default(0.7) // 控制输出随机性
+  top_p             Float?       @default(0.9) // 影响token选择的多样性
+  top_k             Int?         @default(40)  // 限制每步考虑的token数量
+  repeat_penalty    Float?       @default(1.1) // 重复惩罚系数
+  stop_sequences    String?      // 停止序列，以逗号分隔
+  max_tokens        Int?         @default(2048) // 最大生成token数
+  presence_penalty  Float?       @default(0.0) // 存在惩罚
+  frequency_penalty Float?       @default(0.0) // 频率惩罚
+  
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段
+  user              User         @relation(fields: [userId], references: [id])
+  userId            String       @unique @map("user_id") // 确保一对一关系
+  
+  @@map("agents")
 }
 
 // 用户联系人关系表
@@ -51,6 +82,8 @@ model UserContact {
 // 聊天模型 - 简化版
 model Chat {
   id                 String       @id @default(uuid())
+  name               String       // 聊天名称
+  avatar_urls        String       // 头像URL数组，以逗号分隔存储
   unread_count       Int          @default(0) // 未读消息数量
   last_message       String?      // 最后一条消息的内容
   last_message_time  DateTime?    // 最后一条消息的时间
@@ -67,6 +100,8 @@ model Chat {
 // 聊天参与者模型 - 多对多关系表
 model ChatParticipant {
   id           String       @id @default(uuid())
+  nickname     String?      // 用户在该聊天中的昵称
+  description  String?      // 用户在该聊天中的描述
   joinedAt     DateTime     @default(now()) @map("joined_at")
   
   // 关系字段

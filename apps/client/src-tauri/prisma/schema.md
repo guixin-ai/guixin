@@ -9,14 +9,34 @@ erDiagram
     User ||--o{ Message : "发送"
     User ||--o{ ChatParticipant : "参与"
     User ||--o{ UserContact : "拥有"
+    User ||--o| Agent : "关联"
     Chat ||--o{ ChatParticipant : "包含"
     Chat ||--o{ Message : "包含"
 
     User {
         string id PK
         string name
+        string avatar_url
         string description
         boolean is_ai
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Agent {
+        string id PK
+        string provider
+        string model_name
+        string system_prompt
+        float temperature
+        float top_p
+        int top_k
+        float repeat_penalty
+        string stop_sequences
+        int max_tokens
+        float presence_penalty
+        float frequency_penalty
+        string userId FK "User.id"
         datetime createdAt
         datetime updatedAt
     }
@@ -31,6 +51,8 @@ erDiagram
 
     Chat {
         string id PK
+        string name
+        string avatar_urls
         int unread_count
         string last_message
         datetime last_message_time
@@ -40,6 +62,8 @@ erDiagram
 
     ChatParticipant {
         string id PK
+        string nickname
+        string description
         datetime joinedAt
         string chatId FK "Chat.id"
         string userId FK "User.id"
@@ -64,14 +88,34 @@ classDiagram
     User "1" --> "*" Message : 发送
     User "1" --> "*" ChatParticipant : 参与
     User "1" --> "*" UserContact : 拥有联系人
+    User "1" --> "0..1" Agent : 关联
     Chat "1" --> "*" ChatParticipant : 包含
     Chat "1" --> "*" Message : 包含
 
     class User {
         +String id
         +String name
+        +String avatar_url
         +String description
         +Boolean is_ai
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class Agent {
+        +String id
+        +String provider
+        +String model_name
+        +String system_prompt
+        +Float temperature
+        +Float top_p
+        +Int top_k
+        +Float repeat_penalty
+        +String stop_sequences
+        +Int max_tokens
+        +Float presence_penalty
+        +Float frequency_penalty
+        +String userId
         +DateTime createdAt
         +DateTime updatedAt
     }
@@ -86,6 +130,8 @@ classDiagram
 
     class Chat {
         +String id
+        +String name
+        +String avatar_urls
         +Int unread_count
         +String last_message
         +DateTime last_message_time
@@ -95,6 +141,8 @@ classDiagram
 
     class ChatParticipant {
         +String id
+        +String nickname
+        +String description
         +DateTime joinedAt
         +String chatId
         +String userId
@@ -113,6 +161,9 @@ classDiagram
 ## 关系类型说明
 
 在上面的基数关系图中：
+
+- **1对1关系 (1:1)**
+  - User 与 Agent：一个用户最多关联一个AI代理
 
 - **1对多关系 (1:N)**
   - User 与 Message：一个用户可以发送多条消息
@@ -133,27 +184,43 @@ classDiagram
    - 一个用户可以发送多条消息 (`messages`)
    - 一个用户可以参与多个聊天 (`chats`)
    - 一个用户可以有多个联系人 (`contacts`)
+   - 一个用户可以关联一个AI代理 (`agent`)
 
-2. **UserContact (用户联系人)**
+2. **Agent (AI代理)**
+   - 包含模型提供商和模型名称信息
+   - 包含系统提示词以控制AI的行为
+   - 包含多种推理参数用于微调模型输出:
+     - temperature、top_p、top_k等控制随机性和多样性
+     - repeat_penalty控制重复内容
+     - max_tokens控制生成长度
+     - 其他参数微调生成质量
+   - 与用户是一对一关系
+
+3. **UserContact (用户联系人)**
    - 表示用户与联系人的关系
    - 每个记录代表一个用户添加了另一个用户作为联系人
    - 只存储联系人ID，不存储其他信息
 
 ### 聊天相关
 
-3. **Chat (聊天)**
+4. **Chat (聊天)**
    - 代表一个聊天会话
+   - 包含聊天名称 (`name`)
+   - 包含头像URL数组 (`avatar_urls`)，以逗号分隔存储
    - 包含未读消息数量 (`unread_count`)
    - 包含最后一条消息内容 (`last_message`)
    - 包含最后一条消息时间 (`last_message_time`)
    - 包含多个参与者 (`participants`)
    - 包含多条消息 (`messages`)
 
-4. **ChatParticipant (聊天参与者)**
+5. **ChatParticipant (聊天参与者)**
    - 多对多关系表，连接Chat和User
+   - 包含用户在特定聊天中的昵称 (`nickname`)
+   - 包含用户在特定聊天中的描述 (`description`)
+   - 允许用户在不同聊天中使用不同的身份标识
    - 一个用户在一个聊天中只能有一个参与记录
 
-5. **Message (消息)**
+6. **Message (消息)**
    - 包含消息内容
    - 有一个发送者 (`sender`)
    - 属于一个聊天 (`chat`)
@@ -173,6 +240,21 @@ classDiagram
 ### 添加联系人流程
 
 1. 在UserContact表中创建记录，指定user_id和contact_id
+
+### 关联AI代理流程
+
+1. 创建Agent记录，指定provider、model_name和各种模型参数
+2. 关联到特定用户
+
+### 调整AI行为流程
+
+1. 更新Agent记录中的system_prompt和其他参数
+2. 修改temperature等参数调整输出随机性与创造性
+
+### 设置聊天昵称和描述流程
+
+1. 更新用户在特定聊天中的ChatParticipant记录
+2. 设置nickname和description字段
 
 ### 获取聊天历史流程
 

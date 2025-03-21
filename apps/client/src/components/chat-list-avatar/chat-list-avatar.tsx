@@ -71,20 +71,15 @@ export const ChatListAvatar: React.FC<ChatListAvatarProps> = ({
   const renderAvatar = (avatar: string, index: number, className: string = ''): React.ReactElement => {
     const testIdSuffix = avatarCount > 1 ? `-${index}` : '';
     
-    // 共享的样式和结构
-    const commonStyles = {
-      borderRadius: '8%'
-    };
-    
-    // 共享的容器类
-    const containerClass = `w-full h-0 pt-[100%] relative overflow-hidden ${className}`;
+    // 共享的容器类 - 使用aspect-square替代padding方案但保留容器结构
+    const containerClass = `w-full aspect-square relative overflow-hidden ${className}`;
     
     // 图片头像
     return (
       <div 
         key={index}
         className={containerClass}
-        style={commonStyles}
+        style={{ borderRadius: '8%' }}
         data-testid={`${testId}${testIdSuffix}-img`}
       >
         <img 
@@ -95,6 +90,7 @@ export const ChatListAvatar: React.FC<ChatListAvatarProps> = ({
             e.currentTarget.src = defaultAvatarUrl;
           }}
         />
+        {/* 这里未来可以添加加载占位符 */}
       </div>
     );
   };

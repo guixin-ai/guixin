@@ -1,9 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
-import ThreeAvatarsLayout from './three-avatars-layout';
+import React from 'react';
 
 export interface ChatListAvatarProps {
   /**
-   * 头像数组，可以是图片URL或者字符串（用于显示第一个字符）
+   * 头像数组，应为图片URL
    */
   avatars: string[];
   
@@ -16,6 +15,11 @@ export interface ChatListAvatarProps {
    * 额外的CSS类名
    */
   className?: string;
+  
+  /**
+   * 默认头像URL，当图片加载失败时使用
+   */
+  defaultAvatarUrl: string;
 }
 
 // 布局类型枚举
@@ -26,62 +30,26 @@ type LayoutType = 'single' | 'two' | 'three' | 'four' | 'five' | 'six' | 'seven'
  * 
  * 用于显示聊天列表中的头像，支持单个头像和群聊头像（多个头像组合）
  * 当有多个头像时，使用网格布局，最多显示9个头像
- * 组件大小和字体大小完全响应式，会适应父容器大小
+ * 组件大小完全响应式，会适应父容器大小
  * 头像圆角采用8%的百分比值，确保在任何尺寸下都保持一致的视觉效果
  * 所有头像都严格保持1:1的宽高比
+ * 
+ * @throws Error 当头像数量为2个时会抛出异常
  */
 export const ChatListAvatar: React.FC<ChatListAvatarProps> = ({
   avatars,
   testId = 'chat-avatar',
   className = '',
+  defaultAvatarUrl,
 }) => {
-  // 容器引用，用于计算大小
-  const containerRef = useRef<HTMLDivElement>(null);
-  // 字体大小状态
-  const [fontSize, setFontSize] = useState('');
-
-  // 确保avatars始终是数组且不为空
-  const safeAvatars = Array.isArray(avatars) && avatars.length > 0 
-    ? avatars 
-    : ['?'];
-  
   // 最多显示9个头像
-  const displayAvatars = safeAvatars.slice(0, 9);
+  const displayAvatars = avatars?.slice(0, 9) || [];
   const avatarCount = displayAvatars.length;
   
-  // 计算并设置响应式字体大小
-  useEffect(() => {
-    const updateFontSize = () => {
-      if (!containerRef.current) return;
-      
-      // 获取容器尺寸
-      const containerWidth = containerRef.current.clientWidth;
-      
-      // 根据容器尺寸和头像数量计算合适的字体大小
-      let calculatedSize;
-      if (avatarCount === 1) {
-        calculatedSize = containerWidth * 0.5; // 单个头像时，字体大小为容器宽度的一半
-      } else if (avatarCount <= 4) {
-        calculatedSize = containerWidth * 0.25; // 2-4个头像时，字体大小更小
-      } else {
-        calculatedSize = containerWidth * 0.15; // 5-9个头像时，字体大小最小
-      }
-      
-      // 设置字体大小（单位为px）
-      setFontSize(`${calculatedSize}px`);
-    };
-    
-    // 初始计算
-    updateFontSize();
-    
-    // 监听窗口大小变化，以便在容器大小变化时更新字体大小
-    window.addEventListener('resize', updateFontSize);
-    
-    // 清理监听器
-    return () => {
-      window.removeEventListener('resize', updateFontSize);
-    };
-  }, [avatarCount]);
+  // 当头像数量为2时，抛出异常
+  if (avatarCount === 2) {
+    throw new Error('不支持两个头像的布局，请使用1个或3个及以上的头像数量');
+  }
   
   // 获取布局类型，根据头像数量返回对应的布局分类
   const getLayoutType = (): LayoutType => {
@@ -99,54 +67,8 @@ export const ChatListAvatar: React.FC<ChatListAvatarProps> = ({
     }
   };
 
-  // 计算网格样式，根据布局类型返回对应的CSS类名
-  const getGridStyles = (): string => {
-    const layoutType = getLayoutType();
-    
-    switch (layoutType) {
-      case 'single':
-        return ''; // 单个头像不需要网格
-      case 'two':
-        return 'grid grid-cols-2 gap-0.5'; // 两个头像，2列
-      case 'three':
-        return ''; // 三个头像使用专门的组件
-      case 'four':
-        return 'grid grid-cols-2 gap-0.5'; // 四个头像，2x2网格
-      default:
-        return 'grid grid-cols-3 gap-0.5'; // 5-9个头像，3x3网格
-    }
-  };
-  
-  // 获取字体大小样式
-  const getFontSizeStyle = () => {
-    return { fontSize };
-  };
-  
-  // 判断是否为图片URL
-  const isImageUrl = (str: string): boolean => {
-    return str.startsWith('http://') || 
-           str.startsWith('https://') || 
-           str.startsWith('/');
-  };
-  
-  // 获取容器样式类
-  const getContainerClass = (): string => {
-    const layoutType = getLayoutType();
-    let baseClass = `w-full h-full ${getGridStyles()} relative ${className}`;
-    
-    // 为不同布局添加特定样式
-    if (layoutType === 'single') {
-      baseClass += ' flex items-center justify-center';
-    } else if (layoutType !== 'three') {
-      // 三个头像使用专门组件，其他多头像情况使用网格并居中
-      baseClass += ' items-center justify-center';
-    }
-    
-    return baseClass;
-  };
-  
   // 渲染单个头像
-  const renderAvatar = (avatar: string, index: number): React.ReactElement => {
+  const renderAvatar = (avatar: string, index: number, className: string = ''): React.ReactElement => {
     const testIdSuffix = avatarCount > 1 ? `-${index}` : '';
     
     // 共享的样式和结构
@@ -155,66 +77,105 @@ export const ChatListAvatar: React.FC<ChatListAvatarProps> = ({
     };
     
     // 共享的容器类
-    const containerClass = "w-full h-0 pt-[100%] relative overflow-hidden";
+    const containerClass = `w-full h-0 pt-[100%] relative overflow-hidden ${className}`;
     
-    // 内容渲染
-    if (isImageUrl(avatar)) {
-      // 图片头像
-      return (
-        <div 
-          key={index}
-          className={containerClass}
-          style={commonStyles}
-          data-testid={`${testId}${testIdSuffix}-img`}
-        >
-          <img 
-            src={avatar} 
-            alt="头像" 
-            className="absolute top-0 left-0 w-full h-full object-cover"
-          />
-        </div>
-      );
-    } else {
-      // 文字头像
-      return (
-        <div 
-          key={index}
-          className={`${containerClass} bg-gradient-to-br from-green-400 to-green-600`}
-          style={commonStyles}
-          data-testid={`${testId}${testIdSuffix}-text`}
-        >
-          <div 
-            className="absolute top-0 left-0 w-full h-full flex items-center justify-center text-white font-semibold"
-            style={getFontSizeStyle()}
-          >
-            {avatar.charAt(0)}
+    // 图片头像
+    return (
+      <div 
+        key={index}
+        className={containerClass}
+        style={commonStyles}
+        data-testid={`${testId}${testIdSuffix}-img`}
+      >
+        <img 
+          src={avatar}
+          alt="头像" 
+          className="absolute top-0 left-0 w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.src = defaultAvatarUrl;
+          }}
+        />
+      </div>
+    );
+  };
+  
+  // 根据布局类型获取内容
+  const getContent = () => {
+    const layoutType = getLayoutType();
+    
+    switch (layoutType) {
+      case 'single':
+        // 单个头像：占满整个容器
+        return renderAvatar(displayAvatars[0], 0);
+      
+      case 'two':
+        // 两个头像：左右并排
+        // 注意：由于前面已经抛出异常，这段代码实际上不会被执行
+        return (
+          <div className="grid grid-cols-2 gap-0.5 w-full h-full">
+            {displayAvatars.map((avatar, index) => renderAvatar(avatar, index))}
           </div>
-        </div>
-      );
+        );
+      
+      case 'three':
+        // 三个头像：品字形布局（上一下二）
+        return (
+          <div className="w-full h-full flex flex-col justify-between gap-0.5">
+            {/* 上方头像 */}
+            <div className="flex justify-center">
+              <div className="w-1/2">
+                {renderAvatar(displayAvatars[0], 0)}
+              </div>
+            </div>
+            {/* 下方两个头像 */}
+            <div className="flex justify-between gap-0.5">
+              <div className="w-1/2">
+                {renderAvatar(displayAvatars[1], 1)}
+              </div>
+              <div className="w-1/2">
+                {renderAvatar(displayAvatars[2], 2)}
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 'four':
+        // 四个头像：2x2网格
+        return (
+          <div className="grid grid-cols-2 gap-0.5 w-full h-full">
+            {displayAvatars.map((avatar, index) => renderAvatar(avatar, index))}
+          </div>
+        );
+      
+      default:
+        // 5-9个头像：3x3网格
+        return (
+          <div className="grid grid-cols-3 grid-rows-3 gap-0.5 w-full h-full">
+            {displayAvatars.map((avatar, index) => renderAvatar(avatar, index))}
+          </div>
+        );
     }
   };
   
-  // 针对三个头像的特殊情况，使用专门的布局组件
-  if (avatarCount === 3) {
+  // 处理空数组的情况
+  if (avatarCount === 0) {
     return (
-      <div ref={containerRef} className="w-full h-full">
-        <ThreeAvatarsLayout 
-          avatars={displayAvatars}
-          testId={testId}
-          getFontSizeStyle={getFontSizeStyle}
-        />
+      <div 
+        className={`w-full h-full relative ${className}`}
+        data-testid={testId}
+      >
+        {renderAvatar(defaultAvatarUrl, 0)}
       </div>
     );
   }
   
-  // 渲染默认布局
+  // 渲染组件
   return (
     <div 
-      ref={containerRef}
-      className={getContainerClass()}
+      className={`w-full h-full relative ${className}`}
       data-testid={testId}
     >
-      {displayAvatars.map((avatar, index) => renderAvatar(avatar, index))}
+      {getContent()}
     </div>
   );
 };

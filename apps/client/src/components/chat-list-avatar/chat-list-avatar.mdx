@@ -5,21 +5,25 @@ import * as ChatListAvatarStories from './chat-list-avatar.stories';
 
 <Title>ChatListAvatar 聊天列表头像</Title>
 
-聊天列表头像组件用于在聊天列表中显示单个或多个头像，支持文字头像和图片头像。多个头像时使用特殊布局，使所有头像都垂直水平居中，类似于微信群聊的头像样式。组件完全响应式，会自动适应父容器的大小。
+聊天列表头像组件用于在聊天列表中显示单个或多个头像。多个头像时使用特殊布局，模仿微信群聊头像的布局方式，使所有头像都垂直水平居中。组件完全响应式，会自动适应父容器的大小。
 
 ## 特点
 
-- 支持单个头像和多个头像（群聊）的显示
-- 支持图片URL或文字作为头像
-- 文字头像显示字符串的第一个字符
-- 图片头像自动判断（以http://、https://或/开头的字符串）
+- 支持单个头像和群聊头像（3个及以上）的显示
+- **注意：当头像数量为2个时，组件会抛出异常**
+- 支持图片URL作为头像
+- **必须提供defaultAvatarUrl属性**（用于图片加载失败时显示）
+- 图片加载失败时会自动使用默认头像
 - 完全响应式设计，自动适应父容器大小
-- 文字大小会根据头像数量自动调整
 - 使用8%的圆角百分比，确保在任何尺寸下保持一致的视觉效果
-- 三个头像时使用特殊三角形布局（上方一个，下方两个）
-- 2/4个头像使用2x2网格布局
-- 5-9个头像使用3x3网格布局
+- 采用类似微信群聊的头像布局：
+  - 一个头像：占满整个容器
+  - 两个头像：**不支持**（会抛出异常）
+  - 三个头像：品字形布局（上方一个，下方两个）
+  - 四个头像：2×2网格布局
+  - 五到九个头像：3×3网格布局
 - 最多显示9个头像
+- 当传入空数组时，会显示默认头像
 
 ## 使用方法
 
@@ -29,37 +33,63 @@ import { ChatListAvatar } from '@/components/chat-list-avatar';
 // 基本使用（在固定大小的容器中）
 <div className="w-12 h-12">
   <ChatListAvatar 
-    avatars={['张']}
+    avatars={['https://example.com/avatar1.jpg']}
+    defaultAvatarUrl="https://example.com/default-avatar.jpg"
   />
 </div>
 
-// 两个头像示例
+// 三个头像示例（品字形布局）
 <div className="w-12 h-12">
   <ChatListAvatar 
-    avatars={['张', '李']}
-  />
-</div>
-
-// 三个头像示例
-<div className="w-12 h-12">
-  <ChatListAvatar 
-    avatars={['张', '李', '王']}
+    avatars={['https://example.com/avatar1.jpg', 'https://example.com/avatar2.jpg', 'https://example.com/avatar3.jpg']}
+    defaultAvatarUrl="https://example.com/default-avatar.jpg"
   />
 </div>
 
 // 九个头像示例
 <div className="w-12 h-12">
   <ChatListAvatar 
-    avatars={['张', '李', '王', '赵', '刘', '陈', '钱', '孙', '周']}
+    avatars={[
+      'https://example.com/avatar1.jpg',
+      'https://example.com/avatar2.jpg',
+      'https://example.com/avatar3.jpg',
+      'https://example.com/avatar4.jpg',
+      'https://example.com/avatar5.jpg',
+      'https://example.com/avatar6.jpg',
+      'https://example.com/avatar7.jpg',
+      'https://example.com/avatar8.jpg',
+      'https://example.com/avatar9.jpg'
+    ]}
+    defaultAvatarUrl="https://example.com/default-avatar.jpg"
   />
 </div>
 
-// 混合头像示例（文字和图片）
+// 自定义默认头像（用于图片加载失败时）
 <div className="w-12 h-12">
   <ChatListAvatar 
-    avatars={['张', 'https://example.com/avatar.jpg']}
+    avatars={['https://example.com/avatar1.jpg', 'https://example.com/avatar2.jpg', 'https://example.com/avatar3.jpg']}
+    defaultAvatarUrl="https://example.com/custom-default-avatar.jpg"
   />
 </div>
+
+// 空数组时显示默认头像
+<div className="w-12 h-12">
+  <ChatListAvatar 
+    avatars={[]}
+    defaultAvatarUrl="https://example.com/default-avatar.jpg"
+  />
+</div>
+
+// 注意：两个头像会抛出异常
+// 错误示例 - 不要这样做
+try {
+  <ChatListAvatar 
+    avatars={['url1', 'url2']} 
+    defaultAvatarUrl="https://example.com/default-avatar.jpg"
+  />
+} catch (error) {
+  // 会抛出 "不支持两个头像的布局，请使用1个或3个及以上的头像数量" 错误
+}
 ```
 
 ## 组件属性
@@ -71,10 +101,6 @@ import { ChatListAvatar } from '@/components/chat-list-avatar';
 ### 一个头像
 
 <Story of={ChatListAvatarStories.OneAvatar} />
-
-### 两个头像
-
-<Story of={ChatListAvatarStories.TwoAvatars} />
 
 ### 三个头像
 
@@ -104,14 +130,14 @@ import { ChatListAvatar } from '@/components/chat-list-avatar';
 
 <Story of={ChatListAvatarStories.NineAvatars} />
 
-### 混合头像的群聊（文字和图片）
+### 图片加载失败时使用默认头像
 
-<Story of={ChatListAvatarStories.MixedAvatarsGroup} />
+<Story of={ChatListAvatarStories.FallbackAvatar} />
+
+### 空头像数组（使用默认头像）
+
+<Story of={ChatListAvatarStories.EmptyAvatars} />
 
 ### 超过上限的头像（只显示前9个）
 
-<Story of={ChatListAvatarStories.ExceedLimitAvatars} />
-
-### 不同尺寸的容器
-
-<Story of={ChatListAvatarStories.DifferentSizes} /> 
+<Story of={ChatListAvatarStories.ExceedLimitAvatars} /> 

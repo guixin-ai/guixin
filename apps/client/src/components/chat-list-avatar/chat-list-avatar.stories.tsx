@@ -8,7 +8,7 @@ const meta = {
   },
   argTypes: {
     avatars: {
-      description: '头像数组，可以是图片URL或者字符串（用于显示第一个字符）',
+      description: '头像图片URL数组',
       control: { type: 'object' },
     },
     testId: {
@@ -17,6 +17,10 @@ const meta = {
     },
     className: {
       description: '额外的CSS类名',
+      control: 'text',
+    },
+    defaultAvatarUrl: {
+      description: '默认头像URL，当图片加载失败时使用',
       control: 'text',
     },
   },
@@ -34,6 +38,28 @@ const meta = {
   ],
 } satisfies Meta<typeof ChatListAvatar>;
 
+// 默认头像URL，使用线上头像
+const defaultAvatarUrl = 'https://ui-avatars.com/api/?background=ff5733&color=ffffff&name=默认';
+
+// 随机图片URLs的示例数组
+const sampleAvatarUrls = [
+  'https://picsum.photos/200/200',
+  'https://picsum.photos/201/201',
+  'https://picsum.photos/202/202',
+  'https://picsum.photos/203/203',
+  'https://picsum.photos/204/204',
+  'https://picsum.photos/205/205',
+  'https://picsum.photos/206/206',
+  'https://picsum.photos/207/207',
+  'https://picsum.photos/208/208',
+  'https://picsum.photos/209/209',
+  'https://picsum.photos/210/210',
+  'https://picsum.photos/211/211'
+];
+
+// 故意设置一个无效的图片URL以展示fallback功能
+const invalidImageUrl = 'https://invalid-image-url/404.jpg';
+
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -42,8 +68,9 @@ type Story = StoryObj<typeof meta>;
  */
 export const OneAvatar: Story = {
   args: {
-    avatars: ['张'],
+    avatars: [sampleAvatarUrls[0]],
     testId: 'story-one-avatar',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
@@ -54,35 +81,22 @@ export const OneAvatar: Story = {
   }
 };
 
-/**
- * 两个头像
- */
-export const TwoAvatars: Story = {
-  args: {
-    avatars: ['张', '李'],
-    testId: 'story-two-avatars',
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: '两个头像时，从左上角开始，从左到右排列。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
-      }
-    }
-  }
-};
+// 注意：两个头像会抛出异常，因此不提供演示示例
+// 使用时请避免传入恰好两个头像的数组
 
 /**
  * 三个头像
  */
 export const ThreeAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2]],
     testId: 'story-three-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '三个头像时，使用三角形布局：上方一个居中，下方两个并排。所有头像在容器中垂直水平居中。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '三个头像时，使用品字形布局：上方一个居中，下方两个并排。所有头像在容器中垂直水平居中。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
@@ -93,8 +107,9 @@ export const ThreeAvatars: Story = {
  */
 export const FourAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2], sampleAvatarUrls[3]],
     testId: 'story-four-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
@@ -110,13 +125,14 @@ export const FourAvatars: Story = {
  */
 export const FiveAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵', '刘'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2], sampleAvatarUrls[3], sampleAvatarUrls[4]],
     testId: 'story-five-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '五个头像时，使用3x3网格，前两行各三个，最后一个在第三行左侧。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '五个头像时，使用3×3网格布局，从左到右、从上到下排列。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
@@ -127,13 +143,14 @@ export const FiveAvatars: Story = {
  */
 export const SixAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵', '刘', '陈'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2], sampleAvatarUrls[3], sampleAvatarUrls[4], sampleAvatarUrls[5]],
     testId: 'story-six-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '六个头像时，使用3x3网格，前两行各三个。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '六个头像时，使用3×3网格布局，从左到右、从上到下排列。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
@@ -144,13 +161,14 @@ export const SixAvatars: Story = {
  */
 export const SevenAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵', '刘', '陈', '钱'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2], sampleAvatarUrls[3], sampleAvatarUrls[4], sampleAvatarUrls[5], sampleAvatarUrls[6]],
     testId: 'story-seven-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '七个头像时，使用3x3网格，前两行各三个，最后一个在第三行左侧。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '七个头像时，使用3×3网格布局，从左到右、从上到下排列。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
@@ -161,13 +179,14 @@ export const SevenAvatars: Story = {
  */
 export const EightAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵', '刘', '陈', '钱', '孙'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2], sampleAvatarUrls[3], sampleAvatarUrls[4], sampleAvatarUrls[5], sampleAvatarUrls[6], sampleAvatarUrls[7]],
     testId: 'story-eight-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '八个头像时，使用3x3网格，前两行各三个，最后两个在第三行。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '八个头像时，使用3×3网格布局，从左到右、从上到下排列。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
@@ -178,37 +197,50 @@ export const EightAvatars: Story = {
  */
 export const NineAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵', '刘', '陈', '钱', '孙', '周'],
+    avatars: [sampleAvatarUrls[0], sampleAvatarUrls[1], sampleAvatarUrls[2], sampleAvatarUrls[3], sampleAvatarUrls[4], sampleAvatarUrls[5], sampleAvatarUrls[6], sampleAvatarUrls[7], sampleAvatarUrls[8]],
     testId: 'story-nine-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '九个头像时，使用3x3网格，填满所有位置。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '九个头像时，使用3×3网格布局，填满所有位置。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
 };
 
 /**
- * 混合头像的群聊（文字和图片）
+ * 图片加载失败时使用默认头像
  */
-export const MixedAvatarsGroup: Story = {
+export const FallbackAvatar: Story = {
   args: {
-    avatars: [
-      '张', 
-      'https://picsum.photos/200/200', 
-      '王', 
-      'https://picsum.photos/201/201', 
-      '李', 
-      'https://picsum.photos/202/202'
-    ],
-    testId: 'story-mixed-avatars-group',
+    avatars: [sampleAvatarUrls[0], invalidImageUrl, sampleAvatarUrls[2]],
+    testId: 'story-fallback-avatar',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {
       description: {
-        story: '混合头像展示，同时包含文字头像和图片头像。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+        story: '当图片加载失败时，会显示默认头像（橙色背景的头像）。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
+      }
+    }
+  }
+};
+
+/**
+ * 空头像数组（使用默认头像）
+ */
+export const EmptyAvatars: Story = {
+  args: {
+    avatars: [],
+    testId: 'story-empty-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: '当提供空头像数组时，会显示默认头像（橙色背景的头像）。上方为小容器(w-12 h-12)，下方为大容器(w-20 h-20)展示。'
       }
     }
   }
@@ -219,8 +251,9 @@ export const MixedAvatarsGroup: Story = {
  */
 export const ExceedLimitAvatars: Story = {
   args: {
-    avatars: ['张', '李', '王', '赵', '刘', '陈', '钱', '孙', '周', '吴', '郑', '冯'],
+    avatars: sampleAvatarUrls,
     testId: 'story-exceed-limit-avatars',
+    defaultAvatarUrl: defaultAvatarUrl,
   },
   parameters: {
     docs: {

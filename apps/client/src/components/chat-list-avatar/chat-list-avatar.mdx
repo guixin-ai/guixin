@@ -1,0 +1,117 @@
+import { Meta, Title, Description, Controls, Story } from '@storybook/blocks';
+import * as ChatListAvatarStories from './chat-list-avatar.stories';
+
+<Meta of={ChatListAvatarStories} />
+
+<Title>ChatListAvatar 聊天列表头像</Title>
+
+聊天列表头像组件用于在聊天列表中显示单个或多个头像，支持文字头像和图片头像。多个头像时使用特殊布局，使所有头像都垂直水平居中，类似于微信群聊的头像样式。组件完全响应式，会自动适应父容器的大小。
+
+## 特点
+
+- 支持单个头像和多个头像（群聊）的显示
+- 支持图片URL或文字作为头像
+- 文字头像显示字符串的第一个字符
+- 图片头像自动判断（以http://、https://或/开头的字符串）
+- 完全响应式设计，自动适应父容器大小
+- 文字大小会根据头像数量自动调整
+- 使用8%的圆角百分比，确保在任何尺寸下保持一致的视觉效果
+- 三个头像时使用特殊三角形布局（上方一个，下方两个）
+- 2/4个头像使用2x2网格布局
+- 5-9个头像使用3x3网格布局
+- 最多显示9个头像
+
+## 使用方法
+
+```tsx
+import { ChatListAvatar } from '@/components/chat-list-avatar';
+
+// 基本使用（在固定大小的容器中）
+<div className="w-12 h-12">
+  <ChatListAvatar 
+    avatars={['张']}
+  />
+</div>
+
+// 两个头像示例
+<div className="w-12 h-12">
+  <ChatListAvatar 
+    avatars={['张', '李']}
+  />
+</div>
+
+// 三个头像示例
+<div className="w-12 h-12">
+  <ChatListAvatar 
+    avatars={['张', '李', '王']}
+  />
+</div>
+
+// 九个头像示例
+<div className="w-12 h-12">
+  <ChatListAvatar 
+    avatars={['张', '李', '王', '赵', '刘', '陈', '钱', '孙', '周']}
+  />
+</div>
+
+// 混合头像示例（文字和图片）
+<div className="w-12 h-12">
+  <ChatListAvatar 
+    avatars={['张', 'https://example.com/avatar.jpg']}
+  />
+</div>
+```
+
+## 组件属性
+
+<Controls />
+
+## 变体展示
+
+### 一个头像
+
+<Story of={ChatListAvatarStories.OneAvatar} />
+
+### 两个头像
+
+<Story of={ChatListAvatarStories.TwoAvatars} />
+
+### 三个头像
+
+<Story of={ChatListAvatarStories.ThreeAvatars} />
+
+### 四个头像
+
+<Story of={ChatListAvatarStories.FourAvatars} />
+
+### 五个头像
+
+<Story of={ChatListAvatarStories.FiveAvatars} />
+
+### 六个头像
+
+<Story of={ChatListAvatarStories.SixAvatars} />
+
+### 七个头像
+
+<Story of={ChatListAvatarStories.SevenAvatars} />
+
+### 八个头像
+
+<Story of={ChatListAvatarStories.EightAvatars} />
+
+### 九个头像
+
+<Story of={ChatListAvatarStories.NineAvatars} />
+
+### 混合头像的群聊（文字和图片）
+
+<Story of={ChatListAvatarStories.MixedAvatarsGroup} />
+
+### 超过上限的头像（只显示前9个）
+
+<Story of={ChatListAvatarStories.ExceedLimitAvatars} />
+
+### 不同尺寸的容器
+
+<Story of={ChatListAvatarStories.DifferentSizes} /> 

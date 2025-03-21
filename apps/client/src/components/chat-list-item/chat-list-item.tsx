@@ -6,6 +6,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from '@/components/ui/context-menu';
+import { ChatListAvatar } from '@/components/chat-list-avatar';
 
 export interface ChatListItemProps {
   /**
@@ -58,12 +59,12 @@ export const ChatListItem: React.FC<ChatListItemProps> = ({
           data-testid={testId}
         >
           <div className="flex items-center">
-            {/* 头像 */}
-            <div className="relative">
-              <div className="w-12 h-12 rounded-md bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold"
-                data-testid={`${testId}-avatar`}>
-                {chat.avatar}
-              </div>
+            {/* 头像 - 使用新的ChatListAvatar组件 */}
+            <div className="relative w-12 h-12">
+              <ChatListAvatar 
+                avatars={[chat.avatar]} 
+                testId={`${testId}-avatar`}
+              />
               {/* 未读消息提示 - 只有当未读数大于0时才显示 */}
               {chat.unread !== undefined && chat.unread !== null && chat.unread > 0 && (
                 <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs"

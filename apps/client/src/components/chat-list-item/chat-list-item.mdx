@@ -9,11 +9,12 @@ import * as ChatListItemStories from './chat-list-item.stories';
 
 ## 特点
 
-- 显示聊天头像，使用首字母作为默认头像
+- 显示聊天头像，支持文字和图片头像
 - 显示聊天名称和最后一条消息的预览
 - 显示消息时间戳
 - 支持未读消息提示徽章
 - 支持点击事件
+- 支持右键菜单删除功能
 
 ## 使用方法
 
@@ -25,12 +26,14 @@ import { ChatListItem } from '@/components/chat-list-item';
   chat={{
     id: 'chat-1',
     name: '张三',
-    avatar: '张',
+    avatar: '张', // 文字头像，显示第一个字符
+    // 或者使用图片URL: avatar: 'https://example.com/avatar.jpg'
     lastMessage: '你好，最近在忙什么呢？',
     timestamp: '10:30',
     unread: 2 // 可选
   }}
   onClick={(chatId) => console.log('点击了聊天:', chatId)}
+  onDelete={(chatId) => console.log('删除聊天:', chatId)}
 />
 ```
 
@@ -47,6 +50,10 @@ import { ChatListItem } from '@/components/chat-list-item';
 ### 带有未读消息的聊天列表项
 
 <Story of={ChatListItemStories.WithUnread} />
+
+### 使用图片头像的聊天列表项
+
+<Story of={ChatListItemStories.WithImageAvatar} />
 
 ### 长内容的聊天列表项
 

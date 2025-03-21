@@ -164,4 +164,29 @@ export const TruncatedText: Story = {
       }
     }
   }
+};
+
+/**
+ * 使用图片头像的聊天列表项
+ */
+export const WithImageAvatar: Story = {
+  args: {
+    chat: {
+      id: 'chat-7',
+      name: '小猫咪',
+      avatar: 'https://placekitten.com/200/200',
+      lastMessage: '喵喵喵~',
+      timestamp: '昨天',
+    },
+    onClick: action('clicked'),
+    onDelete: action('deleted'),
+    testId: 'story-image-avatar-chat',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: '当头像字段是一个URL（以http://、https://或/开头），会自动显示为图片头像。'
+      }
+    }
+  }
 }; 

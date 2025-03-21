@@ -122,6 +122,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      eventemitter3:
+        specifier: ^5.0.1
+        version: 5.0.1
       immer:
         specifier: ^10.1.1
         version: 10.1.1

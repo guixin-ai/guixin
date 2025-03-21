@@ -170,7 +170,7 @@ const CreateFriend = ({ onBack, onComplete }: CreateFriendProps) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 absolute inset-0 z-10">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 fixed z-50 inset-0">
       {/* 头部 */}
       <div className="flex items-center p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <Button

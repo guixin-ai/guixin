@@ -43,18 +43,18 @@ const groupContactsByPinyin = (contacts: Contact[]): ContactGroup[] => {
 const ContactsPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // 从URL查询参数中获取当前模态框和选中的联系人ID
   const currentModal = searchParams.get('modal');
   const contactId = searchParams.get('contactId');
-  
+
   // 使用 useShallow 和选择器获取需要的状态和方法
   const { searchContacts, initializeList, contacts, initializedList } = useContactStore(
     useShallow(state => ({
       searchContacts: state.searchContacts,
       initializeList: state.initializeList,
       contacts: state.contacts,
-      initializedList: state.initializedList
+      initializedList: state.initializedList,
     }))
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,7 +72,7 @@ const ContactsPage = () => {
           setLoading(false);
           return;
         }
-        
+
         // 如果未初始化，才调用服务获取数据
         const response = await contactService.getContacts();
         // 调用模型层的初始化方法设置数据和初始化标记
@@ -97,7 +97,7 @@ const ContactsPage = () => {
     if (!searchQuery) {
       return groupsData;
     }
-    
+
     return groupsData
       .map((group: ContactGroup) => ({
         ...group,
@@ -137,35 +137,35 @@ const ContactsPage = () => {
     setSearchParams({ modal: 'new-chat' });
     setShowDropdown(false);
   };
-  
+
   // 处理聊天创建完成
   const handleChatCreated = async (contactIds: string[]) => {
     if (!contactIds || contactIds.length === 0) {
       return;
     }
-    
+
     try {
       // 使用新的异步createGroupChat方法创建群聊
       const chatId = await useChatStore.getState().createGroupChat(contactIds);
-      
+
       // 导航到新的聊天页面
       navigate(`/chat/${chatId}`);
       clearModal();
     } catch (error) {
       console.error('创建群聊失败:', error);
-      
+
       // 根据错误类型显示不同的错误信息
       let errorMessage = '创建群聊失败，请稍后重试';
-      
+
       if (error instanceof GroupChatCreationFailedException) {
         errorMessage = error.message;
       }
-      
+
       // 这里可以添加显示错误提示的代码，例如toast通知
       alert(errorMessage); // 实际应用中应替换为更友好的UI组件
     }
   };
-  
+
   // 关闭创建聊天页面
   const handleCloseCreateChat = () => {
     clearModal();
@@ -184,22 +184,22 @@ const ContactsPage = () => {
       clearModal();
       return;
     }
-    
+
     try {
       // 创建完朋友后，直接创建一个与该朋友的聊天
       const chatId = await useChatStore.getState().createGroupChat([contactId]);
-      
+
       // 导航到新的聊天页面
       navigate(`/chat/${chatId}`);
       clearModal();
     } catch (error) {
       console.error('创建聊天失败:', error);
       let errorMessage = '创建聊天失败，请稍后重试';
-      
+
       if (error instanceof GroupChatCreationFailedException) {
         errorMessage = error.message;
       }
-      
+
       // 错误提示
       alert(errorMessage);
       clearModal();
@@ -334,31 +334,21 @@ const ContactsPage = () => {
             </a>
           ))}
         </div>
-
-        {/* 联系人详情组件 - 基于URL参数条件渲染 */}
-        {currentModal === 'contact-detail' && contactId && (
-          <ContactDetailComponent
-            contactId={contactId}
-            onBack={handleCloseContactDetail}
-          />
-        )}
-        
-        {/* 新建聊天组件 - 基于URL参数条件渲染 */}
-        {currentModal === 'new-chat' && (
-          <NewChat
-            onBack={handleCloseCreateChat}
-            onComplete={handleChatCreated}
-          />
-        )}
-
-        {/* 创建朋友组件 - 基于URL参数条件渲染 */}
-        {currentModal === 'create-friend' && (
-          <CreateFriend
-            onBack={handleCloseCreateFriend}
-            onComplete={handleFriendCreated}
-          />
-        )}
       </div>
+      {/* 联系人详情组件 - 基于URL参数条件渲染 */}
+      {currentModal === 'contact-detail' && contactId && (
+        <ContactDetailComponent contactId={contactId} onBack={handleCloseContactDetail} />
+      )}
+
+      {/* 新建聊天组件 - 基于URL参数条件渲染 */}
+      {currentModal === 'new-chat' && (
+        <NewChat onBack={handleCloseCreateChat} onComplete={handleChatCreated} />
+      )}
+
+      {/* 创建朋友组件 - 基于URL参数条件渲染 */}
+      {currentModal === 'create-friend' && (
+        <CreateFriend onBack={handleCloseCreateFriend} onComplete={handleFriendCreated} />
+      )}
     </DelayedLoading>
   );
 };

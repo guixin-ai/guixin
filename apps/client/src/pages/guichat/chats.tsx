@@ -16,6 +16,7 @@ import CreateFriend from '../../components/create-friend';
 import { ChatListItem } from '../../components/chat-list-item';
 import { useShallow } from 'zustand/react/shallow';
 import { ChatItem, ChatDetail } from '../../types/chat';
+import { chatService } from '@/services/chat.service';
 
 const ChatsPage = () => {
   const navigate = useNavigate();
@@ -25,11 +26,12 @@ const ChatsPage = () => {
   const currentModal = searchParams.get('modal');
   
   // 使用 useShallow 和选择器获取需要的状态和方法
-  const { searchChats, chats, initializeChatList } = useChatStore(
+  const { searchChats, chats, initializeChatList, initializedChatList } = useChatStore(
     useShallow(state => ({
       searchChats: state.searchChats,
       chats: state.chats,
-      initializeChatList: state.initializeChatList
+      initializeChatList: state.initializeChatList,
+      initializedChatList: state.initializedChatList
     }))
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,8 +41,18 @@ const ChatsPage = () => {
   useEffect(() => {
     const loadChats = async () => {
       try {
-        // 直接调用初始化方法
-        await initializeChatList();
+        // 先检查模型层的初始化状态
+        if (initializedChatList) {
+          // 如果已经初始化，直接使用模型中的数据，不再调用服务
+          console.log('聊天列表已初始化，跳过服务调用');
+          setLoading(false);
+          return;
+        }
+        
+        // 如果未初始化，才调用服务获取数据
+        const response = await chatService.getChats();
+        // 调用模型层的初始化方法设置数据和初始化标记
+        initializeChatList(response.chats);
         setLoading(false);
       } catch (error) {
         console.error('加载聊天列表失败:', error);
@@ -52,7 +64,7 @@ const ChatsPage = () => {
     };
 
     loadChats();
-  }, [initializeChatList]);
+  }, [initializeChatList, initializedChatList]);
 
   // 过滤后的聊天列表
   const filteredChats = searchQuery ? searchChats(searchQuery) : chats;

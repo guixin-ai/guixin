@@ -51,7 +51,7 @@ export interface ChatState {
   addChatMember: (chatId: string, member: ChatMember) => void;
   
   // 初始化方法
-  initializeChatList: () => Promise<ChatItem[]>;
+  initializeChatList: (chats: ChatItem[]) => void;
   initializeChatMessages: (chatId: string) => Promise<ChatMessage[]>;
   initializeChatDetail: (chatId: string) => Promise<ChatDetail | null>;
 }
@@ -94,13 +94,8 @@ export const useChatStore = create(
           return state.chats;
         }
         
-        // 如果未初始化，则调用初始化方法
-        try {
-          return await get().initializeChatList();
-        } catch (error) {
-          console.error(`获取聊天列表失败: ${error}`);
-          return [];
-        }
+        // 如果未初始化，则返回空列表
+        return [];
       },
 
       // 搜索聊天
@@ -253,31 +248,12 @@ export const useChatStore = create(
         });
       },
 
-      // 初始化聊天列表
-      initializeChatList: async () => {
-        const state = get();
-
-        // 如果已经初始化，则直接返回聊天列表
-        if (state.initializedChatList) {
-          return state.chats;
-        }
-
-        try {
-          // 调用fetchAllChats获取聊天列表
-          await get().fetchAllChats();
-
-          // 标记为已初始化
-          set(state => {
-            state.initializedChatList = true;
-          });
-
-          // 返回初始化后的聊天列表
-          return get().chats;
-        } catch (error) {
-          console.error('聊天列表初始化失败:', error);
-          // 抛出自定义异常
-          throw new ChatListInitFailedException(error);
-        }
+      // 初始化聊天列表 - 修改为同步方法，接收聊天数据参数
+      initializeChatList: (chats: ChatItem[]) => {
+        set(state => {
+          state.chats = chats;
+          state.initializedChatList = true;
+        });
       },
 
       // 初始化指定聊天的消息

@@ -33,8 +33,8 @@ export interface ContactState {
   getContactById: (id: string) => Promise<Contact | null>;
   updateContactDetail: (id: string, updates: Partial<ContactDetail>) => Promise<ContactDetail | null>;
 
-  // 初始化方法
-  initializeList: () => Promise<void>;
+  // 初始化方法 - 修改为同步方法，接收联系人列表参数
+  initializeList: (contacts: Contact[]) => void;
   initializeContactDetail: (id: string) => Promise<ContactDetail | null>;
 }
 
@@ -190,14 +190,8 @@ export const useContactStore = create(
           return state.contacts;
         }
         
-        // 如果未初始化，则调用初始化方法
-        try {
-          await get().initializeList();
-          return get().contacts;
-        } catch (error) {
-          console.error(`获取联系人列表失败: ${error}`);
-          return [];
-        }
+        // 如果未初始化，则返回空列表
+        return [];
       },
       
       // 获取联系人详情 - 判断是否已初始化并返回数据
@@ -227,32 +221,16 @@ export const useContactStore = create(
           return state.contacts.find(contact => contact.id === id) || null;
         }
         
-        // 如果未初始化，则调用初始化方法
-        try {
-          await get().initializeList();
-          return get().contacts.find(contact => contact.id === id) || null;
-        } catch (error) {
-          console.error(`获取联系人失败: ${error}`);
-          return null;
-        }
+        // 如果未初始化，则返回null
+        return null;
       },
 
-      // 初始化联系人列表
-      initializeList: async () => {
-        const state = get();
-
-        // 如果已经初始化，则直接返回
-        if (state.initializedList) {
-          return;
-        }
-
-        try {
-          // 调用fetchAllContacts获取联系人列表
-          await get().fetchAllContacts();
-        } catch (error) {
-          console.error('联系人列表初始化失败:', error);
-          throw new ContactListInitFailedException(error);
-        }
+      // 初始化联系人列表 - 修改为同步方法，接收联系人数据参数
+      initializeList: (contacts: Contact[]) => {
+        set(state => {
+          state.contacts = contacts;
+          state.initializedList = true;
+        });
       },
       
       // 初始化联系人详情

@@ -12,6 +12,7 @@ import CreateFriend from '../../components/create-friend';
 import { useChatStore } from '../../models/chat.model';
 import { ChatItem, ChatDetail as ChatDetailType } from '../../types/chat';
 import { GroupChatCreationFailedException } from '@/errors/chat.errors';
+import { contactService } from '@/services/contact.service';
 
 // 按拼音首字母分组联系人的函数
 const groupContactsByPinyin = (contacts: Contact[]): ContactGroup[] => {
@@ -48,11 +49,12 @@ const ContactsPage = () => {
   const contactId = searchParams.get('contactId');
   
   // 使用 useShallow 和选择器获取需要的状态和方法
-  const { searchContacts, initializeList, contacts } = useContactStore(
+  const { searchContacts, initializeList, contacts, initializedList } = useContactStore(
     useShallow(state => ({
       searchContacts: state.searchContacts,
       initializeList: state.initializeList,
-      contacts: state.contacts
+      contacts: state.contacts,
+      initializedList: state.initializedList
     }))
   );
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,8 +65,18 @@ const ContactsPage = () => {
   useEffect(() => {
     const loadContacts = async () => {
       try {
-        // 直接调用初始化方法
-        await initializeList();
+        // 先检查模型层的初始化状态
+        if (initializedList) {
+          // 如果已经初始化，直接使用模型中的数据，不再调用服务
+          console.log('联系人列表已初始化，跳过服务调用');
+          setLoading(false);
+          return;
+        }
+        
+        // 如果未初始化，才调用服务获取数据
+        const response = await contactService.getContacts();
+        // 调用模型层的初始化方法设置数据和初始化标记
+        initializeList(response.contacts);
         setLoading(false);
       } catch (error) {
         console.error('加载联系人数据失败:', error);
@@ -73,7 +85,7 @@ const ContactsPage = () => {
     };
 
     loadContacts();
-  }, [initializeList]);
+  }, [initializeList, initializedList]);
 
   // 使用useMemo来计算分组数据 - 计算属性
   const groupsData = useMemo(() => {

@@ -58,7 +58,8 @@ export default defineConfig({
               ]
             },
             { text: '服务端示例', link: '/mcp/example-servers' },
-            { text: '客户端示例', link: '/mcp/example-clients' }
+            { text: '客户端示例', link: '/mcp/example-clients' },
+            { text: 'TypeScript SDK', link: '/mcp/typescript-sdk' }
           ]
         },
         {

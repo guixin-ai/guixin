@@ -13,7 +13,6 @@ interface AppProps {
 function App({ children }: AppProps) {
   const { initialize } = useAppStore();
   const [loading, setLoading] = useState(true);
-  const [processingChats, setProcessingChats] = useState<Set<string>>(new Set());
 
   // 在应用加载时初始化基础数据
   useEffect(() => {
@@ -39,18 +38,15 @@ function App({ children }: AppProps) {
   useEffect(() => {
     // 处理单个聊天的消息队列
     const processChatQueue = async (chatId: string) => {
-      // 如果已经在处理这个聊天的队列，则跳过
-      if (processingChats.has(chatId)) return;
-
-      const { queueItems, getChatHistory, startProcessing, completeProcessing, errorProcessing, handleContent } =
+      const { queueItems, processingItems, getChatHistory, startProcessing, completeProcessing, errorProcessing, handleContent } =
         useAIQueueStore.getState();
+
+      // 如果已经在处理这个聊天的队列，则跳过
+      if (processingItems[chatId]) return;
 
       // 获取该聊天的队列
       const chatQueue = queueItems[chatId] || [];
       if (chatQueue.length === 0) return;
-
-      // 标记该聊天正在处理
-      setProcessingChats(prev => new Set(prev).add(chatId));
 
       // 获取队列头部项目
       const nextItem = chatQueue[0];
@@ -76,12 +72,6 @@ function App({ children }: AppProps) {
           },
           onComplete: (chatId, messageId, content) => {
             completeProcessing(chatId, messageId, content);
-            // 移除处理标记
-            setProcessingChats(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(chatId);
-              return newSet;
-            });
             // 检查该聊天是否还有下一个队列项
             const currentState = useAIQueueStore.getState();
             if ((currentState.queueItems[chatId]?.length || 0) > 0) {
@@ -91,12 +81,6 @@ function App({ children }: AppProps) {
           },
           onError: (chatId, messageId, error) => {
             errorProcessing(chatId, messageId, error);
-            // 移除处理标记
-            setProcessingChats(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(chatId);
-              return newSet;
-            });
             // 检查是否还有下一个队列项
             const currentState = useAIQueueStore.getState();
             if ((currentState.queueItems[chatId]?.length || 0) > 0) {
@@ -145,7 +129,7 @@ function App({ children }: AppProps) {
     return () => {
       unsubscribe();
     };
-  }, [processingChats]);
+  }, []);
 
   // 使用DelayedLoading组件来处理加载状态，避免闪烁
   return (

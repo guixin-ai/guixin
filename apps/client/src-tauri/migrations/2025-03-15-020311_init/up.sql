@@ -31,6 +31,20 @@ CREATE TABLE agents (
   FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+-- 创建资源表
+CREATE TABLE resources (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  url TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  description TEXT,
+  user_id TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
 -- 创建用户联系人关系表
 CREATE TABLE user_contacts (
   id TEXT PRIMARY KEY NOT NULL,
@@ -93,6 +107,12 @@ BEGIN
   UPDATE agents SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
+CREATE TRIGGER update_resources_updated_at
+AFTER UPDATE ON resources
+BEGIN
+  UPDATE resources SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER update_user_contacts_updated_at
 AFTER UPDATE ON user_contacts
 BEGIN
@@ -150,6 +170,7 @@ INSERT INTO users (
 CREATE INDEX idx_user_contacts_user_id ON user_contacts(user_id);
 CREATE INDEX idx_user_contacts_contact_id ON user_contacts(contact_id);
 CREATE INDEX idx_agents_user_id ON agents(user_id);
+CREATE INDEX idx_resources_user_id ON resources(user_id);
 CREATE INDEX idx_chat_participants_user_id ON chat_participants(user_id);
 CREATE INDEX idx_chat_participants_chat_id ON chat_participants(chat_id);
 CREATE INDEX idx_messages_chat_id ON messages(chat_id);

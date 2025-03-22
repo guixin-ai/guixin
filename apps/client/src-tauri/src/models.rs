@@ -47,6 +47,35 @@ pub struct NewUserContact {
     pub updated_at: NaiveDateTime,
 }
 
+// Resource 模型
+#[derive(Queryable, Selectable, Debug, Serialize, Deserialize)]
+#[diesel(table_name = resources)]
+pub struct Resource {
+    pub id: String,
+    pub name: String,
+    pub type_: String,
+    pub url: String,
+    pub file_name: String,
+    pub description: Option<String>,
+    pub user_id: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Insertable, Debug, Deserialize)]
+#[diesel(table_name = resources)]
+pub struct NewResource {
+    pub id: String,
+    pub name: String,
+    pub type_: String,
+    pub url: String,
+    pub file_name: String,
+    pub description: Option<String>,
+    pub user_id: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
 // Chat 模型
 #[derive(Queryable, Selectable, Debug, Serialize, Deserialize)]
 #[diesel(table_name = chats)]

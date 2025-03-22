@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, RouteObject, Outlet } from 'react-router
 import GuiChatLayout from './pages/guichat';
 import GuiChatChats from './pages/guichat/chats';
 import GuiChatContacts from './pages/guichat/contacts';
+import GuiChatResources from './pages/guichat/resources';
 import GuiChatChat from './pages/chat';
 import NotFoundPage from './pages/not-found';
 import ErrorBoundary from './components/error-boundary';
@@ -54,6 +55,11 @@ const routes: RouteObject[] = [
             // 联系人列表页，显示所有联系人
             path: 'contacts',
             element: <GuiChatContacts />,
+          },
+          {
+            // 资源库页面，显示所有资源
+            path: 'resources',
+            element: <GuiChatResources />,
           },
         ],
       },

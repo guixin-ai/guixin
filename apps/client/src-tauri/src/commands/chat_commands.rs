@@ -1,7 +1,7 @@
 // 聊天相关命令
 use crate::AppState;
 use crate::models::ChatParticipant;
-use crate::repositories::{chat_participant_repository::ChatParticipantRepository, chat_repository::ChatRepository, message_repository::MessageRepository};
+use crate::repositories::{chat_participant_repository::ChatParticipantRepository, chat_repository::ChatRepository};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 

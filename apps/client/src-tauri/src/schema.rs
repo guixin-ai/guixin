@@ -56,6 +56,21 @@ diesel::table! {
 }
 
 diesel::table! {
+    resources (id) {
+        id -> Text,
+        name -> Text,
+        #[sql_name = "type"]
+        type_ -> Text,
+        url -> Text,
+        file_name -> Text,
+        description -> Nullable<Text>,
+        user_id -> Text,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     user_contacts (id) {
         id -> Text,
         user_id -> Text,
@@ -82,12 +97,14 @@ diesel::joinable!(chat_participants -> chats (chat_id));
 diesel::joinable!(chat_participants -> users (user_id));
 diesel::joinable!(messages -> chats (chat_id));
 diesel::joinable!(messages -> users (sender_id));
+diesel::joinable!(resources -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     agents,
     chat_participants,
     chats,
     messages,
+    resources,
     user_contacts,
     users,
 );

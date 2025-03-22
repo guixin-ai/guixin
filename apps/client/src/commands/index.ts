@@ -10,4 +10,7 @@ export { contactCommands, type ContactResponse } from './contact.commands';
 export { userCommands, type UserInfo } from './user.commands';
 
 // 导出聊天指令
-export { chatCommands, type ChatListResponse, type ChatListItemResponse } from './chat.commands'; 
+export { chatCommands, type ChatListResponse, type ChatListItemResponse } from './chat.commands';
+
+// 导出资源指令
+export { resourceCommands, type ResourceResponse } from './resource.commands'; 

@@ -10,6 +10,7 @@ erDiagram
     User ||--o{ ChatParticipant : "参与"
     User ||--o{ UserContact : "拥有"
     User ||--o| Agent : "关联"
+    User ||--o{ Resource : "拥有"
     Chat ||--o{ ChatParticipant : "包含"
     Chat ||--o{ Message : "包含"
 
@@ -47,6 +48,18 @@ erDiagram
         datetime updatedAt
         string userId FK "User.id"
         string contactId
+    }
+
+    Resource {
+        string id PK
+        string name
+        string type
+        string url
+        string file_name
+        string description
+        datetime createdAt
+        datetime updatedAt
+        string userId FK "User.id"
     }
 
     Chat {
@@ -89,6 +102,7 @@ classDiagram
     User "1" --> "*" ChatParticipant : 参与
     User "1" --> "*" UserContact : 拥有联系人
     User "1" --> "0..1" Agent : 关联
+    User "1" --> "*" Resource : 拥有资源
     Chat "1" --> "*" ChatParticipant : 包含
     Chat "1" --> "*" Message : 包含
 
@@ -126,6 +140,18 @@ classDiagram
         +DateTime updatedAt
         +String userId
         +String contactId
+    }
+
+    class Resource {
+        +String id
+        +String name
+        +String type
+        +String url
+        +String file_name
+        +String description
+        +String userId
+        +DateTime createdAt
+        +DateTime updatedAt
     }
 
     class Chat {
@@ -169,6 +195,7 @@ classDiagram
   - User 与 Message：一个用户可以发送多条消息
   - User 与 ChatParticipant：一个用户可以参与多个聊天
   - User 与 UserContact：一个用户可以有多个联系人
+  - User 与 Resource：一个用户可以拥有多个资源
   - Chat 与 ChatParticipant：一个聊天可以包含多个参与者
   - Chat 与 Message：一个聊天可以包含多条消息
 
@@ -185,6 +212,7 @@ classDiagram
    - 一个用户可以参与多个聊天 (`chats`)
    - 一个用户可以有多个联系人 (`contacts`)
    - 一个用户可以关联一个AI代理 (`agent`)
+   - 一个用户可以拥有多个资源 (`resources`)
 
 2. **Agent (AI代理)**
    - 包含模型提供商和模型名称信息
@@ -201,9 +229,16 @@ classDiagram
    - 每个记录代表一个用户添加了另一个用户作为联系人
    - 只存储联系人ID，不存储其他信息
 
+4. **Resource (资源)**
+   - 表示用户拥有的各种资源
+   - 包含资源的基本信息，如名称、类型、URL等
+   - 类型字段区分不同类型的资源(文本、图片等)
+   - 每个资源都关联到一个用户，表示资源的所有者
+   - 文件名和URL用于定位和访问资源
+
 ### 聊天相关
 
-4. **Chat (聊天)**
+5. **Chat (聊天)**
    - 代表一个聊天会话
    - 包含聊天名称 (`name`)
    - 包含头像URL数组 (`avatar_urls`)，以逗号分隔存储
@@ -213,14 +248,14 @@ classDiagram
    - 包含多个参与者 (`participants`)
    - 包含多条消息 (`messages`)
 
-5. **ChatParticipant (聊天参与者)**
+6. **ChatParticipant (聊天参与者)**
    - 多对多关系表，连接Chat和User
    - 包含用户在特定聊天中的昵称 (`nickname`)
    - 包含用户在特定聊天中的描述 (`description`)
    - 允许用户在不同聊天中使用不同的身份标识
    - 一个用户在一个聊天中只能有一个参与记录
 
-6. **Message (消息)**
+7. **Message (消息)**
    - 包含消息内容
    - 有一个发送者 (`sender`)
    - 属于一个聊天 (`chat`)
@@ -260,3 +295,9 @@ classDiagram
 
 1. 查询指定Chat的所有Message
 2. 按时间顺序排列显示
+
+### 管理资源流程
+
+1. 创建Resource记录，指定用户ID、资源类型和基本信息
+2. 上传图片或文本内容到资源存储位置
+3. 更新Resource的URL字段指向实际存储位置

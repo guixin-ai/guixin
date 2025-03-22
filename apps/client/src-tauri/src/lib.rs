@@ -46,8 +46,15 @@ pub fn run() {
             commands::remove_current_user_contact,
             commands::create_current_user_ai_contact,
             commands::get_current_user_contacts,
-            commands::upload_image,
-            commands::get_image_url
+            commands::upload_current_user_image,
+            commands::get_image_url,
+            commands::upload_current_user_text,
+            commands::get_current_user_resources,
+            commands::get_current_user_image_resources,
+            commands::get_current_user_text_resources,
+            commands::get_resource,
+            commands::read_text_resource,
+            commands::delete_resource
         ])
         .run(tauri::generate_context!())
         .expect("运行应用失败");

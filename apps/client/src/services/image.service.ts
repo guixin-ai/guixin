@@ -19,7 +19,7 @@ export const imageService = {
       const uint8Array = new Uint8Array(arrayBuffer);
       
       // 调用Tauri命令上传图片
-      const response = await invoke<UploadImageResponse>('upload_image', {
+      const response = await invoke<UploadImageResponse>('upload_current_user_image', {
         imageData: Array.from(uint8Array),
         file_name: file.name
       });

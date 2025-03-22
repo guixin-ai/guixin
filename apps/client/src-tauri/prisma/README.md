@@ -41,6 +41,13 @@
   - 包含用户在特定聊天中的描述(`description`)
   - 允许用户在不同聊天中使用不同的昵称和描述
 - `Message`: 消息模型，包含消息内容和发送者信息
+- `Resource`: 资源模型，表示用户拥有的资源
+  - 包含资源名称(`name`)和类型(`type`)
+  - 类型字段(`type`)用于区分不同类型的资源，如"text"或"image"
+  - 包含资源URL(`url`)，用于访问资源内容
+  - 包含文件名(`file_name`)，用于标识资源文件
+  - 包含可选的描述(`description`)
+  - 每个资源都关联到一个用户，表示资源的所有者
 
 这些模型与 Diesel ORM 中定义的模型保持一致，但使用 Prisma 的语法表示。
 
@@ -55,6 +62,7 @@
 - `update_chat_last_message`: 在新消息插入时，自动更新聊天的最后消息内容和时间
 - `update_agents_updated_at`: 在Agent更新时，自动更新更新时间
 - `update_chat_participants_updated_at`: 在聊天参与者信息更新时，自动更新更新时间
+- `update_resources_updated_at`: 在资源更新时，自动更新更新时间
 
 ## 如何使用这个参考
 

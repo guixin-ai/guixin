@@ -33,7 +33,28 @@ model User {
   // Agent关系
   agent        Agent?        // 用户关联的AI代理
 
+  // 资源关系
+  resources    Resource[]    // 用户拥有的资源
+
   @@map("users")
+}
+
+// 资源模型
+model Resource {
+  id           String       @id @default(uuid())
+  name         String       // 资源名称
+  type         String       // 资源类型: "text" 或 "image"
+  url          String       // 资源URL
+  file_name    String       // 文件名
+  description  String?      // 资源描述
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  
+  // 关系字段 - 资源所有者
+  user         User         @relation(fields: [userId], references: [id])
+  userId       String       @map("user_id")
+
+  @@map("resources")
 }
 
 // AI代理模型

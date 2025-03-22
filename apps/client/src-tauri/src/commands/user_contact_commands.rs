@@ -17,6 +17,11 @@ pub struct ContactResponse {
 /// 获取当前用户的联系人列表
 /// 
 /// 此命令会从应用状态中获取当前用户ID，不需要显式传递用户ID
+///
+/// ## 数据库影响
+/// - 读取操作：查询 user_contacts 表获取当前用户的所有联系人关系
+/// - 读取操作：对每个联系人关系，查询 users 表获取联系人详细信息
+/// - 无写入或修改操作
 #[tauri::command]
 pub async fn get_current_user_contacts(state: State<'_, AppState>) -> Result<Vec<ContactResponse>, String> {
     let pool = state.db_pool.lock().expect("无法获取数据库连接池");
@@ -54,6 +59,12 @@ pub async fn get_current_user_contacts(state: State<'_, AppState>) -> Result<Vec
 /// 为当前用户添加联系人
 /// 
 /// 此命令会从应用状态中获取当前用户ID，不需要显式传递用户ID
+///
+/// ## 数据库影响
+/// - 读取操作：检查 users 表中联系人是否存在
+/// - 读取操作：检查 user_contacts 表中是否已存在此联系人关系
+/// - 写入操作：如果联系人存在且关系不存在，则在 user_contacts 表中创建新记录
+/// - 无修改或删除操作
 #[tauri::command]
 pub async fn add_current_user_contact(contact_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let pool = state.db_pool.lock().expect("无法获取数据库连接池");
@@ -81,6 +92,11 @@ pub async fn add_current_user_contact(contact_id: String, state: State<'_, AppSt
 /// 从当前用户的联系人列表中移除联系人
 /// 
 /// 此命令会从应用状态中获取当前用户ID，不需要显式传递用户ID
+///
+/// ## 数据库影响
+/// - 删除操作：从 user_contacts 表中删除当前用户与指定联系人之间的关系记录
+/// - 不会删除 users 表中的用户数据，只删除关系
+/// - 无读取或修改操作
 #[tauri::command]
 pub async fn remove_current_user_contact(contact_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let pool = state.db_pool.lock().expect("无法获取数据库连接池");
@@ -95,6 +111,12 @@ pub async fn remove_current_user_contact(contact_id: String, state: State<'_, Ap
 /// 创建AI用户并添加为当前用户的联系人
 /// 
 /// 此命令会创建一个新的AI用户，并将其添加为当前用户的联系人
+///
+/// ## 数据库影响
+/// - 写入操作：在 users 表中创建新的AI用户记录
+/// - 写入操作：在 user_contacts 表中创建当前用户与新AI用户的联系人关系
+/// - 使用事务确保两个操作同时成功或同时失败
+/// - 无修改或删除操作
 #[tauri::command]
 pub async fn create_current_user_ai_contact(
     name: String, 

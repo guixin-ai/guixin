@@ -3,8 +3,8 @@ import {
   ChatMessagesInitFailedException,
   ChatNotFoundException,
 } from '@/errors/chat.errors';
-import { aiQueueManager } from '@/services/ai-queue-manager.service';
-import { AIMember } from '@/services/ai-queue.service';
+import { AIMember, useAIQueueStore } from '@/models/ai-queue.model';
+import { aiProcessor } from '@/services/ai-processor.service';
 import { ChatMember, ChatMessage } from '@/types/chat';
 import { ArrowLeft, Mic, MoreVertical, Paperclip, Send, Smile } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -89,6 +89,22 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     addChatMember,
   } = chatStore;
 
+  // 获取AI队列相关方法
+  const aiQueueStore = useAIQueueStore(
+    useShallow(state => ({
+      registerHandlers: state.registerHandlers,
+      updateChatHistory: state.updateChatHistory,
+      addToQueue: state.addToQueue,
+      cancelChat: state.cancelChat,
+      getChatHistory: state.getChatHistory,
+      queueItems: state.queueItems,
+      processingItems: state.processingItems,
+      startProcessing: state.startProcessing,
+      completeProcessing: state.completeProcessing,
+      errorProcessing: state.errorProcessing
+    }))
+  );
+
   // 使用联系人模型获取联系人详情 - 方法不需要重新创建
   const getContactDetail = useContactStore(state => state.getContactDetail);
 
@@ -127,7 +143,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           chatDetail = {
             id: chatItem.id,
             name: chatItem.name,
-            avatar: chatItem.avatar,
+            avatar: typeof chatItem.avatar === 'string' ? chatItem.avatar : chatItem.avatar[0],
             isAI: true, // 假设所有聊天都是AI
             members: [
               {
@@ -139,7 +155,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
               {
                 id: chatItem.id,
                 name: chatItem.name,
-                avatar: chatItem.avatar,
+                avatar: typeof chatItem.avatar === 'string' ? chatItem.avatar : chatItem.avatar[0],
                 isAI: true,
                 username: '@自如',
               },
@@ -203,7 +219,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     initializedChatIds,
   ]);
 
-  // 注册AI队列服务响应处理器
+  // 注册AI队列处理器
   useEffect(() => {
     // 定义当前聊天的消息处理器
     const handlers = {
@@ -300,15 +316,97 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
 
     // 注册处理器并获取取消注册函数
-    const unregister = aiQueueManager.registerHandlers(chatId, handlers);
+    const unregister = aiQueueStore.registerHandlers(chatId, handlers);
+
+    // 处理队列中的项目
+    const processNextInQueue = async () => {
+      const { queueItems, processingItems, getChatHistory } = aiQueueStore;
+      
+      // 如果当前已有处理中的项目，则不处理
+      if (processingItems[chatId]) return;
+      
+      // 获取该聊天的队列
+      const chatQueue = queueItems[chatId] || [];
+      
+      // 如果队列为空，则返回
+      if (chatQueue.length === 0) return;
+      
+      // 获取下一个队列项
+      const nextItem = chatQueue[0];
+      
+      // 获取消息历史
+      const messages = getChatHistory(chatId);
+      
+      // 处理该队列项
+      try {
+        // 直接调用aiProcessor处理
+        await aiProcessor.process({
+          chatId: nextItem.chatId,
+          messageId: nextItem.messageId,
+          aiMember: nextItem.aiMember,
+          modelName: nextItem.modelName,
+          messages,
+          options: nextItem.options,
+          abortController: nextItem.abortController,
+          callbacks: {
+            onStart: (chatId, messageId) => {
+              // 使用aiQueueStore的startProcessing
+              aiQueueStore.startProcessing(chatId, messageId);
+            },
+            onContent: (chatId, messageId, content) => {
+              // 更新UI界面
+              if (virtuosoRef.current && isMessagesInitialized) {
+                virtuosoRef.current.data.map(msg => {
+                  if (msg.key === messageId) {
+                    return {
+                      ...msg,
+                      content,
+                    };
+                  }
+                  return msg;
+                });
+              }
+            },
+            onComplete: (chatId, messageId, content) => {
+              // 使用aiQueueStore的completeProcessing
+              aiQueueStore.completeProcessing(chatId, messageId, content);
+              // 处理下一个队列项
+              setTimeout(processNextInQueue, 100);
+            },
+            onError: (chatId, messageId, error) => {
+              // 使用aiQueueStore的errorProcessing
+              aiQueueStore.errorProcessing(chatId, messageId, error);
+              // 处理下一个队列项
+              setTimeout(processNextInQueue, 100);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('处理队列项失败:', error);
+      }
+    };
+
+    // 监听队列变化，自动处理队列
+    const unsubscribe = useAIQueueStore.subscribe(
+      (state) => {
+        // 返回当前聊天的队列长度
+        return state.queueItems[chatId]?.length || 0;
+      },
+      (currentLength) => {
+        if (currentLength > 0) {
+          processNextInQueue();
+        }
+      }
+    );
 
     // 组件卸载时取消注册
     return () => {
       unregister();
+      unsubscribe();
       // 确保取消当前聊天的所有AI回复
-      aiQueueManager.cancelChat(chatId);
+      aiQueueStore.cancelChat(chatId);
     };
-  }, [chatId, isMessagesInitialized, addChatMessage, updateChatMessage]);
+  }, [chatId, isMessagesInitialized, addChatMessage, updateChatMessage, aiQueueStore]);
 
   // 返回聊天列表
   const handleBack = () => {
@@ -395,7 +493,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
     addChatMessage(chatId, chatMessage);
 
-    // 使用aiQueueManager处理AI回复
+    // 使用aiQueueStore处理AI回复
     // 1. 准备历史消息
     getChatMessages(chatId).then(messages => {
       // 2. 格式化消息为Ollama格式
@@ -404,8 +502,8 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
         content: msg.content,
       }));
 
-      // 3. 初始化aiQueueManager的历史记录 (已包含最新的用户消息)
-      aiQueueManager.updateChatHistory(chatId, chatHistory);
+      // 3. 初始化aiQueueStore的历史记录 (已包含最新的用户消息)
+      aiQueueStore.updateChatHistory(chatId, chatHistory);
 
       // 5. 获取聊天中的AI成员
       const chatDetail = chatDetails[chatId];
@@ -421,7 +519,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
         const messageId = `ai-${aiMember.id}-${Date.now()}`;
 
         // 添加到队列
-        aiQueueManager.addToQueue({
+        aiQueueStore.addToQueue({
           chatId,
           messageId,
           aiMember: {
@@ -438,9 +536,6 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           },
         });
       });
-
-      // 7. 启动队列处理
-      aiQueueManager.startProcessing(chatId);
     });
 
     // 保持输入框焦点
@@ -467,10 +562,10 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     setShowChatInfo(true);
   };
 
-  // 修改取消生成函数，使用aiQueueManager
+  // 修改取消生成函数，使用aiQueueStore
   const cancelCurrentGeneration = () => {
-    // 取消当前聊天的整个队列
-    aiQueueManager.removeQueue(chatId);
+    // 取消当前聊天的所有AI回复
+    aiQueueStore.cancelChat(chatId);
     // 重置AI响应状态
     setIsAIResponding(false);
   };

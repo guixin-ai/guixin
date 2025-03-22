@@ -361,12 +361,14 @@ class OllamaService {
    * @param options 附加选项，包含 AbortSignal
    * @param onChunk 块响应回调
    * @param onComplete 完成回调
+   * @param onError 错误回调
    */
   async chatStream(
     request: OllamaChatRequest,
     options: ChatStreamOptions = {},
     onChunk: (chunk: OllamaChatResponse) => void,
-    onComplete?: (fullResponse: OllamaMessage) => void
+    onComplete?: (fullResponse: OllamaMessage) => void,
+    onError?: (error: Error) => void
   ): Promise<void> {
     // 确保流模式开启
     request.stream = true;
@@ -385,6 +387,7 @@ class OllamaService {
         // 使用自定义逻辑处理流式聊天的错误，因为我们需要特殊处理
         const errorText = await response.text();
         let errorMessage = `状态码: ${response.status}`;
+        let error: Error;
 
         try {
           const errorJson = JSON.parse(errorText);
@@ -395,18 +398,32 @@ class OllamaService {
           errorMessage = `${errorMessage}, ${errorText}`;
         }
 
-        // 根据状态码选择合适的异常类型
+        // 根据状态码创建合适的错误对象
         if (response.status === 404) {
-          throw new OllamaModelNotFoundError(request.model, response.status, errorMessage, errorText);
+          error = new OllamaModelNotFoundError(request.model, response.status, errorMessage, errorText);
         } else if (response.status === 500 && errorMessage.includes("failed to load model")) {
-          throw new OllamaModelLoadError(request.model, response.status, errorMessage, errorText);
+          error = new OllamaModelLoadError(request.model, response.status, errorMessage, errorText);
         } else {
-          throw new OllamaChatStreamError(response.status, errorMessage, false, errorText);
+          error = new OllamaChatStreamError(response.status, errorMessage, false, errorText);
         }
+        
+        // 使用回调处理错误而不是抛出
+        if (onError) {
+          onError(error);
+          return;
+        }
+        
+        // 如果没有提供错误回调，则抛出异常（向后兼容）
+        throw error;
       }
 
       if (!response.body) {
-        throw new OllamaChatStreamError(0, '响应没有可读取的内容');
+        const error = new OllamaChatStreamError(0, '响应没有可读取的内容');
+        if (onError) {
+          onError(error);
+          return;
+        }
+        throw error;
       }
 
       const reader = response.body.getReader();
@@ -450,7 +467,18 @@ class OllamaService {
         // 处理中断错误
         if (error.name === 'AbortError') {
           console.log('流式生成被用户中断');
-          throw new OllamaStreamAbortedError(); // 使用新的中断异常类
+          const abortError = new OllamaStreamAbortedError();
+          if (onError) {
+            onError(abortError);
+            return;
+          }
+          throw abortError;
+        }
+        
+        // 处理其他读取错误
+        if (onError) {
+          onError(error);
+          return;
         }
         throw error;
       }
@@ -476,7 +504,36 @@ class OllamaService {
           content: fullContent,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      // 处理所有其他错误，使用通用错误处理逻辑
+      let handledError: Error;
+      
+      // 如果是已知的Ollama异常，直接使用
+      if (error instanceof OllamaBaseError) {
+        handledError = error;
+      } 
+      // 网络错误
+      else if (error instanceof TypeError && error.message.includes('fetch')) {
+        handledError = new OllamaConnectionError(error.message, error);
+      }
+      // 中断错误
+      else if (error instanceof DOMException && error.name === 'AbortError') {
+        handledError = new OllamaTimeoutError(0, error);
+      }
+      // 未知错误
+      else {
+        handledError = new OllamaUnknownError(
+          error instanceof Error ? error.message : String(error),
+          error
+        );
+      }
+      
+      if (onError) {
+        onError(handledError);
+        return;
+      }
+      
+      // 如果没有提供错误回调，则使用原始的错误处理逻辑（向后兼容）
       handleCommonErrors(error);
     }
   }

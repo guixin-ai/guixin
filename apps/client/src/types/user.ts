@@ -18,6 +18,9 @@ export interface UserInfo {
   updated_at: string;
 }
 
+// 导入指令层的经过验证的UserInfo类型以确保兼容性
+export type { UserInfoValidated } from '@/commands/user.commands';
+
 // 创建用户请求接口
 export interface CreateUserRequest {
   name: string;

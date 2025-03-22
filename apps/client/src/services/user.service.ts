@@ -12,9 +12,6 @@ class UserService {
   // 单例实例
   private static instance: UserService;
   
-  // 当前用户缓存
-  private currentUserCache: UserInfo | null = null;
-  
   // 私有构造函数，防止外部实例化
   private constructor() {}
   
@@ -32,14 +29,8 @@ class UserService {
    * 获取当前登录用户
    */
   public async getCurrentUser(): Promise<UserInfo> {
-    if (this.currentUserCache) {
-      return this.currentUserCache;
-    }
-    
     try {
-      const user = await userCommands.getCurrentUser();
-      this.currentUserCache = user;
-      return user;
+      return await userCommands.getCurrentUser();
     } catch (error) {
       console.error('获取当前用户失败:', error);
       throw new Error('获取当前用户失败');
@@ -51,7 +42,7 @@ class UserService {
    */
   public async getUser(id: string): Promise<UserInfo> {
     try {
-      return await userCommands.getUser(id);
+      return await userCommands.getUser({ id });
     } catch (error) {
       console.error(`获取用户 ${id} 失败:`, error);
       throw new Error(`获取用户失败: ${error}`);
@@ -63,7 +54,7 @@ class UserService {
    */
   public async createAiUser(name: string, description?: string): Promise<UserInfo> {
     try {
-      return await userCommands.createAiUser(name, description);
+      return await userCommands.createAiUser({ name, description });
     } catch (error) {
       console.error('创建AI用户失败:', error);
       throw new Error(`创建AI用户失败: ${error}`);

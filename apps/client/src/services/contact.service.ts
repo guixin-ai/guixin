@@ -122,7 +122,7 @@ class ContactService {
       }
       
       // 从指令层获取用户详情数据
-      const userData = await userCommands.getUser(id);
+      const userData = await userCommands.getUser({ id });
       
       const contactDetail: ContactDetail = {
         id: userData.id,

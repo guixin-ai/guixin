@@ -2,6 +2,7 @@
  * 用户指令 - 定义与后端对应的用户相关指令
  */
 import { invoke } from '@tauri-apps/api/core';
+import { z } from 'zod';
 import { ContactResponse } from './contact.commands';
 
 /**
@@ -10,11 +11,43 @@ import { ContactResponse } from './contact.commands';
 export interface UserInfo {
   id: string;
   name: string;
-  description?: string | null;
+  description: string | null;
   is_ai: boolean;
   created_at: string;
   updated_at: string;
 }
+
+/**
+ * 用户信息Zod验证Schema
+ */
+export const userInfoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  is_ai: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string()
+});
+
+/**
+ * 获取用户参数Zod验证Schema
+ */
+export const getUserParamsSchema = z.object({
+  id: z.string().min(1, "用户ID不能为空")
+});
+
+/**
+ * 创建AI用户参数Zod验证Schema
+ */
+export const createAiUserParamsSchema = z.object({
+  name: z.string().min(1, "用户名不能为空"),
+  description: z.string().optional()
+});
+
+// 根据Zod Schema派生类型
+export type UserInfoValidated = z.infer<typeof userInfoSchema>;
+export type GetUserParams = z.infer<typeof getUserParamsSchema>;
+export type CreateAiUserParams = z.infer<typeof createAiUserParamsSchema>;
 
 /**
  * 用户指令类
@@ -23,9 +56,6 @@ export interface UserInfo {
 class UserCommands {
   // 单例实例
   private static instance: UserCommands;
-  
-  // 当前用户缓存
-  private currentUserCache: UserInfo | null = null;
   
   // 私有构造函数，防止外部实例化
   private constructor() {}
@@ -45,15 +75,18 @@ class UserCommands {
    * 调用后端 get_current_user 命令
    */
   public async getCurrentUser(): Promise<UserInfo> {
-    if (this.currentUserCache) {
-      return this.currentUserCache;
-    }
-    
     try {
-      const user = await invoke('get_current_user') as UserInfo;
-      this.currentUserCache = user;
-      return user;
+      const response = await invoke('get_current_user');
+      
+      // 使用Zod验证返回数据
+      const validatedUser = userInfoSchema.parse(response);
+      
+      return validatedUser;
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('用户数据验证失败:', error.errors);
+        throw new Error(`用户数据格式无效: ${JSON.stringify(error.errors)}`);
+      }
       console.error('获取当前用户失败:', error);
       throw new Error(`获取当前用户失败: ${error}`);
     }
@@ -62,12 +95,25 @@ class UserCommands {
   /**
    * 根据ID获取用户
    * 调用后端 get_user 命令
+   * @param params 获取用户的参数
    */
-  public async getUser(id: string): Promise<UserInfo> {
+  public async getUser(params: GetUserParams): Promise<UserInfo> {
     try {
-      return await invoke('get_user', { id }) as UserInfo;
+      // 使用Zod验证输入参数
+      const validatedParams = getUserParamsSchema.parse(params);
+      
+      const response = await invoke('get_user', { id: validatedParams.id });
+      
+      // 使用Zod验证返回数据
+      const validatedUser = userInfoSchema.parse(response);
+      
+      return validatedUser;
     } catch (error) {
-      console.error(`获取用户 ${id} 失败:`, error);
+      if (error instanceof z.ZodError) {
+        console.error('参数或返回数据验证失败:', error.errors);
+        throw new Error(`数据格式无效: ${JSON.stringify(error.errors)}`);
+      }
+      console.error(`获取用户失败:`, error);
       throw new Error(`获取用户失败: ${error}`);
     }
   }
@@ -75,11 +121,27 @@ class UserCommands {
   /**
    * 创建AI用户
    * 调用后端 create_ai_user 命令
+   * @param params 创建AI用户的参数
    */
-  public async createAiUser(name: string, description?: string): Promise<UserInfo> {
+  public async createAiUser(params: CreateAiUserParams): Promise<UserInfo> {
     try {
-      return await invoke('create_ai_user', { name, description }) as UserInfo;
+      // 使用Zod验证输入参数
+      const validatedParams = createAiUserParamsSchema.parse(params);
+      
+      const response = await invoke('create_ai_user', { 
+        name: validatedParams.name, 
+        description: validatedParams.description 
+      });
+      
+      // 使用Zod验证返回数据
+      const validatedUser = userInfoSchema.parse(response);
+      
+      return validatedUser;
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('参数或返回数据验证失败:', error.errors);
+        throw new Error(`数据格式无效: ${JSON.stringify(error.errors)}`);
+      }
       console.error('创建AI用户失败:', error);
       throw new Error(`创建AI用户失败: ${error}`);
     }

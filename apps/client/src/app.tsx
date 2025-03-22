@@ -4,6 +4,8 @@ import DelayedLoading from './components/delayed-loading';
 import { useAppStore } from './models/app.model';
 import { useAIQueueStore } from './models/ai-queue.model';
 import { aiProcessor } from './services/ai-processor.service';
+import { userCommands } from '@/commands';
+import { convertUserInfoToUser } from '@/converters';
 
 // 定义 App 组件的属性类型
 interface AppProps {
@@ -20,10 +22,18 @@ function App({ children }: AppProps) {
       try {
         setLoading(true);
 
-        // 初始化应用
-        await initialize();
-
-        console.log('应用基础数据初始化完成');
+        // 直接从命令层获取当前用户
+        const userInfo = await userCommands.getCurrentUser();
+        
+        if (userInfo) {
+          // 将UserInfo转换为User，然后传入初始化方法
+          const user = convertUserInfoToUser(userInfo);
+          initialize(user);
+          console.log('应用基础数据初始化完成');
+        } else {
+          console.error('无法获取当前用户');
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error('应用基础数据初始化失败:', error);

@@ -41,24 +41,24 @@ function App({ children }: AppProps) {
     const processChatQueue = async (chatId: string) => {
       // 如果已经在处理这个聊天的队列，则跳过
       if (processingChats.has(chatId)) return;
-      
-      const { queueItems, getChatHistory, startProcessing, completeProcessing, errorProcessing } = useAIQueueStore.getState();
-      
+
+      const { queueItems, getChatHistory, startProcessing, completeProcessing, errorProcessing, handleContent } =
+        useAIQueueStore.getState();
+
       // 获取该聊天的队列
       const chatQueue = queueItems[chatId] || [];
       if (chatQueue.length === 0) return;
-      
+
       // 标记该聊天正在处理
       setProcessingChats(prev => new Set(prev).add(chatId));
-      
+
       // 获取队列头部项目
       const nextItem = chatQueue[0];
-      
+
       // 获取该聊天的历史记录
       const messages = getChatHistory(chatId);
-      
-      // 进行处理，不再需要try/catch，使用回调处理所有错误
-      const result = await aiProcessor.process({
+
+      await aiProcessor.process({
         chatId: nextItem.chatId,
         messageId: nextItem.messageId,
         aiMember: nextItem.aiMember,
@@ -71,7 +71,8 @@ function App({ children }: AppProps) {
             startProcessing(chatId, messageId);
           },
           onContent: (chatId, messageId, content) => {
-            // 内容更新无需特殊处理，模型层会处理UI更新
+            // 使用模型层提供的方法处理内容更新，而不是直接调用注册的处理器
+            handleContent(chatId, messageId, content);
           },
           onComplete: (chatId, messageId, content) => {
             completeProcessing(chatId, messageId, content);
@@ -102,17 +103,15 @@ function App({ children }: AppProps) {
               // 继续处理该聊天的下一个队列项
               setTimeout(() => processChatQueue(chatId), 50);
             }
-          }
-        }
+          },
+        },
       });
-      
-      // 如果返回为空，说明处理失败，但这已经通过onError回调处理了
     };
-    
+
     // 扫描所有聊天队列并启动处理
     const scanAndProcessQueues = () => {
       const { queueItems } = useAIQueueStore.getState();
-      
+
       // 遍历所有聊天的队列，并行启动处理
       for (const chatId in queueItems) {
         if (queueItems[chatId].length > 0) {
@@ -120,46 +119,31 @@ function App({ children }: AppProps) {
         }
       }
     };
-    
-    // 监听队列变化
-    const unsubscribe = useAIQueueStore.subscribe(
-      (state) => {
-        // 返回队列中有项目的聊天ID数组，用于检测变化
-        return Object.keys(state.queueItems).filter(
-          chatId => (state.queueItems[chatId]?.length || 0) > 0
-        ).join(',');
-      }
-    );
-    
-    // 手动实现监听逻辑
+
+    // 监听队列变化并处理队列
     let prevQueuedChats = '';
-    const checkQueueChanges = () => {
-      const state = useAIQueueStore.getState();
-      const currentQueuedChats = Object.keys(state.queueItems).filter(
-        chatId => (state.queueItems[chatId]?.length || 0) > 0
-      ).join(',');
-      
+
+    const unsubscribe = useAIQueueStore.subscribe(state => {
+      // 获取队列中有项目的聊天ID字符串
+      const currentQueuedChats = Object.keys(state.queueItems)
+        .filter(chatId => (state.queueItems[chatId]?.length || 0) > 0)
+        .join(',');
+
+      // 只有当队列发生变化时才处理
       if (currentQueuedChats !== prevQueuedChats) {
         prevQueuedChats = currentQueuedChats;
         if (currentQueuedChats) {
           scanAndProcessQueues();
         }
       }
-      
-      // 定期检查队列变化
-      requestAnimationFrame(checkQueueChanges);
-    };
-    
-    // 启动检查
-    const animationId = requestAnimationFrame(checkQueueChanges);
-    
+    });
+
     // 初始扫描一次队列
     scanAndProcessQueues();
-    
+
     // 返回清理函数
     return () => {
       unsubscribe();
-      cancelAnimationFrame(animationId);
     };
   }, [processingChats]);
 

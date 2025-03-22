@@ -107,6 +107,9 @@ export interface AIQueueState {
   // 开始处理队列项
   startProcessing: (chatId: string, messageId: string) => void;
   
+  // 处理内容更新
+  handleContent: (chatId: string, messageId: string, content: string) => void;
+  
   // 完成处理队列项
   completeProcessing: (chatId: string, messageId: string, content: string) => void;
   
@@ -287,6 +290,22 @@ export const useAIQueueStore = create(
             const handlers = state.responseHandlers[chatId];
             if (handlers?.onStart) {
               handlers.onStart(messageId, item.aiMember);
+            }
+          }
+        });
+      },
+      
+      // 处理内容更新
+      handleContent: (chatId, messageId, content) => {
+        set(state => {
+          const processingItem = state.processingItems[chatId];
+          
+          // 只有当当前正在处理该消息时才触发回调
+          if (processingItem && processingItem.messageId === messageId) {
+            // 调用处理器的内容更新回调
+            const handlers = state.responseHandlers[chatId];
+            if (handlers?.onContent) {
+              handlers.onContent(messageId, content, processingItem.aiMember);
             }
           }
         });

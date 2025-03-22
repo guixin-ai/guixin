@@ -267,6 +267,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
             return msg;
           });
         }
+        updateChatMessage(chatId, messageId, content);
       },
 
       // 当AI回复完成时调用
@@ -318,91 +319,9 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     // 注册处理器并获取取消注册函数
     const unregister = aiQueueStore.registerHandlers(chatId, handlers);
 
-    // 处理队列中的项目
-    const processNextInQueue = async () => {
-      const { queueItems, processingItems, getChatHistory } = aiQueueStore;
-      
-      // 如果当前已有处理中的项目，则不处理
-      if (processingItems[chatId]) return;
-      
-      // 获取该聊天的队列
-      const chatQueue = queueItems[chatId] || [];
-      
-      // 如果队列为空，则返回
-      if (chatQueue.length === 0) return;
-      
-      // 获取下一个队列项
-      const nextItem = chatQueue[0];
-      
-      // 获取消息历史
-      const messages = getChatHistory(chatId);
-      
-      // 处理该队列项
-      try {
-        // 直接调用aiProcessor处理
-        await aiProcessor.process({
-          chatId: nextItem.chatId,
-          messageId: nextItem.messageId,
-          aiMember: nextItem.aiMember,
-          modelName: nextItem.modelName,
-          messages,
-          options: nextItem.options,
-          abortController: nextItem.abortController,
-          callbacks: {
-            onStart: (chatId, messageId) => {
-              // 使用aiQueueStore的startProcessing
-              aiQueueStore.startProcessing(chatId, messageId);
-            },
-            onContent: (chatId, messageId, content) => {
-              // 更新UI界面
-              if (virtuosoRef.current && isMessagesInitialized) {
-                virtuosoRef.current.data.map(msg => {
-                  if (msg.key === messageId) {
-                    return {
-                      ...msg,
-                      content,
-                    };
-                  }
-                  return msg;
-                });
-              }
-            },
-            onComplete: (chatId, messageId, content) => {
-              // 使用aiQueueStore的completeProcessing
-              aiQueueStore.completeProcessing(chatId, messageId, content);
-              // 处理下一个队列项
-              setTimeout(processNextInQueue, 100);
-            },
-            onError: (chatId, messageId, error) => {
-              // 使用aiQueueStore的errorProcessing
-              aiQueueStore.errorProcessing(chatId, messageId, error);
-              // 处理下一个队列项
-              setTimeout(processNextInQueue, 100);
-            }
-          }
-        });
-      } catch (error) {
-        console.error('处理队列项失败:', error);
-      }
-    };
-
-    // 监听队列变化，自动处理队列
-    const unsubscribe = useAIQueueStore.subscribe(
-      (state) => {
-        // 返回当前聊天的队列长度
-        return state.queueItems[chatId]?.length || 0;
-      },
-      (currentLength) => {
-        if (currentLength > 0) {
-          processNextInQueue();
-        }
-      }
-    );
-
     // 组件卸载时取消注册
     return () => {
       unregister();
-      unsubscribe();
       // 确保取消当前聊天的所有AI回复
       aiQueueStore.cancelChat(chatId);
     };

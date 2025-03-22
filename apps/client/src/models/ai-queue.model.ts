@@ -57,7 +57,19 @@ export interface AIQueueState {
   // 队列项，按聊天ID分组
   queueItems: Record<string, AIQueueItem[]>;
   
-  // 当前处理中的队列项，按聊天ID索引
+  /**
+   * 当前处理中的队列项，按聊天ID索引
+   * 
+   * 这是一个核心数据结构，用于追踪和管理每个聊天当前正在处理的AI回复任务：
+   * - 键是聊天ID，值是正在处理的AIQueueItem或null（表示没有处理中的项）
+   * - 每个聊天同一时间只能有一个正在处理的项目，确保消息的顺序处理
+   * - 当开始处理时，队列项从queueItems[chatId]中移除并设置为processingItems[chatId]
+   * - 处理完成或出错后，将设置为null以允许处理下一个队列项
+   * - 用于回调控制，确保只有正在处理的消息才能触发内容更新
+   * - 存储abortController，支持用户随时中断AI生成
+   * 
+   * 例如：{ "chat1": {AIQueueItem}, "chat2": null }
+   */
   processingItems: Record<string, AIQueueItem | null>;
   
   // 消息历史缓存，按聊天ID存储
@@ -104,13 +116,54 @@ export interface AIQueueState {
   // 取消处理
   cancelProcessing: (chatId: string, messageId: string) => void;
   
-  // 开始处理队列项
+  /**
+   * 开始处理队列项
+   * 
+   * 此方法负责将一个队列项从等待队列移动到活跃处理状态：
+   * 1. 在queueItems[chatId]中找到指定messageId的队列项
+   * 2. 将其状态更新为'processing'并从queueItems中移除
+   * 3. 将该项设置为processingItems[chatId]，标记为当前正在处理的项
+   * 4. 触发已注册的onStart回调，通知UI层开始处理
+   * 
+   * 这确保了每个聊天同一时间只有一个项目被处理，实现了顺序处理的机制
+   * 
+   * @param chatId 聊天ID
+   * @param messageId 消息ID
+   */
   startProcessing: (chatId: string, messageId: string) => void;
   
-  // 处理内容更新
+  /**
+   * 处理内容更新
+   * 
+   * 该方法处理AI回复的流式内容更新：
+   * 1. 检查processingItems[chatId]是否存在并且messageId匹配
+   * 2. 如果匹配，则调用该聊天注册的onContent回调
+   * 
+   * 使用processingItems进行验证确保只有当前正在处理的消息才能触发内容更新，
+   * 避免了已完成或已取消的处理继续影响UI
+   * 
+   * @param chatId 聊天ID
+   * @param messageId 消息ID
+   * @param content 更新的内容
+   */
   handleContent: (chatId: string, messageId: string, content: string) => void;
   
-  // 完成处理队列项
+  /**
+   * 完成处理队列项
+   * 
+   * 该方法处理AI回复完成的流程：
+   * 1. 验证processingItems[chatId]存在且messageId匹配
+   * 2. 将队列项状态更新为'completed'
+   * 3. 触发已注册的onComplete回调，通知UI层更新最终内容
+   * 4. 将回复添加到chatHistoryCache以供后续AI生成使用
+   * 5. 将processingItems[chatId]设置为null，表示该聊天可以开始处理下一个队列项
+   * 
+   * 处理完成后清空processingItems对应项是关键步骤，它允许队列系统继续处理下一个项目
+   * 
+   * @param chatId 聊天ID
+   * @param messageId 消息ID 
+   * @param content 完整的回复内容
+   */
   completeProcessing: (chatId: string, messageId: string, content: string) => void;
   
   // 处理队列项出错
@@ -267,7 +320,20 @@ export const useAIQueueStore = create(
         });
       },
       
-      // 开始处理队列项
+      /**
+       * 开始处理队列项
+       * 
+       * 此方法负责将一个队列项从等待队列移动到活跃处理状态：
+       * 1. 在queueItems[chatId]中找到指定messageId的队列项
+       * 2. 将其状态更新为'processing'并从queueItems中移除
+       * 3. 将该项设置为processingItems[chatId]，标记为当前正在处理的项
+       * 4. 触发已注册的onStart回调，通知UI层开始处理
+       * 
+       * 这确保了每个聊天同一时间只有一个项目被处理，实现了顺序处理的机制
+       * 
+       * @param chatId 聊天ID
+       * @param messageId 消息ID
+       */
       startProcessing: (chatId, messageId) => {
         set(state => {
           const chatQueue = state.queueItems[chatId] || [];
@@ -295,7 +361,20 @@ export const useAIQueueStore = create(
         });
       },
       
-      // 处理内容更新
+      /**
+       * 处理内容更新
+       * 
+       * 该方法处理AI回复的流式内容更新：
+       * 1. 检查processingItems[chatId]是否存在并且messageId匹配
+       * 2. 如果匹配，则调用该聊天注册的onContent回调
+       * 
+       * 使用processingItems进行验证确保只有当前正在处理的消息才能触发内容更新，
+       * 避免了已完成或已取消的处理继续影响UI
+       * 
+       * @param chatId 聊天ID
+       * @param messageId 消息ID
+       * @param content 更新的内容
+       */
       handleContent: (chatId, messageId, content) => {
         set(state => {
           const processingItem = state.processingItems[chatId];
@@ -311,7 +390,22 @@ export const useAIQueueStore = create(
         });
       },
       
-      // 完成处理队列项
+      /**
+       * 完成处理队列项
+       * 
+       * 该方法处理AI回复完成的流程：
+       * 1. 验证processingItems[chatId]存在且messageId匹配
+       * 2. 将队列项状态更新为'completed'
+       * 3. 触发已注册的onComplete回调，通知UI层更新最终内容
+       * 4. 将回复添加到chatHistoryCache以供后续AI生成使用
+       * 5. 将processingItems[chatId]设置为null，表示该聊天可以开始处理下一个队列项
+       * 
+       * 处理完成后清空processingItems对应项是关键步骤，它允许队列系统继续处理下一个项目
+       * 
+       * @param chatId 聊天ID
+       * @param messageId 消息ID 
+       * @param content 完整的回复内容
+       */
       completeProcessing: (chatId, messageId, content) => {
         set(state => {
           const processingItem = state.processingItems[chatId];

@@ -13,6 +13,49 @@
 5. **Ollama服务调用** - 与Ollama API交互获取AI回复
 6. **结果回显** - 通过回调函数将结果更新到UI
 
+## 关键数据结构
+
+### processingItems
+
+`processingItems` 是AI队列模型（`ai-queue.model.ts`）中的核心数据结构，用于追踪和管理每个聊天当前正在处理的队列项：
+
+```typescript
+// 当前处理中的队列项，按聊天ID索引
+processingItems: Record<string, AIQueueItem | null>;
+```
+
+**主要功能和作用：**
+
+1. **活跃处理项管理**：
+   - 存储每个聊天（由chatId标识）当前正在处理的队列项
+   - 键是聊天ID，值是正在处理的`AIQueueItem`或`null`（表示没有处理中的项）
+
+2. **确保顺序处理**：
+   - 每个聊天ID同一时间只能有一个正在处理的项目
+   - 当前项处理完成后才会处理下一个排队项目
+   - 支持不同聊天之间的并行处理
+
+3. **生命周期管理**：
+   - 当开始处理队列项时，该项从`queueItems[chatId]`数组中移除，并设置为`processingItems[chatId]`
+   - 处理完成或出错后，将`processingItems[chatId]`设置为`null`，表示可以处理下一个项目
+
+4. **回调控制**：
+   - 在回调判断中使用，确保只有正在处理的消息才能触发更新
+   - 例如，在`handleContent`方法中，只有当`messageId`匹配`processingItems[chatId].messageId`时才触发内容更新
+
+5. **中断处理支持**：
+   - 存储`AIQueueItem`中的`abortController`，可用于随时中断处理
+   - 当需要取消处理时（如用户终止生成），可以通过`processingItems[chatId].abortController.abort()`实现
+
+**示例工作流程：**
+
+1. 队列初始状态：`queueItems = { chat1: [item1, item2] }`, `processingItems = { chat1: null }`
+2. 开始处理：`queueItems = { chat1: [item2] }`, `processingItems = { chat1: item1 }`
+3. 处理完成：`queueItems = { chat1: [item2] }`, `processingItems = { chat1: null }`
+4. 开始处理下一项：`queueItems = { chat1: [] }`, `processingItems = { chat1: item2 }`
+
+该数据结构使整个AI队列系统能够有序、可控地处理多个聊天的消息队列，同时保持良好的并发性能。
+
 ## 1. 用户界面操作
 
 用户在聊天页面(`chat.tsx`)输入消息并点击发送按钮或按Enter键，触发`handleSend`函数：

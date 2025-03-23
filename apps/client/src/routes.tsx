@@ -7,17 +7,23 @@ import GuiChatResources from './pages/home/resources';
 import GuiChatResourceDetail from './pages/resources/[resourceId]';
 import NewTextResourcePage from './pages/resources/new-text';
 import GuiChatChat from './pages/chats/[chatId]';
+import NewContactPage from './pages/contacts/new-contact';
 import NotFoundPage from './pages/not-found';
 import RouteErrorBoundary from './components/route-error-boundary';
 // 导入 loaders
 import { resourcesLoader } from './loaders/resources.loader';
 import { resourceDetailLoader } from './loaders/resource-detail.loader';
+import { contactsLoader } from './loaders/contacts.loader';
 // 导入 actions
 import { 
   createTextResourceAction, 
   uploadImageResourceAction,
   deleteResourceAction 
-} from './actions/resource-actions';
+} from './actions/resource.actions';
+import {
+  createContactAction,
+  deleteContactAction
+} from './actions/contact.actions';
 
 // 创建路由配置
 const routes: RouteObject[] = [
@@ -50,6 +56,8 @@ const routes: RouteObject[] = [
             // 联系人列表页，显示所有联系人
             path: 'contacts',
             element: <GuiChatContacts />,
+            // 使用loader加载联系人数据
+            loader: contactsLoader,
           },
           {
             // 资源库页面，显示所有资源
@@ -59,6 +67,11 @@ const routes: RouteObject[] = [
             loader: resourcesLoader,
           },
         ],
+      },
+      {
+        // 添加联系人页面
+        path: 'contacts/new',
+        element: <NewContactPage />,
       },
       {
         // 添加文本资源页面 - 不再包含action，改用API路由处理
@@ -91,6 +104,20 @@ const routes: RouteObject[] = [
           {
             path: 'delete',
             action: deleteResourceAction,
+          },
+        ],
+      },
+      // API路由 - 用于处理联系人相关操作
+      {
+        path: 'api/contacts',
+        children: [
+          {
+            path: 'create',
+            action: createContactAction,
+          },
+          {
+            path: 'delete',
+            action: deleteContactAction,
           },
         ],
       },

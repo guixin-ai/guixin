@@ -8,6 +8,8 @@ export interface Contact {
   name: string;
   avatar: string;
   pinyin?: string;
+  description?: string;
+  isAi?: boolean;
 }
 
 // 联系人详情类型（独立的，不继承自Contact）

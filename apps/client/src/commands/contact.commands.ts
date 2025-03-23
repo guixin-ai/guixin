@@ -2,6 +2,7 @@
  * 联系人指令 - 定义与后端对应的联系人相关指令
  */
 import { invoke } from '@tauri-apps/api/core';
+import { z } from 'zod';
 
 /**
  * 联系人响应接口
@@ -12,6 +13,36 @@ export interface ContactResponse {
   description?: string | null;
   is_ai: boolean;
 }
+
+/**
+ * 联系人响应Zod验证Schema
+ */
+export const contactResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  is_ai: z.boolean()
+});
+
+/**
+ * 创建AI联系人参数Zod验证Schema
+ */
+export const createAiContactParamsSchema = z.object({
+  name: z.string().min(1, "联系人名称不能为空"),
+  description: z.string().optional()
+});
+
+/**
+ * 移除联系人参数Zod验证Schema
+ */
+export const removeContactParamsSchema = z.object({
+  contactId: z.string().min(1, "联系人ID不能为空")
+});
+
+// 根据Zod Schema派生类型
+export type ContactResponseValidated = z.infer<typeof contactResponseSchema>;
+export type CreateAiContactParams = z.infer<typeof createAiContactParamsSchema>;
+export type RemoveContactParams = z.infer<typeof removeContactParamsSchema>;
 
 /**
  * 联系人指令类
@@ -40,8 +71,17 @@ class ContactCommands {
    */
   public async getCurrentUserContacts(): Promise<ContactResponse[]> {
     try {
-      return await invoke('get_current_user_contacts') as ContactResponse[];
+      const response = await invoke<any[]>('get_current_user_contacts');
+      
+      // 使用Zod验证返回数据
+      const validatedContacts = z.array(contactResponseSchema).parse(response);
+      
+      return validatedContacts;
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('返回数据验证失败:', error.errors);
+        throw new Error(`数据格式无效: ${JSON.stringify(error.errors)}`);
+      }
       console.error('获取当前用户联系人列表失败:', error);
       throw new Error(`获取联系人列表失败: ${error}`);
     }
@@ -53,8 +93,15 @@ class ContactCommands {
    */
   public async addCurrentUserContact(contactId: string): Promise<void> {
     try {
+      // 验证参数
+      removeContactParamsSchema.parse({ contactId });
+      
       await invoke('add_current_user_contact', { contact_id: contactId });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('参数验证失败:', error.errors);
+        throw new Error(`参数格式无效: ${JSON.stringify(error.errors)}`);
+      }
       console.error('添加联系人失败:', error);
       throw new Error(`添加联系人失败: ${error}`);
     }
@@ -66,8 +113,15 @@ class ContactCommands {
    */
   public async removeCurrentUserContact(contactId: string): Promise<void> {
     try {
+      // 验证参数
+      removeContactParamsSchema.parse({ contactId });
+      
       await invoke('remove_current_user_contact', { contact_id: contactId });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('参数验证失败:', error.errors);
+        throw new Error(`参数格式无效: ${JSON.stringify(error.errors)}`);
+      }
       console.error('删除联系人失败:', error);
       throw new Error(`删除联系人失败: ${error}`);
     }
@@ -82,11 +136,23 @@ class ContactCommands {
     description?: string
   ): Promise<ContactResponse> {
     try {
-      return await invoke('create_current_user_ai_contact', { 
+      // 验证参数
+      createAiContactParamsSchema.parse({ name, description });
+      
+      const response = await invoke<any>('create_current_user_ai_contact', { 
         name, 
         description 
-      }) as ContactResponse;
+      });
+      
+      // 验证返回数据
+      const validatedResponse = contactResponseSchema.parse(response);
+      
+      return validatedResponse;
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('参数或返回数据验证失败:', error.errors);
+        throw new Error(`数据格式无效: ${JSON.stringify(error.errors)}`);
+      }
       console.error('创建AI联系人失败:', error);
       throw new Error(`创建AI联系人失败: ${error}`);
     }

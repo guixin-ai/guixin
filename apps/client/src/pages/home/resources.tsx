@@ -17,6 +17,19 @@ interface ResourceLoaderData {
   resources: ResourceItem[];
 }
 
+// 定义删除资源操作返回数据类型
+interface DeleteFetcherData {
+  success?: boolean;
+  error?: string;
+}
+
+// 定义上传资源操作返回数据类型
+interface UploadFetcherData {
+  success?: boolean;
+  error?: string;
+  resource?: ResourceItem;
+}
+
 const ResourcesPage = () => {
   const navigate = useNavigate();
   
@@ -29,8 +42,8 @@ const ResourcesPage = () => {
   const errorMessage = data.error;
 
   // 创建独立的fetcher实例处理数据操作
-  const deleteFetcher = useFetcher();
-  const uploadFetcher = useFetcher();
+  const deleteFetcher = useFetcher<DeleteFetcherData>();
+  const uploadFetcher = useFetcher<UploadFetcherData>();
 
   const [searchQuery, setSearchQuery] = useState('');
 

@@ -12,6 +12,12 @@ interface ResourceDetailLoaderData {
   resource: ResourceItem | null;
 }
 
+// 定义删除资源操作返回数据类型
+interface DeleteFetcherData {
+  success?: boolean;
+  error?: string;
+}
+
 const ResourceDetailPage = () => {
   const navigate = useNavigate();
   const { resourceId } = useParams<{ resourceId: string }>();
@@ -25,7 +31,7 @@ const ResourceDetailPage = () => {
   const errorMessage = data.error;
 
   // 使用fetcher替代直接调用resourceCommands
-  const deleteFetcher = useFetcher();
+  const deleteFetcher = useFetcher<DeleteFetcherData>();
   
   // 文本内容状态
   const [textContent, setTextContent] = useState<string>('');

@@ -28,10 +28,10 @@ type ActionErrorData = {
 
 const NewTextResourcePage = () => {
   const navigate = useNavigate();
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<ActionErrorData>();
   
   // 获取fetcher中的错误数据
-  const actionData = fetcher.data as ActionErrorData | undefined;
+  const actionData = fetcher.data;
   
   // 监听fetcher状态，成功时跳转
   useEffect(() => {

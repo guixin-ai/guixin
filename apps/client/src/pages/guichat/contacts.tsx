@@ -59,7 +59,7 @@ const ContactsPage = () => {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // 初始化联系人数据
   useEffect(() => {
@@ -69,17 +69,20 @@ const ContactsPage = () => {
         if (initializedList) {
           // 如果已经初始化，直接使用模型中的数据，不再调用服务
           console.log('联系人列表已初始化，跳过服务调用');
-          setLoading(false);
           return;
         }
 
+        // 设置加载状态为 true，只在发起请求时
+        setLoading(true);
+        
         // 如果未初始化，才调用服务获取数据
         const response = await contactService.getContacts();
         // 调用模型层的初始化方法设置数据和初始化标记
         initializeList(response.contacts);
-        setLoading(false);
       } catch (error) {
         console.error('加载联系人数据失败:', error);
+      } finally {
+        // 请求完成后设置加载状态为 false
         setLoading(false);
       }
     };

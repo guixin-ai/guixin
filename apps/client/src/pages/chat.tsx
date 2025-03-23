@@ -47,7 +47,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   const virtuosoRef = useRef<VirtuosoMessageListMethods<VirtuosoMessageItem>>(null);
   const [inputValue, setInputValue] = useState('');
   const [contact, setContact] = useState<Contact | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isAIResponding, setIsAIResponding] = useState(false);
   const [isMessagesInitialized, setIsMessagesInitialized] = useState(false);
   const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
@@ -121,6 +121,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
   // 加载聊天数据
   useEffect(() => {
     const loadChatData = async () => {
+      // 设置加载状态为 true，只在发起请求时
       setLoading(true);
       setIsMessagesInitialized(false);
 

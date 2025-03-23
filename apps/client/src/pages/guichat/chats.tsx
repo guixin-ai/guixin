@@ -38,7 +38,7 @@ const ChatsPage = () => {
     }))
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // 初始化聊天数据
   useEffect(() => {
@@ -48,20 +48,23 @@ const ChatsPage = () => {
         if (initializedChatList) {
           // 如果已经初始化，直接使用模型中的数据，不再调用服务
           console.log('聊天列表已初始化，跳过服务调用');
-          setLoading(false);
           return;
         }
 
+        // 设置加载状态为 true，只在发起请求时
+        setLoading(true);
+        
         // 如果未初始化，才调用服务获取数据
         const response = await chatService.getChats();
         // 调用模型层的初始化方法设置数据和初始化标记
         initializeChatList(response.chats);
-        setLoading(false);
       } catch (error) {
         console.error('加载聊天列表失败:', error);
         if (error instanceof ChatListInitFailedException) {
           console.error(`聊天列表初始化失败: ${error.message}`);
         }
+      } finally {
+        // 请求完成后设置加载状态为 false
         setLoading(false);
       }
     };

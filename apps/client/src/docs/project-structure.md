@@ -54,9 +54,9 @@
 
 ```
 /pages
-  /page.tsx                 # 根路由 /
   /layout.tsx               # 全局布局
-  /not-found.tsx            # 全局404页面
+  /not-found
+    /page.tsx               # 全局404页面
   /chats
     /page.tsx               # /chats
     /layout.tsx             # /chats及子路由的共享布局

@@ -7,10 +7,10 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   VirtuosoMessage,
   VirtuosoMessageListMethods,
-} from '../../components/lib/virtuoso-message/virtuoso-message';
-import MessageItemContent, { VirtuosoMessageItem } from '../../components/message-item';
-import { Button } from '../../components/ui/button';
-import { OllamaMessage } from '../../services/ollama.service';
+} from '../../../components/lib/virtuoso-message/virtuoso-message';
+import MessageItemContent, { VirtuosoMessageItem } from '../../../components/message-item';
+import { Button } from '../../../components/ui/button';
+import { OllamaMessage } from '../../../services/ollama.service';
 import { useFetcher } from 'react-router-dom';
 
 // 联系人类型

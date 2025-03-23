@@ -12,7 +12,7 @@ const GuiChatLayout = () => {
       {/* 底部导航 */}
       <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-around">
         <NavLink
-          to="/guichat/chats"
+          to="/home/chats"
           className={({ isActive }) => `w-1/3 py-3 flex flex-col items-center justify-center ${
             isActive ? 'text-green-500' : 'text-gray-600 dark:text-gray-400'
           }`}
@@ -22,7 +22,7 @@ const GuiChatLayout = () => {
         </NavLink>
         
         <NavLink
-          to="/guichat/contacts"
+          to="/home/contacts"
           className={({ isActive }) => `w-1/3 py-3 flex flex-col items-center justify-center ${
             isActive ? 'text-green-500' : 'text-gray-600 dark:text-gray-400'
           }`}
@@ -32,7 +32,7 @@ const GuiChatLayout = () => {
         </NavLink>
         
         <NavLink
-          to="/guichat/resources"
+          to="/home/resources"
           className={({ isActive }) => `w-1/3 py-3 flex flex-col items-center justify-center ${
             isActive ? 'text-green-500' : 'text-gray-600 dark:text-gray-400'
           }`}

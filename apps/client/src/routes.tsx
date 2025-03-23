@@ -7,15 +7,21 @@ import GuiChatResources from './pages/home/resources';
 import GuiChatResourceDetail from './pages/resources/[resourceId]';
 import NewTextResourcePage from './pages/resources/new-text';
 import GuiChatChat from './pages/chats/[chatId]';
+import ChatInfoPage from './pages/chats/chat-info';
+import NewChatPage from './pages/chats/new-chat';
 import NewContactPage from './pages/contacts/new-contact';
 import ContactDetailPage from './pages/contacts/[contactId]';
 import NotFoundPage from './pages/not-found';
 import RouteErrorBoundary from './components/route-error-boundary';
 // 导入 loaders
-import { resourcesLoader } from './loaders/resources.loader';
-import { resourceDetailLoader } from './loaders/resource-detail.loader';
-import { contactsLoader } from './loaders/contacts.loader';
-import { contactDetailLoader } from './loaders/contact-detail.loader';
+import { 
+  resourcesLoader, 
+  resourceDetailLoader,
+  contactsLoader,
+  contactDetailLoader,
+  newChatLoader,
+  chatDetailLoader
+} from './loaders';
 // 导入 actions
 import { 
   createTextResourceAction, 
@@ -26,6 +32,10 @@ import {
   createContactAction,
   deleteContactAction
 } from './actions/contact.actions';
+import {
+  createGroupChatAction,
+  sendChatMessageAction
+} from './actions/chat.actions';
 
 // 创建路由配置
 const routes: RouteObject[] = [
@@ -96,6 +106,19 @@ const routes: RouteObject[] = [
         // 聊天详情页，显示与特定联系人的聊天记录
         path: 'chats/:chatId',
         element: <GuiChatChat />,
+        loader: chatDetailLoader,
+      },
+      {
+        // 聊天详情信息页面
+        path: 'chats/:chatId/info',
+        element: <ChatInfoPage />,
+        loader: chatDetailLoader,
+      },
+      {
+        // 新建聊天页面
+        path: 'chats/new',
+        element: <NewChatPage />,
+        loader: newChatLoader,
       },
       // API路由 - 用于处理资源相关操作
       {
@@ -126,6 +149,20 @@ const routes: RouteObject[] = [
           {
             path: 'delete',
             action: deleteContactAction,
+          },
+        ],
+      },
+      // API路由 - 用于处理聊天相关操作
+      {
+        path: 'api/chats',
+        children: [
+          {
+            path: 'create-group',
+            action: createGroupChatAction,
+          },
+          {
+            path: 'send-message',
+            action: sendChatMessageAction,
           },
         ],
       },

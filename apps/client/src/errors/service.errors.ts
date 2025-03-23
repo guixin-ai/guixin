@@ -55,6 +55,13 @@ export class ChatMessagesFetchException extends ChatServiceException {
   }
 }
 
+// 创建群聊失败异常
+export class GroupChatCreationFailedException extends ChatServiceException {
+  constructor() {
+    super('创建群聊失败');
+  }
+}
+
 // 联系人列表获取失败异常
 export class ContactListFetchException extends ContactServiceException {
   constructor() {

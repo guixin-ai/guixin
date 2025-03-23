@@ -5,7 +5,8 @@ import { ChatItem, ChatMessage, ChatsResponse } from '@/types/chat';
 import { 
   ChatFetchException, 
   ChatDetailFetchException, 
-  ChatMessagesFetchException 
+  ChatMessagesFetchException,
+  GroupChatCreationFailedException 
 } from '@/errors/service.errors';
 import { invoke } from '@tauri-apps/api/core';
 import { formatDate } from '@/utils/date-utils';
@@ -30,6 +31,23 @@ interface BackendChatListItem {
 interface BackendChatListResponse {
   chats: BackendChatListItem[];
   total: number;
+}
+
+/**
+ * 创建群聊的响应接口
+ */
+interface CreateGroupChatResponse {
+  chatId: string;
+  status: string;
+}
+
+/**
+ * 发送消息的响应接口
+ */
+interface SendMessageResponse {
+  messageId: string;
+  timestamp: string;
+  status: string;
 }
 
 /**
@@ -115,6 +133,58 @@ class ChatService {
     } catch (error) {
       console.error(`获取聊天 ${chatId} 消息失败:`, error);
       throw new ChatMessagesFetchException(chatId);
+    }
+  }
+
+  /**
+   * 创建群聊
+   * @param contactIds 联系人ID数组
+   * @returns 包含新创建群聊ID的响应
+   */
+  public async createGroupChat(contactIds: string[]): Promise<CreateGroupChatResponse> {
+    try {
+      // TODO: 调用后端API创建群聊
+      // 目前返回模拟数据，等待后端实现
+      console.log('创建群聊，联系人IDs:', contactIds);
+      
+      // 模拟延迟和返回
+      const chatId = `chat-${Date.now()}`;
+      
+      return {
+        chatId,
+        status: 'success'
+      };
+    } catch (error) {
+      console.error('创建群聊失败:', error);
+      throw new GroupChatCreationFailedException();
+    }
+  }
+
+  /**
+   * 发送聊天消息
+   * @param chatId 聊天ID
+   * @param content 消息内容
+   * @param tempId 临时消息ID，用于前端标识
+   * @returns 包含消息ID和时间戳的响应
+   */
+  public async sendMessage(chatId: string, content: string, tempId?: string): Promise<SendMessageResponse> {
+    try {
+      // TODO: 调用后端API发送消息
+      // 目前返回模拟数据，等待后端实现
+      console.log('发送消息:', { chatId, content, tempId });
+      
+      // 模拟消息发送
+      const messageId = `msg-${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      
+      return {
+        messageId,
+        timestamp,
+        status: 'success'
+      };
+    } catch (error) {
+      console.error(`发送消息到聊天 ${chatId} 失败:`, error);
+      throw new Error(`发送消息失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

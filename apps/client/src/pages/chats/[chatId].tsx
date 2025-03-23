@@ -1,28 +1,17 @@
-import {
-  ChatDetailInitFailedException,
-  ChatMessagesInitFailedException,
-  ChatNotFoundException,
-} from '@/errors/chat.errors';
 import { AIMember, useAIQueueStore } from '@/models/ai-queue.model';
-import { aiProcessor } from '@/services/ai-processor.service';
 import { ChatMember, ChatMessage } from '@/types/chat';
 import { ArrowLeft, Mic, MoreVertical, Paperclip, Send, Smile } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLoaderData } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
-import ChatInfoPage from '../../components/chat-info';
-import DelayedLoading from '../../components/delayed-loading';
 import {
   VirtuosoMessage,
   VirtuosoMessageListMethods,
 } from '../../components/lib/virtuoso-message/virtuoso-message';
 import MessageItemContent, { VirtuosoMessageItem } from '../../components/message-item';
-import NewChat from '../../components/new-chat';
 import { Button } from '../../components/ui/button';
-import { useChatStore } from '../../models/chat.model';
-import { useContactStore } from '../../models/contact.model';
 import { OllamaMessage } from '../../services/ollama.service';
-import { chatService } from '@/services/chat.service';
+import { useFetcher } from 'react-router-dom';
 
 // 联系人类型
 interface Contact {
@@ -32,62 +21,53 @@ interface Contact {
   isAI?: boolean;
 }
 
-// 新增 ChatPageWrapper 组件
-const ChatPageWrapper = () => {
-  const { chatId } = useParams<{ chatId: string }>();
-  if (!chatId) {
-    throw new ChatNotFoundException('未指定聊天ID');
-  }
-  return <ChatPageContent chatId={chatId} />;
-};
+// 聊天详情页加载器数据类型
+interface ChatDetailLoaderData {
+  success: boolean;
+  error?: string;
+  chat: {
+    id: string;
+    name: string;
+    avatar: string[];
+    isAI?: boolean;
+    members?: ChatMember[];
+  } | null;
+  messages: ChatMessage[];
+}
 
-// 将原 ChatPage 组件重命名为 ChatPageContent，并接收 chatId 作为 props
-const ChatPageContent = ({ chatId }: { chatId: string }) => {
+// 消息发送返回数据类型
+interface SendMessageFetcherData {
+  success: boolean;
+  error?: string;
+  message?: ChatMessage;
+}
+
+// 聊天详情页组件
+const ChatPage = () => {
+  const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
+  
+  // 创建fetcher用于发送消息
+  const messageFetcher = useFetcher<SendMessageFetcherData>();
+  
+  // 从loader获取数据
+  const data = useLoaderData<ChatDetailLoaderData>();
+  
+  const chatDetail = data.success ? data.chat : null;
+  const initialMessages = data.success ? data.messages : [];
+  const hasError = !data.success;
+  const errorMessage = data.error;
+  
   const virtuosoRef = useRef<VirtuosoMessageListMethods<VirtuosoMessageItem>>(null);
   const [inputValue, setInputValue] = useState('');
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(false);
   const [isAIResponding, setIsAIResponding] = useState(false);
   const [isMessagesInitialized, setIsMessagesInitialized] = useState(false);
-  const [initialMessages, setInitialMessages] = useState<VirtuosoMessageItem[]>([]);
-  const [showChatInfo, setShowChatInfo] = useState(false);
-  const [showNewChat, setShowNewChat] = useState(false);
+  const [messages, setMessages] = useState<VirtuosoMessageItem[]>([]);
 
   // 添加输入框引用，用于保持焦点
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // 使用 useShallow 和选择器获取需要的状态和方法
-  const chatStore = useChatStore(
-    useShallow(state => ({
-      chatDetails: state.chatDetails,
-      chatMessages: state.chatMessages,
-      initializedChatDetailIds: state.initializedChatDetailIds,
-      initializedChatIds: state.initializedChatIds,
-      initializeChatDetail: state.initializeChatDetail,
-      initializeChatMessages: state.initializeChatMessages,
-      addChatMessage: state.addChatMessage,
-      updateChatMessage: state.updateChatMessage,
-      getChatDetail: state.getChatDetail,
-      getChatMessages: state.getChatMessages,
-      addChatMember: state.addChatMember,
-    }))
-  );
-
-  // 使用析构来简化后续访问
-  const {
-    chatDetails,
-    chatMessages,
-    initializedChatDetailIds,
-    initializedChatIds,
-    initializeChatDetail,
-    initializeChatMessages,
-    addChatMessage,
-    updateChatMessage,
-    getChatDetail,
-    getChatMessages,
-    addChatMember,
-  } = chatStore;
 
   // 获取AI队列相关方法
   const aiQueueStore = useAIQueueStore(
@@ -96,17 +76,8 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       updateChatHistory: state.updateChatHistory,
       addToQueue: state.addToQueue,
       cancelChat: state.cancelChat,
-      getChatHistory: state.getChatHistory,
-      queueItems: state.queueItems,
-      processingItems: state.processingItems,
-      startProcessing: state.startProcessing,
-      completeProcessing: state.completeProcessing,
-      errorProcessing: state.errorProcessing
     }))
   );
-
-  // 使用联系人模型获取联系人详情 - 方法不需要重新创建
-  const getContactDetail = useContactStore(state => state.getContactDetail);
 
   // 转换ChatMessage为VirtuosoMessageItem
   const convertToVirtuosoMessage = (message: ChatMessage): VirtuosoMessageItem => {
@@ -118,110 +89,28 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     };
   };
 
-  // 加载聊天数据
+  // 初始化聊天数据
   useEffect(() => {
-    const loadChatData = async () => {
-      // 设置加载状态为 true，只在发起请求时
-      setLoading(true);
-      setIsMessagesInitialized(false);
-
-      try {
-        // 先检查聊天详情是否已初始化
-        let chatDetail = null;
-        if (initializedChatDetailIds[chatId]) {
-          // 如果已经初始化，则直接使用缓存数据
-          chatDetail = chatDetails[chatId];
-        } else {
-          // 如果未初始化，直接调用服务获取聊天详情
-          const chatItem = await chatService.getChatById(chatId);
-
-          // 如果没有找到，抛出异常
-          if (!chatItem) {
-            throw new ChatNotFoundException(chatId);
-          }
-
-          // 转换成详情对象
-          chatDetail = {
-            id: chatItem.id,
-            name: chatItem.name,
-            avatar: typeof chatItem.avatar === 'string' ? chatItem.avatar : chatItem.avatar[0],
-            isAI: true, // 假设所有聊天都是AI
-            members: [
-              {
-                id: 'current-user',
-                name: '我',
-                avatar: '我',
-                username: '@自如',
-              },
-              {
-                id: chatItem.id,
-                name: chatItem.name,
-                avatar: typeof chatItem.avatar === 'string' ? chatItem.avatar : chatItem.avatar[0],
-                isAI: true,
-                username: '@自如',
-              },
-            ],
-          };
-
-          // 调用同步的初始化方法设置数据
-          initializeChatDetail(chatId, chatDetail);
-        }
-
-        // 设置联系人信息
-        setContact({
-          id: chatDetail.id,
-          name: chatDetail.name,
-          avatar: chatDetail.avatar,
-          isAI: chatDetail.isAI || false,
-        });
-
-        // 先检查聊天消息是否已初始化
-        let chatMessages = [];
-        if (initializedChatIds[chatId]) {
-          // 如果已经初始化，则直接使用缓存数据
-          chatMessages = chatStore.chatMessages[chatId] || [];
-        } else {
-          // 如果未初始化，直接调用服务获取聊天消息
-          chatMessages = await chatService.getChatMessages(chatId);
-
-          // 调用同步的初始化方法设置数据
-          initializeChatMessages(chatId, chatMessages);
-        }
-
-        // 转换为VirtuosoMessageItem
-        const virtuosoMessages = chatMessages.map(convertToVirtuosoMessage);
-        setInitialMessages(virtuosoMessages);
-
-        setIsMessagesInitialized(true);
-      } catch (error) {
-        // 处理不同类型的错误
-        if (error instanceof ChatNotFoundException) {
-          console.error(`聊天未找到: ${error.message}`);
-        } else if (error instanceof ChatDetailInitFailedException) {
-          console.error(`聊天详情初始化失败: ${error.message}`);
-        } else if (error instanceof ChatMessagesInitFailedException) {
-          console.error(`聊天消息初始化失败: ${error.message}`);
-        } else {
-          console.error('加载聊天数据失败:', error);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadChatData();
-  }, [
-    chatId,
-    initializeChatDetail,
-    initializeChatMessages,
-    chatDetails,
-    chatMessages,
-    initializedChatDetailIds,
-    initializedChatIds,
-  ]);
+    if (!chatDetail || !chatId) return;
+    
+    // 设置联系人信息
+    setContact({
+      id: chatDetail.id,
+      name: chatDetail.name,
+      avatar: chatDetail.avatar[0],
+      isAI: chatDetail.isAI || false,
+    });
+    
+    // 转换消息格式并设置到状态
+    const virtuosoMessages = initialMessages.map(convertToVirtuosoMessage);
+    setMessages(virtuosoMessages);
+    setIsMessagesInitialized(true);
+  }, [chatDetail, chatId, initialMessages]);
 
   // 注册AI队列处理器
   useEffect(() => {
+    if (!chatId) return;
+    
     // 定义当前聊天的消息处理器
     const handlers = {
       // 当AI开始回复时调用
@@ -244,14 +133,18 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           virtuosoRef.current.data.append([aiMessage]);
         }
 
-        // 同步到模型层 - 初始添加空消息
-        const chatAiMessage: ChatMessage = {
-          id: messageId,
-          content: '',
-          isSelf: false,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        addChatMessage(chatId, chatAiMessage);
+        // 同步到后端 - 使用fetcher发送消息
+        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        messageFetcher.submit(
+          { 
+            chatId, 
+            messageId,
+            content: '',
+            isSelf: 'false',
+            timestamp: currentTime
+          },
+          { method: "post", action: "/api/chats/send-message" }
+        );
       },
 
       // 当收到AI部分回复内容时调用
@@ -268,7 +161,20 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
             return msg;
           });
         }
-        updateChatMessage(chatId, messageId, content);
+
+        // 定期更新消息内容到后端 - 使用防抖处理
+        // 这里简化实现，实际应用中可能需要更复杂的防抖逻辑
+        if (content.length % 50 === 0) {
+          messageFetcher.submit(
+            { 
+              chatId, 
+              messageId,
+              content,
+              update: 'true'
+            },
+            { method: "post", action: "/api/chats/send-message" }
+          );
+        }
       },
 
       // 当AI回复完成时调用
@@ -286,8 +192,17 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           });
         }
 
-        // 同步最终完整的响应到模型层
-        updateChatMessage(chatId, messageId, fullContent);
+        // 最终更新完整内容到后端
+        messageFetcher.submit(
+          { 
+            chatId, 
+            messageId,
+            content: fullContent,
+            update: 'true',
+            isComplete: 'true'
+          },
+          { method: "post", action: "/api/chats/send-message" }
+        );
 
         // 取消AI响应状态
         setIsAIResponding(false);
@@ -309,8 +224,17 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
           });
         }
 
-        // 更新模型层中的错误消息
-        updateChatMessage(chatId, messageId, error.message);
+        // 更新错误消息到后端
+        messageFetcher.submit(
+          { 
+            chatId, 
+            messageId,
+            content: `错误: ${error.message}`,
+            update: 'true',
+            isError: 'true'
+          },
+          { method: "post", action: "/api/chats/send-message" }
+        );
 
         // 取消AI响应状态
         setIsAIResponding(false);
@@ -326,63 +250,36 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       // 确保取消当前聊天的所有AI回复
       aiQueueStore.cancelChat(chatId);
     };
-  }, [chatId, isMessagesInitialized, addChatMessage, updateChatMessage, aiQueueStore]);
+  }, [chatId, isMessagesInitialized, messageFetcher, aiQueueStore]);
 
   // 返回聊天列表
   const handleBack = () => {
-    if (showNewChat) {
-      setShowNewChat(false);
-    } else if (showChatInfo) {
-      setShowChatInfo(false);
-    } else {
-      navigate('/guichat/chats');
-    }
+    navigate('/home/chats');
   };
 
-  // 显示添加成员组件
-  const handleAddMember = () => {
-    setShowChatInfo(false);
-    setShowNewChat(true);
-  };
-
-  // 处理选择联系人
-  const handleSelectContacts = async (contactIds: string[]) => {
-    // 获取聊天详情
-    const chatDetail = await getChatDetail(chatId);
-    if (!chatDetail) return;
-
-    // 为每个选择的联系人ID添加到聊天成员中
-    for (const contactId of contactIds) {
-      // 获取联系人详情
-      const contactDetail = await getContactDetail(contactId);
-      if (contactDetail) {
-        const member: ChatMember = {
-          id: contactDetail.id,
-          name: contactDetail.name,
-          avatar: contactDetail.avatar || contactDetail.name.charAt(0),
-          username: `@${contactDetail.name}`,
-        };
-        addChatMember(chatId, member);
-      }
+  // 跳转到聊天信息页面
+  const handleOpenChatInfo = () => {
+    if (chatId) {
+      navigate(`/chats/${chatId}/info`);
     }
-
-    // 关闭新聊天组件
-    setShowNewChat(false);
   };
 
   // 发送消息
   const handleSend = () => {
+    if (!chatId) return;
+    
     // 如果没有输入内容或AI正在响应，则不发送消息
     if (!inputValue.trim() || isAIResponding) return;
 
     const userMessageId = `user-${Date.now()}`;
+    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     // 创建用户消息
     const userMessage: VirtuosoMessageItem = {
       key: userMessageId,
       content: inputValue,
       isSelf: true,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: currentTime,
     };
 
     // 直接添加到UI，优先响应界面变化
@@ -396,7 +293,7 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
       });
     } else {
       // 如果组件未初始化，初始化组件并显示消息
-      setInitialMessages([userMessage]);
+      setMessages([userMessage]);
       setIsMessagesInitialized(true);
     }
 
@@ -404,57 +301,64 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     const currentInput = inputValue;
     setInputValue('');
 
-    // 将用户消息同步到模型层
-    const chatMessage: ChatMessage = {
+    // 将用户消息保存到后端 - 使用fetcher发送消息
+    messageFetcher.submit(
+      { 
+        chatId, 
+        messageId: userMessageId,
+        content: currentInput,
+        isSelf: 'true',
+        timestamp: currentTime
+      },
+      { method: "post", action: "/api/chats/send-message" }
+    );
+
+    // 使用aiQueueStore处理AI回复
+    // 准备历史消息 - 包括刚才的用户消息
+    const allCurrentMessages = [...initialMessages, {
       id: userMessageId,
       content: currentInput,
       isSelf: true,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    addChatMessage(chatId, chatMessage);
+      timestamp: currentTime
+    }];
+    
+    // 格式化消息为Ollama格式
+    const chatHistory: OllamaMessage[] = allCurrentMessages.map(msg => ({
+      role: msg.isSelf ? 'user' : 'assistant',
+      content: msg.content,
+    }));
 
-    // 使用aiQueueStore处理AI回复
-    // 1. 准备历史消息
-    getChatMessages(chatId).then(messages => {
-      // 2. 格式化消息为Ollama格式
-      const chatHistory: OllamaMessage[] = messages.map(msg => ({
-        role: msg.isSelf ? 'user' : 'assistant',
-        content: msg.content,
-      }));
+    // 初始化aiQueueStore的历史记录 (已包含最新的用户消息)
+    aiQueueStore.updateChatHistory(chatId, chatHistory);
 
-      // 3. 初始化aiQueueStore的历史记录 (已包含最新的用户消息)
-      aiQueueStore.updateChatHistory(chatId, chatHistory);
+    // 获取聊天中的AI成员
+    if (!chatDetail || !chatDetail.members) return;
 
-      // 5. 获取聊天中的AI成员
-      const chatDetail = chatDetails[chatId];
-      if (!chatDetail || !chatDetail.members) return;
+    // 过滤出所有AI成员
+    const aiMembers = chatDetail.members.filter(member => member.isAI);
+    if (aiMembers.length === 0) return;
 
-      // 过滤出所有AI成员
-      const aiMembers = chatDetail.members.filter(member => member.isAI);
-      if (aiMembers.length === 0) return;
+    // 为每个AI成员创建回复任务
+    aiMembers.forEach(aiMember => {
+      // 生成唯一消息ID
+      const messageId = `ai-${aiMember.id}-${Date.now()}`;
 
-      // 6. 为每个AI成员创建回复任务
-      aiMembers.forEach(aiMember => {
-        // 生成唯一消息ID
-        const messageId = `ai-${aiMember.id}-${Date.now()}`;
-
-        // 添加到队列
-        aiQueueStore.addToQueue({
-          chatId,
-          messageId,
-          aiMember: {
-            id: aiMember.id,
-            name: aiMember.name,
-            avatar: aiMember.avatar || aiMember.name.charAt(0),
-            description: aiMember.description,
-            isAI: true,
-          },
-          modelName: 'gemma3:1b', // 可配置
-          options: {
-            temperature: 0.7,
-            top_p: 0.9,
-          },
-        });
+      // 添加到队列
+      aiQueueStore.addToQueue({
+        chatId,
+        messageId,
+        aiMember: {
+          id: aiMember.id,
+          name: aiMember.name,
+          avatar: typeof aiMember.avatar === 'string' ? aiMember.avatar : aiMember.avatar[0],
+          description: aiMember.description,
+          isAI: true,
+        },
+        modelName: 'gemma3:1b', // 可配置
+        options: {
+          temperature: 0.7,
+          top_p: 0.9,
+        },
       });
     });
 
@@ -477,179 +381,202 @@ const ChatPageContent = ({ chatId }: { chatId: string }) => {
     }
   };
 
-  // 打开聊天信息设置
-  const handleOpenChatInfo = () => {
-    setShowChatInfo(true);
-  };
-
   // 修改取消生成函数，使用aiQueueStore
   const cancelCurrentGeneration = () => {
+    if (!chatId) return;
+    
     // 取消当前聊天的所有AI回复
     aiQueueStore.cancelChat(chatId);
     // 重置AI响应状态
     setIsAIResponding(false);
   };
 
-  // 聊天页面（包括未找到聊天的情况）
+  // 添加一个新的状态来控制显示加载UI
+  const [showLoading, setShowLoading] = useState(false);
+  
+  // 修改loading状态变化监听
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    if (loading) {
+      // 如果进入加载状态，设置延迟计时器
+      timer = setTimeout(() => {
+        setShowLoading(true);
+      }, 300); // 300ms延迟
+    } else {
+      // 如果退出加载状态，立即隐藏加载UI
+      setShowLoading(false);
+    }
+
+    // 清理函数，在组件卸载或依赖变化时清除计时器
+    return () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+      }
+    };
+  }, [loading]);
+
+  // 聊天页面
   return (
-    <>
-      <DelayedLoading loading={loading}>
-        {contact ? (
-          <div className="flex flex-col h-screen bg-white dark:bg-black">
-            {/* 聊天消息页面 - 始终显示 */}
-            <>
-              {/* 头部 */}
-              <div className="flex items-center p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-600 dark:text-gray-300 mr-2"
-                  onClick={handleBack}
-                >
-                  <ArrowLeft size={20} />
-                </Button>
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+      {/* 头部 */}
+      <div className="flex items-center p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-gray-600 dark:text-gray-300 mr-2"
+          onClick={handleBack}
+        >
+          <ArrowLeft size={20} />
+        </Button>
 
-                <div className="flex-1 text-center">
-                  <h2 className="font-medium text-gray-800 dark:text-white">
-                    {contact.name}
-                    {contact.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
-                  </h2>
-                </div>
+        <div className="flex-1 text-center">
+          <h2 className="font-medium text-gray-800 dark:text-white">
+            {contact?.name}
+            {contact?.isAI && <span className="text-xs text-green-400 ml-2">AI助手</span>}
+          </h2>
+        </div>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-600 dark:text-gray-300"
-                  onClick={handleOpenChatInfo}
-                >
-                  <MoreVertical size={20} />
-                </Button>
-              </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-gray-600 dark:text-gray-300"
+          onClick={handleOpenChatInfo}
+        >
+          <MoreVertical size={20} />
+        </Button>
+      </div>
 
-              {/* 消息区域 - 使用VirtuosoMessage组件 */}
-              {isMessagesInitialized ? (
-                <VirtuosoMessage<VirtuosoMessageItem, null>
-                  ref={virtuosoRef}
-                  className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
-                  computeItemKey={({ data }) => data.key}
-                  ItemContent={({ data }) => (
-                    <MessageItemContent
-                      data={data}
-                      contact={contact}
-                      aiMembers={chatDetails[chatId]?.members || []}
-                    />
-                  )}
-                  initialData={initialMessages}
-                  initialLocation={{ index: 'LAST', align: 'end' }}
-                />
-              ) : (
-                <div className="flex-1 bg-gray-100 dark:bg-gray-900"></div>
-              )}
+      {/* 错误提示 */}
+      {hasError && (
+        <div className="p-4 m-4 bg-red-500/20 text-red-400 rounded-md">
+          <p>{errorMessage || '加载聊天失败'}</p>
+        </div>
+      )}
 
-              {/* 输入区域 */}
-              <div className="p-2 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center bg-white dark:bg-gray-800 rounded-lg p-1">
+      {/* 消息区域 - 使用VirtuosoMessage组件 */}
+      {isMessagesInitialized ? (
+        <VirtuosoMessage<VirtuosoMessageItem, null>
+          ref={virtuosoRef}
+          className="flex-1 h-full bg-gray-100 dark:bg-gray-900"
+          computeItemKey={({ data }) => data.key}
+          ItemContent={({ data }) => (
+            <MessageItemContent
+              data={data}
+              contact={contact}
+              aiMembers={chatDetail?.members || []}
+            />
+          )}
+          initialData={messages}
+          initialLocation={{ index: 'LAST', align: 'end' }}
+        />
+      ) : (
+        <div className="flex-1 flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+          <p className="text-gray-500">加载消息...</p>
+        </div>
+      )}
+
+      {/* 输入区域 */}
+      <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center">
+          <div className="flex-1 relative">
+            <textarea
+              ref={inputRef}
+              className="w-full h-11 px-4 py-2 pr-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none resize-none"
+              placeholder="输入消息..."
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyPress}
+              disabled={isAIResponding || messageFetcher.state === 'submitting'}
+            />
+            <div className="absolute right-3 top-2 flex items-center space-x-2">
+              <Button variant="ghost" size="icon" className="text-gray-400 w-7 h-7">
+                <Smile size={18} />
+              </Button>
+            </div>
+          </div>
+          <div className="flex items-center ml-2">
+            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300 mx-1">
+              <Paperclip size={20} />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300 mx-1">
+              <Mic size={20} />
+            </Button>
+            <Button
+              className="bg-blue-500 hover:bg-blue-600 text-white ml-1 w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-50"
+              disabled={!inputValue.trim() || isAIResponding || messageFetcher.state === 'submitting'}
+              onClick={handleSend}
+            >
+              <Send size={18} />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex mt-2 px-2">
+          <div className="flex-1">
+            {messageFetcher.state === "submitting" && (
+              <div className="text-gray-500 text-xs">发送中...</div>
+            )}
+            
+            {hasError && (
+              <div className="text-red-500 text-xs">{errorMessage}</div>
+            )}
+
+            {/* 底部操作提示区 */}
+            <div className="flex justify-between">
+              {!inputValue.trim() && !isAIResponding && (
+                <>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="text-gray-500"
-                    disabled={isAIResponding}
+                    size="sm"
+                    className="text-gray-500 text-xs"
+                    onClick={() => setInputValue('')}
                   >
-                    <Smile size={20} />
+                    清空
                   </Button>
+                </>
+              )}
 
-                  <div className="flex-1 mx-1">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      className="w-full p-2 bg-transparent text-gray-800 dark:text-white focus:outline-none"
-                      placeholder={isAIResponding ? 'AI正在回复中...' : '输入消息...'}
-                      value={inputValue}
-                      onChange={e => setInputValue(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      disabled={false}
-                    />
+              {isAIResponding && (
+                <div className="flex items-center">
+                  <div className="text-gray-500 text-xs mr-2 flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+                    <div
+                      className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
+                      style={{ animationDelay: '0.2s' }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                      style={{ animationDelay: '0.4s' }}
+                    ></div>
                   </div>
-
-                  <div className="flex items-center">
-                    {!inputValue.trim() && !isAIResponding && (
-                      <>
-                        <Button variant="ghost" size="icon" className="text-gray-500">
-                          <Paperclip size={20} />
-                        </Button>
-
-                        <Button variant="ghost" size="icon" className="text-gray-500">
-                          <Mic size={20} />
-                        </Button>
-                      </>
-                    )}
-
-                    {inputValue.trim() && !isAIResponding && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-white bg-green-500 rounded-full p-1.5"
-                        onClick={handleSend}
-                      >
-                        <Send size={18} />
-                      </Button>
-                    )}
-
-                    {isAIResponding && (
-                      <div className="flex items-center">
-                        <div className="text-gray-500 text-xs mr-2 flex items-center">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                          <div
-                            className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
-                            style={{ animationDelay: '0.2s' }}
-                          ></div>
-                          <div
-                            className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
-                            style={{ animationDelay: '0.4s' }}
-                          ></div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-500 text-xs ml-1"
-                          onClick={cancelCurrentGeneration}
-                        >
-                          终止生成
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-500 text-xs ml-1"
+                    onClick={cancelCurrentGeneration}
+                  >
+                    终止生成
+                  </Button>
                 </div>
-              </div>
-            </>
+              )}
+            </div>
           </div>
-        ) : (
-          // 空白页面 - 不显示未找到聊天的提示
-          <div className="h-screen bg-white dark:bg-black"></div>
-        )}
-      </DelayedLoading>
-      {/* 聊天信息组件 - 条件渲染且浮动在上面 */}
-      {showChatInfo && (
-        <ChatInfoPage
-          onBack={() => setShowChatInfo(false)}
-          chatId={chatId}
-          onAddMember={handleAddMember}
-        />
+        </div>
+      </div>
+      
+      {/* 加载指示器 */}
+      {loading && showLoading && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/10">
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-12 h-12 border-4 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-300 font-medium">加载中...</p>
+          </div>
+        </div>
       )}
-
-      {/* 新聊天组件 - 条件渲染且浮动在上面 */}
-      {showNewChat && (
-        <NewChat
-          onBack={() => setShowNewChat(false)}
-          onComplete={handleSelectContacts}
-          preSelectedContactIds={
-            chatDetails[chatId]?.members?.map((member: ChatMember) => member.id) || []
-          }
-        />
-      )}
-    </>
+    </div>
   );
 };
 
-// 导出 ChatPageWrapper 作为默认组件
-export default ChatPageWrapper;
+// 导出聊天页面组件
+export default ChatPage;

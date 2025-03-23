@@ -2,17 +2,10 @@
  * 简单调试工具 - 提供全局访问各个store的功能
  */
 
-import { useAppStore } from '@/models/app.model';
-import { useChatStore } from '@/models/chat.model';
-import { useContactStore } from '@/models/contact.model';
-
 // 在开发环境中将store挂载到全局对象
 if (process.env.NODE_ENV === 'development') {
   // 定义全局调试对象
   window.__STORES__ = {
-    appStore: useAppStore,
-    chatStore: useChatStore,
-    contactStore: useContactStore
   };
   
   console.log(
@@ -26,9 +19,6 @@ if (process.env.NODE_ENV === 'development') {
 declare global {
   interface Window {
     __STORES__: {
-      appStore: typeof useAppStore;
-      chatStore: typeof useChatStore;
-      contactStore: typeof useContactStore;
     };
   }
 }

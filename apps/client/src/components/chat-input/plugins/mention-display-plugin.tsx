@@ -4,13 +4,23 @@ import { createPortal } from 'react-dom';
 import { ChatContact } from '..';
 import {
   COMMAND_PRIORITY_HIGH,
+  createCommand,
 } from 'lexical';
 import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
 import { SELECT_MENTION_COMMAND } from './mention-keyboard-plugin';
 import { CANCEL_MENTIONS_COMMAND } from './mention-cancellation-plugin';
 import { MentionList } from '../components/mention-list';
-import { MENTION_POSITION_UPDATE_COMMAND } from './mention-position-plugin';
-import { MENTION_FILTER_UPDATE_COMMAND } from './mention-filter-plugin';
+
+// 定义位置更新命令（避免循环依赖）
+export const MENTION_POSITION_UPDATE_COMMAND = createCommand<{
+  position: { left: number; top: number };
+}>();
+
+// 定义过滤更新命令（避免循环依赖）
+export const MENTION_FILTER_UPDATE_COMMAND = createCommand<{
+  searchText: string;
+  filteredContacts: ChatContact[];
+}>();
 
 interface MentionDisplayPluginProps {
   contacts: ChatContact[];
@@ -79,7 +89,9 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
     const removePositionUpdateListener = editor.registerCommand(
       MENTION_POSITION_UPDATE_COMMAND,
       (payload) => {
-        setPosition(payload.position);
+        if (payload && typeof payload === 'object' && 'position' in payload) {
+          setPosition(payload.position);
+        }
         return false; // 不阻止其他插件处理
       },
       COMMAND_PRIORITY_HIGH
@@ -89,12 +101,13 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
     const removeFilterUpdateListener = editor.registerCommand(
       MENTION_FILTER_UPDATE_COMMAND,
       (payload) => {
-        setSearchText(payload.searchText);
-        setFilteredContacts(payload.filteredContacts);
-        
-        // 重置选中项
-        setSelectedIndex(0);
-        
+        if (payload && typeof payload === 'object' && 'searchText' in payload && 'filteredContacts' in payload) {
+          setSearchText(payload.searchText);
+          setFilteredContacts(payload.filteredContacts);
+          
+          // 重置选中项
+          setSelectedIndex(0);
+        }
         return false; // 不阻止其他插件处理
       },
       COMMAND_PRIORITY_HIGH
@@ -162,13 +175,17 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
   
   return dropdownOpen && portalRef.current
     ? createPortal(
-        <div style={{ 
-          position: 'fixed', 
-          left: `${position.left}px`, 
-          top: `${position.top}px`, 
-          zIndex: 9999, 
-          transformOrigin: 'top left' 
-        }}>
+        <div 
+          className="mention-list-portal"
+          style={{ 
+            position: 'fixed', 
+            left: `${position.left}px`, 
+            top: `${position.top}px`, 
+            zIndex: 9999, 
+            transformOrigin: 'top left',
+            maxWidth: '90vw'
+          }}
+        >
           <MentionList 
             contacts={filteredContacts}
             searchText={searchText}

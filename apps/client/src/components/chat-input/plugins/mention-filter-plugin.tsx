@@ -3,16 +3,10 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { ChatContact } from '..';
 import {
   COMMAND_PRIORITY_HIGH,
-  createCommand,
 } from 'lexical';
 import { MENTION_CONTENT_UPDATE_COMMAND } from './mention-content-tracker-plugin';
 import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
-
-// 定义过滤更新命令
-export const MENTION_FILTER_UPDATE_COMMAND = createCommand<{
-  searchText: string;
-  filteredContacts: ChatContact[];
-}>();
+import { MENTION_FILTER_UPDATE_COMMAND } from './mention-display-plugin';
 
 interface MentionFilterPluginProps {
   contacts: ChatContact[];

@@ -39,22 +39,35 @@
 flowchart TD
     MentionTriggerPlugin[MentionTriggerPlugin\n监听@符号输入] -- "触发@命令" --> MentionContentTrackerPlugin[MentionContentTrackerPlugin\n追踪@后内容]
     
-    MentionContentTrackerPlugin -- "内容更新命令" --> MentionListPlugin[MentionListPlugin\n显示和过滤联系人列表]
+    MentionContentTrackerPlugin -- "内容更新命令" --> MentionFilterPlugin[MentionFilterPlugin\n过滤联系人列表]
     
-    MentionListPlugin -- "键盘导航请求" --> MentionKeyboardPlugin[MentionKeyboardPlugin\n键盘导航]
+    MentionFilterPlugin -- "过滤更新命令" --> MentionDisplayPlugin[MentionDisplayPlugin\n显示联系人列表]
+    
+    MentionContentTrackerPlugin -- "内容更新命令" --> MentionPositionPlugin[MentionPositionPlugin\n计算列表位置]
+    
+    MentionPositionPlugin -- "位置更新命令" --> MentionDisplayPlugin
+    
+    MentionDisplayPlugin -- "键盘导航请求" --> MentionKeyboardPlugin[MentionKeyboardPlugin\n键盘导航]
     
     MentionKeyboardPlugin -- "选择联系人命令" --> MentionTransformsPlugin[MentionTransformsPlugin\n创建提及节点]
     MentionTransformsPlugin -- "创建提及节点" --> MentionNodePlugin[MentionNodePlugin\n渲染节点]
     
     MentionTriggerPlugin -- "监听" --> MentionCancellationPlugin[MentionCancellationPlugin\n取消提及]
-    MentionCancellationPlugin -- "取消命令" --> MentionListPlugin
+    MentionCancellationPlugin -- "取消命令" --> MentionDisplayPlugin
+    
+    MentionListPlugin[MentionListPlugin\n聚合插件] -. "包含" .-> MentionDisplayPlugin
+    MentionListPlugin -. "包含" .-> MentionFilterPlugin
+    MentionListPlugin -. "包含" .-> MentionPositionPlugin
     
     classDef functionality fill:#4682b4,stroke:#fff,stroke-width:1px,color:#fff
     classDef utility fill:#2e8b57,stroke:#fff,stroke-width:1px,color:#fff
     classDef core fill:#9932cc,stroke:#fff,stroke-width:1px,color:#fff
+    classDef composite fill:#ff7f50,stroke:#fff,stroke-width:1px,color:#fff
     
     class MentionTriggerPlugin,MentionContentTrackerPlugin,MentionCancellationPlugin core
-    class MentionListPlugin,MentionKeyboardPlugin,MentionTransformsPlugin,MentionNodePlugin functionality
+    class MentionKeyboardPlugin,MentionTransformsPlugin,MentionNodePlugin functionality
+    class MentionDisplayPlugin,MentionFilterPlugin,MentionPositionPlugin utility
+    class MentionListPlugin composite
 ```
 
 ### 插件详细说明
@@ -77,24 +90,40 @@ flowchart TD
    - 监测@后是否输入了空格或ESC键
    - 触发取消提及命令
 
-4. `MentionListPlugin`: 
-   - 显示联系人列表
-   - 实时过滤匹配联系人
-   - 处理联系人选择
-   - 管理下拉列表位置和显示逻辑
+4. `MentionDisplayPlugin`: 
+   - 负责显示和隐藏联系人列表
+   - 处理联系人选择逻辑
+   - 管理下拉列表DOM渲染
+   - 处理点击外部关闭列表
 
-5. `MentionKeyboardPlugin`:
+5. `MentionFilterPlugin`:
+   - 监听内容更新并过滤联系人
+   - 根据搜索文本过滤联系人列表
+   - 通知显示插件过滤后的结果
+
+6. `MentionPositionPlugin`:
+   - 计算下拉列表的最佳位置
+   - 确保列表在视窗内
+   - 窗口大小变化时重新计算位置
+   - 通知显示插件更新位置
+
+7. `MentionListPlugin`（聚合插件）:
+   - 整合显示、过滤和位置三个子插件
+   - 提供统一接口，简化使用
+   - 向下兼容原有API
+
+8. `MentionKeyboardPlugin`:
    - 处理键盘导航逻辑
    - 响应上下键移动选择
    - 管理回车选择联系人
    - 处理Tab和Esc键的行为
 
-6. `MentionTransformsPlugin`:
+9. `MentionTransformsPlugin`:
    - 创建提及节点并替换文本
    - 确保节点的正确位置和结构
    - 处理内容插入后的光标位置
 
-7. `MentionNodePlugin`:
+10. `MentionNodePlugin`:
    - 负责提及节点的视觉渲染
    - 处理提及节点的删除操作
    - 确保整体删除行为

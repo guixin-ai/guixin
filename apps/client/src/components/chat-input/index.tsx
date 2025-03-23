@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -11,11 +11,13 @@ import {
   $createTextNode
 } from 'lexical';
 import {
-  MentionsPlugin,
-  KeyboardPlugin,
   EditorRefPlugin,
   OnChangePlugin,
+  MentionTriggerPlugin,
+  MentionListPlugin,
+  MentionKeyboardPlugin,
   MentionTransformsPlugin,
+  MentionNodePlugin
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -39,7 +41,22 @@ export interface ChatInputProps {
   children?: React.ReactNode; // 添加对子组件的支持，用于传入额外插件
 }
 
-// 主聊天输入组件
+/**
+ * 聊天输入组件
+ * 
+ * 主要功能：
+ * 1. 基本文本输入 - 支持普通文本输入
+ * 2. @提及功能 - 支持@联系人，显示下拉菜单并选择
+ * 3. 自动聚焦 - 可通过autoFocus属性控制是否自动获取焦点
+ * 4. 初始内容 - 通过initialContent可设置初始文本
+ * 
+ * 提及功能使用细粒度的插件结构：
+ * - MentionTriggerPlugin: 监听@符号输入，触发提及功能
+ * - MentionListPlugin: 显示和管理联系人列表
+ * - MentionKeyboardPlugin: 处理键盘导航（上/下/回车）
+ * - MentionTransformsPlugin: 将@文本转换为提及节点
+ * - MentionNodePlugin: 处理提及节点的特殊行为
+ */
 export function ChatInput({
   onChange,
   initialContent = '',
@@ -129,12 +146,12 @@ export function ChatInput({
           {/* 根据参数控制是否添加自动聚焦插件 */}
           {autoFocus && <AutoFocusPlugin defaultSelection="rootEnd" />}
 
-          {/* 核心功能插件 */}
-          <MentionsPlugin contacts={contacts} />
-          <KeyboardPlugin />
-
-          {/* MentionTransformsPlugin已被修改，不再提供自动转换功能 */}
+          {/* 提及功能插件组 */}
+          <MentionTriggerPlugin />
+          <MentionListPlugin contacts={contacts} />
+          <MentionKeyboardPlugin />
           <MentionTransformsPlugin contacts={contacts} />
+          <MentionNodePlugin />
 
           {/* 工具和引用插件 */}
           <EditorRefPlugin onRef={handleEditorRef} />

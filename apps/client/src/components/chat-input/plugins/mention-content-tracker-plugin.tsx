@@ -1,20 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { 
+import {
   TextNode,
   $getSelection,
   $isRangeSelection,
-  createCommand,
-  LexicalCommand,
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
-import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
-
-// 定义一个新命令，用于传递@后面的文本和位置
-export const MENTION_CONTENT_UPDATE_COMMAND: LexicalCommand<{
-  searchText: string;
-  anchor: { left: number; top: number; height: number } | null;
-}> = createCommand('MENTION_CONTENT_UPDATE_COMMAND');
+import { 
+  SHOW_MENTIONS_COMMAND,
+  CANCEL_MENTIONS_COMMAND,
+  MENTION_CONTENT_UPDATE_COMMAND
+} from '../commands';
 
 /**
  * 提及内容追踪插件
@@ -26,38 +22,31 @@ export function MentionContentTrackerPlugin() {
   const [editor] = useLexicalComposerContext();
   const [isTracking, setIsTracking] = useState(false);
   
-  // 获取光标位置
-  const getCursorPosition = () => {
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      
-      if (rect.width > 0 || rect.height > 0) {
-        return {
-          left: rect.right,
-          top: rect.bottom,
-          height: rect.height,
-        };
-      }
-    }
-    return null;
-  };
-  
   useEffect(() => {
-    // 监听提及显示命令，开始追踪
-    const removeShowMentionsListener = editor.registerCommand(
+    if (!editor) return;
+    
+    // 监听显示提及命令，开始跟踪输入内容
+    const startTrackingListener = editor.registerCommand(
       SHOW_MENTIONS_COMMAND,
       () => {
-        // 开始追踪
         setIsTracking(true);
         return false; // 不阻止其他插件处理
       },
       COMMAND_PRIORITY_HIGH
     );
     
-    // 监听编辑器内容变化，计算@后的内容
-    const removeUpdateListener = editor.registerUpdateListener(({ editorState }) => {
+    // 监听取消提及命令，停止跟踪
+    const stopTrackingListener = editor.registerCommand(
+      CANCEL_MENTIONS_COMMAND,
+      () => {
+        setIsTracking(false);
+        return false; // 不阻止其他插件处理
+      },
+      COMMAND_PRIORITY_HIGH
+    );
+    
+    // 监听编辑器内容变化，提取@后面的内容
+    const updateListener = editor.registerUpdateListener(({ editorState }) => {
       if (!isTracking) return;
       
       editorState.read(() => {
@@ -71,36 +60,40 @@ export function MentionContentTrackerPlugin() {
           const textContent = anchorNode.getTextContent();
           const offset = anchor.offset;
           
-          // 找到最后一个@符号
-          const lastAtPos = textContent.lastIndexOf('@', offset);
+          // 查找@符号位置
+          const lastAtPos = textContent.lastIndexOf('@', offset - 1);
           
-          if (lastAtPos === -1) {
-            // 如果没有找到@符号，停止追踪
+          if (lastAtPos !== -1) {
+            // 提取@后面到光标位置的文本内容
+            const searchText = textContent.substring(lastAtPos + 1, offset);
+            
+            // 如果没有空格，发送更新命令
+            if (!searchText.includes(' ')) {
+              editor.dispatchCommand(MENTION_CONTENT_UPDATE_COMMAND, {
+                searchText,
+              });
+            } else {
+              // 如果有空格，取消提及状态
+              editor.dispatchCommand(CANCEL_MENTIONS_COMMAND, undefined);
+              setIsTracking(false);
+            }
+          } else {
+            // 如果找不到@符号，取消提及状态
+            editor.dispatchCommand(CANCEL_MENTIONS_COMMAND, undefined);
             setIsTracking(false);
-            return;
           }
-          
-          // 如果找到@符号，计算@后面的文本
-          const searchText = textContent.substring(lastAtPos + 1, offset);
-          
-          // 获取当前光标位置
-          const currentPosition = getCursorPosition();
-          
-          // 发送更新命令
-          editor.dispatchCommand(MENTION_CONTENT_UPDATE_COMMAND, {
-            searchText,
-            anchor: currentPosition
-          });
         } else {
-          // 如果不是文本节点，停止追踪
+          // 如果不是文本节点，取消提及状态
+          editor.dispatchCommand(CANCEL_MENTIONS_COMMAND, undefined);
           setIsTracking(false);
         }
       });
     });
     
     return () => {
-      removeShowMentionsListener();
-      removeUpdateListener();
+      startTrackingListener();
+      stopTrackingListener();
+      updateListener();
     };
   }, [editor, isTracking]);
   

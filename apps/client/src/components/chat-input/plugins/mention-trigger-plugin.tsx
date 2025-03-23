@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { KEY_DOWN_COMMAND, COMMAND_PRIORITY_NORMAL, createCommand, LexicalCommand } from 'lexical';
-
-// 定义显示提及命令
-export const SHOW_MENTIONS_COMMAND: LexicalCommand<void> = createCommand('SHOW_MENTIONS_COMMAND');
+import { KEY_DOWN_COMMAND, COMMAND_PRIORITY_NORMAL } from 'lexical';
+import { SHOW_MENTIONS_COMMAND } from '../commands';
 
 /**
  * 提及触发插件

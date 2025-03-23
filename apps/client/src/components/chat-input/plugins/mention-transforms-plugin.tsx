@@ -7,10 +7,14 @@ import {
   $createTextNode,
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
-import { SELECT_MENTION_COMMAND } from './mention-keyboard-plugin';
+import { SELECT_MENTION_COMMAND } from '../commands';
 import { $createMentionNode } from '../nodes';
 import { ChatContact } from '..';
 
+/**
+ * 提及转换插件
+ * 负责将选择的联系人转换为提及节点
+ */
 export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] }) {
   const [editor] = useLexicalComposerContext();
   
@@ -61,12 +65,12 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
               }
             }
           }
-          
-          // 确保编辑器保持焦点
-          setTimeout(() => {
-            editor.focus();
-          }, 0);
         });
+        
+        // 确保编辑器保持焦点
+        setTimeout(() => {
+          editor.focus();
+        }, 0);
         
         return true;
       },

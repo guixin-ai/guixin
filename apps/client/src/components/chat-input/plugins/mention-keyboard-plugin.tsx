@@ -11,9 +11,7 @@ import {
   LexicalCommand
 } from 'lexical';
 import { ChatContact } from '..';
-
-// 创建选择提及命令
-export const SELECT_MENTION_COMMAND: LexicalCommand<ChatContact> = createCommand('SELECT_MENTION_COMMAND');
+import { SELECT_MENTION_COMMAND } from '../commands';
 
 // 创建移动提及选择命令
 export const MOVE_MENTION_SELECTION_COMMAND: LexicalCommand<'up' | 'down'> = createCommand('MOVE_MENTION_SELECTION_COMMAND');

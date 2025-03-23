@@ -4,17 +4,15 @@ import {
   TextNode,
   $getSelection,
   $isRangeSelection,
-  createCommand,
-  LexicalCommand,
   COMMAND_PRIORITY_HIGH,
   BLUR_COMMAND,
   KEY_BACKSPACE_COMMAND,
   KEY_ESCAPE_COMMAND,
 } from 'lexical';
-import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
-
-// 定义一个取消提及的命令
-export const CANCEL_MENTIONS_COMMAND: LexicalCommand<void> = createCommand('CANCEL_MENTIONS_COMMAND');
+import { 
+  SHOW_MENTIONS_COMMAND,
+  CANCEL_MENTIONS_COMMAND 
+} from '../commands';
 
 /**
  * 提及取消插件

@@ -2,25 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { createPortal } from 'react-dom';
 import { ChatContact } from '..';
-import {
-  COMMAND_PRIORITY_HIGH,
-  createCommand,
-} from 'lexical';
-import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
-import { SELECT_MENTION_COMMAND } from './mention-keyboard-plugin';
-import { CANCEL_MENTIONS_COMMAND } from './mention-cancellation-plugin';
+import { COMMAND_PRIORITY_HIGH } from 'lexical';
+import { 
+  SHOW_MENTIONS_COMMAND, 
+  SELECT_MENTION_COMMAND, 
+  CANCEL_MENTIONS_COMMAND,
+  MENTION_POSITION_UPDATE_COMMAND,
+  MENTION_FILTER_UPDATE_COMMAND
+} from '../commands';
 import { MentionList } from '../components/mention-list';
-
-// 定义位置更新命令（避免循环依赖）
-export const MENTION_POSITION_UPDATE_COMMAND = createCommand<{
-  position: { left: number; top: number };
-}>();
-
-// 定义过滤更新命令（避免循环依赖）
-export const MENTION_FILTER_UPDATE_COMMAND = createCommand<{
-  searchText: string;
-  filteredContacts: ChatContact[];
-}>();
 
 interface MentionDisplayPluginProps {
   contacts: ChatContact[];

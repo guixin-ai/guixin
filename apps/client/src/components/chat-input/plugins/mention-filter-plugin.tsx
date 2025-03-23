@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { ChatContact } from '..';
-import {
-  COMMAND_PRIORITY_HIGH,
-} from 'lexical';
-import { MENTION_CONTENT_UPDATE_COMMAND } from './mention-content-tracker-plugin';
-import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
-import { MENTION_FILTER_UPDATE_COMMAND } from './mention-display-plugin';
+import { COMMAND_PRIORITY_HIGH } from 'lexical';
+import { 
+  MENTION_CONTENT_UPDATE_COMMAND,
+  SHOW_MENTIONS_COMMAND,
+  MENTION_FILTER_UPDATE_COMMAND
+} from '../commands';
 
 interface MentionFilterPluginProps {
   contacts: ChatContact[];

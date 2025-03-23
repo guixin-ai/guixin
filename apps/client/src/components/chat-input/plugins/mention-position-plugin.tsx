@@ -1,11 +1,11 @@
 import { useCallback, useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import {
-  COMMAND_PRIORITY_HIGH,
-} from 'lexical';
-import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
-import { MENTION_CONTENT_UPDATE_COMMAND } from './mention-content-tracker-plugin';
-import { MENTION_POSITION_UPDATE_COMMAND } from './mention-display-plugin';
+import { COMMAND_PRIORITY_HIGH } from 'lexical';
+import { 
+  SHOW_MENTIONS_COMMAND,
+  MENTION_CONTENT_UPDATE_COMMAND,
+  MENTION_POSITION_UPDATE_COMMAND
+} from '../commands';
 
 /**
  * 提及位置插件
@@ -109,7 +109,7 @@ export function MentionPositionPlugin() {
     const removeContentUpdateListener = editor.registerCommand(
       MENTION_CONTENT_UPDATE_COMMAND,
       () => {
-        // 更新位置
+        // 实时获取当前光标位置并更新
         updatePosition();
         return false; // 不阻止其他插件处理
       },

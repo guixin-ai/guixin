@@ -37,31 +37,24 @@
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#242424', 'primaryTextColor': '#fff', 'primaryBorderColor': '#888', 'lineColor': '#d3d3d3', 'secondaryColor': '#2b2b2b', 'tertiaryColor': '#353535'}}}%%
 flowchart TD
-    MentionTriggerPlugin[MentionTriggerPlugin\n监听@符号输入] -- "触发@命令和位置信息" --> MentionListPlugin[MentionListPlugin\n显示联系人列表]
+    MentionTriggerPlugin[MentionTriggerPlugin\n监听@符号输入] -- "触发@命令" --> MentionContentTrackerPlugin[MentionContentTrackerPlugin\n追踪@后内容]
     
-    MentionListPlugin -- "过滤请求" --> MentionFilterPlugin[MentionFilterPlugin\n过滤联系人]
-    MentionListPlugin -- "键盘导航请求" --> MentionKeyboardNavigationPlugin[MentionKeyboardNavigationPlugin\n键盘导航]
+    MentionContentTrackerPlugin -- "内容更新命令" --> MentionListPlugin[MentionListPlugin\n显示和过滤联系人列表]
     
-    MentionKeyboardNavigationPlugin -- "选择联系人命令" --> MentionNodeTransformerPlugin[MentionNodeTransformerPlugin\n创建提及节点]
-    MentionNodeTransformerPlugin -- "创建提及节点" --> MentionNodeRenderPlugin[MentionNodeRenderPlugin\n渲染节点]
-    MentionNodeTransformerPlugin --> MentionClickHandler[MentionClickHandler\n点击处理]
+    MentionListPlugin -- "键盘导航请求" --> MentionKeyboardPlugin[MentionKeyboardPlugin\n键盘导航]
     
-    MentionNodeRenderPlugin <--> MentionNodeDeletionPlugin[MentionNodeDeletionPlugin\n删除处理]
+    MentionKeyboardPlugin -- "选择联系人命令" --> MentionTransformsPlugin[MentionTransformsPlugin\n创建提及节点]
+    MentionTransformsPlugin -- "创建提及节点" --> MentionNodePlugin[MentionNodePlugin\n渲染节点]
     
-    MentionNodeRenderPlugin -- "渲染提及节点" --> MentionSerializationPlugin[MentionSerializationPlugin\n序列化处理]
-    MentionSerializationPlugin <--> MentionHistoryPlugin[MentionHistoryPlugin\n历史记录]
-    MentionHistoryPlugin <--> MentionEventsPlugin[MentionEventsPlugin\n事件通知]
-    
-    MentionSerializationPlugin & MentionHistoryPlugin & MentionEventsPlugin --> MentionFocusPlugin[MentionFocusPlugin\n焦点管理]
-    MentionSerializationPlugin & MentionHistoryPlugin & MentionEventsPlugin --> MentionAccessibilityPlugin[MentionAccessibilityPlugin\n无障碍支持]
-    
-    MentionFocusPlugin --> MentionDebugPlugin[MentionDebugPlugin\n调试工具]
+    MentionTriggerPlugin -- "监听" --> MentionCancellationPlugin[MentionCancellationPlugin\n取消提及]
+    MentionCancellationPlugin -- "取消命令" --> MentionListPlugin
     
     classDef functionality fill:#4682b4,stroke:#fff,stroke-width:1px,color:#fff
     classDef utility fill:#2e8b57,stroke:#fff,stroke-width:1px,color:#fff
+    classDef core fill:#9932cc,stroke:#fff,stroke-width:1px,color:#fff
     
-    class MentionTriggerPlugin,MentionListPlugin,MentionFilterPlugin,MentionKeyboardNavigationPlugin,MentionNodeTransformerPlugin,MentionClickHandler,MentionNodeRenderPlugin,MentionNodeDeletionPlugin functionality
-    class MentionSerializationPlugin,MentionHistoryPlugin,MentionEventsPlugin,MentionFocusPlugin,MentionAccessibilityPlugin,MentionDebugPlugin utility
+    class MentionTriggerPlugin,MentionContentTrackerPlugin,MentionCancellationPlugin core
+    class MentionListPlugin,MentionKeyboardPlugin,MentionTransformsPlugin,MentionNodePlugin functionality
 ```
 
 ### 插件详细说明
@@ -70,72 +63,42 @@ flowchart TD
 
 1. `MentionTriggerPlugin`: 
    - 监听@符号输入
-   - 检测触发条件并获取位置
+   - 触发提及功能
    - 发送命令通知其他插件
 
-2. `MentionListPlugin`: 
+2. `MentionContentTrackerPlugin`: 
+   - 监听SHOW_MENTIONS_COMMAND命令
+   - 追踪@后内容变化
+   - 实时计算和传递搜索文本
+
+3. `MentionCancellationPlugin`:
+   - 监听失去焦点事件
+   - 监测@符号是否被删除
+   - 监测@后是否输入了空格或ESC键
+   - 触发取消提及命令
+
+4. `MentionListPlugin`: 
    - 显示联系人列表
-   - 处理选择
-   - 提供列表UI组件和定位逻辑
+   - 实时过滤匹配联系人
+   - 处理联系人选择
+   - 管理下拉列表位置和显示逻辑
 
-3. `MentionFilterPlugin`:
-   - 处理输入文本的过滤逻辑
-   - 实时匹配联系人数据
-   - 返回过滤后的联系人列表
-
-4. `MentionKeyboardNavigationPlugin`:
-   - 专门处理键盘导航逻辑
+5. `MentionKeyboardPlugin`:
+   - 处理键盘导航逻辑
    - 响应上下键移动选择
-   - 管理回车、Tab和Esc键的行为
+   - 管理回车选择联系人
+   - 处理Tab和Esc键的行为
 
-5. `MentionClickHandler`:
-   - 处理鼠标点击选择联系人
-   - 管理悬停效果和交互反馈
-
-6. `MentionNodeTransformerPlugin`:
+6. `MentionTransformsPlugin`:
    - 创建提及节点并替换文本
    - 确保节点的正确位置和结构
    - 处理内容插入后的光标位置
 
-7. `MentionNodeDeletionPlugin`:
-   - 专门处理提及节点的删除操作
-   - 确保整体删除行为
-   - 处理退格和删除键的特殊逻辑
-
-8. `MentionNodeRenderPlugin`:
+7. `MentionNodePlugin`:
    - 负责提及节点的视觉渲染
+   - 处理提及节点的删除操作
+   - 确保整体删除行为
    - 提供节点的DOM元素
-   - 处理不同环境下的显示
-
-9. `MentionSerializationPlugin`:
-   - 处理节点的序列化和反序列化
-   - 确保提及信息在保存后可恢复
-   - 提供数据转换格式接口
-
-10. `MentionHistoryPlugin`:
-    - 记录与提及相关的历史操作
-    - 确保撤销/重做正确处理提及节点
-    - 维护编辑状态的一致性
-
-11. `MentionEventsPlugin`:
-    - 对外暴露提及相关的事件
-    - 提供选择、创建、删除提及的回调
-    - 允许外部组件响应提及操作
-
-12. `MentionFocusPlugin`:
-    - 管理提及节点的焦点状态
-    - 处理点击提及节点的特殊反馈
-    - 提供悬停和选中状态
-
-13. `MentionDebugPlugin`:
-    - 开发调试工具
-    - 记录提及相关的状态变化
-    - 提供日志和错误处理
-
-14. `MentionAccessibilityPlugin`:
-    - 提供无障碍支持
-    - 添加适当的ARIA属性
-    - 确保键盘可访问性
 
 ### 辅助插件
 
@@ -154,6 +117,7 @@ flowchart TD
 3. 使用上/下方向键导航列表，回车或点击选择联系人
 4. 选中后，@文本会转换为带特殊样式的提及节点
 5. 删除提及时会整体删除该节点
+6. 删除@符号或输入空格时，会自动取消提及状态
 
 ## API
 

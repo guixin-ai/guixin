@@ -17,7 +17,9 @@ import {
   MentionListPlugin,
   MentionKeyboardPlugin,
   MentionTransformsPlugin,
-  MentionNodePlugin
+  MentionNodePlugin,
+  MentionContentTrackerPlugin,
+  MentionCancellationPlugin
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -52,10 +54,12 @@ export interface ChatInputProps {
  * 
  * 提及功能使用细粒度的插件结构：
  * - MentionTriggerPlugin: 监听@符号输入，触发提及功能
+ * - MentionContentTrackerPlugin: 追踪@后的内容变化
  * - MentionListPlugin: 显示和管理联系人列表
  * - MentionKeyboardPlugin: 处理键盘导航（上/下/回车）
  * - MentionTransformsPlugin: 将@文本转换为提及节点
  * - MentionNodePlugin: 处理提及节点的特殊行为
+ * - MentionCancellationPlugin: 处理取消提及的情况
  */
 export function ChatInput({
   onChange,
@@ -148,10 +152,12 @@ export function ChatInput({
 
           {/* 提及功能插件组 */}
           <MentionTriggerPlugin />
+          <MentionContentTrackerPlugin />
           <MentionListPlugin contacts={contacts} />
-          <MentionKeyboardPlugin />
+          <MentionKeyboardPlugin isDropdownOpen={true} />
           <MentionTransformsPlugin contacts={contacts} />
           <MentionNodePlugin />
+          <MentionCancellationPlugin />
 
           {/* 工具和引用插件 */}
           <EditorRefPlugin onRef={handleEditorRef} />

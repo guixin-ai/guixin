@@ -6,88 +6,25 @@ import {
   COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_LOW,
 } from 'lexical';
-import { 
-  SHOW_MENTIONS_COMMAND, 
-  MENTION_POSITION_COMMAND 
-} from './mention-trigger-plugin';
+import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
 import { SELECT_MENTION_COMMAND } from './mention-keyboard-plugin';
-
-// 联系人列表组件
-interface MentionListProps {
-  contacts: ChatContact[];
-  searchText: string;
-  selectedIndex: number;
-  onSelectContact: (contact: ChatContact) => void;
-}
-
-// 联系人列表组件
-function MentionList({ 
-  contacts, 
-  searchText, 
-  selectedIndex, 
-  onSelectContact 
-}: MentionListProps) {
-  // 过滤联系人
-  const filteredContacts = contacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    contact.id.toLowerCase().includes(searchText.toLowerCase())
-  );
-  
-  // 如果没有匹配的联系人，不显示列表
-  if (filteredContacts.length === 0) {
-    return null;
-  }
-  
-  return (
-    <div className="absolute z-10 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 w-64 max-h-60 overflow-y-auto">
-      {filteredContacts.length === 0 ? (
-        <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
-          未找到匹配的联系人
-        </div>
-      ) : (
-        filteredContacts.map((contact, index) => (
-          <div
-            key={contact.id}
-            className={`px-3 py-2 flex items-center cursor-pointer ${
-              index === selectedIndex
-                ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700/30'
-            }`}
-            onClick={() => onSelectContact(contact)}
-          >
-            {contact.avatar ? (
-              <img
-                src={contact.avatar}
-                alt={contact.name}
-                className="w-6 h-6 rounded-full mr-2"
-              />
-            ) : (
-              <div className={`w-6 h-6 rounded-full mr-2 flex items-center justify-center text-xs ${
-                contact.isAI 
-                  ? 'bg-purple-100 dark:bg-purple-800/30 text-purple-700 dark:text-purple-300' 
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}>
-                {contact.name[0]}
-              </div>
-            )}
-            <div className="flex-1 flex flex-col">
-              <span className="text-sm font-medium">{contact.name}</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {contact.isAI ? 'AI助手' : '联系人'}
-              </span>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
+import { MENTION_CONTENT_UPDATE_COMMAND } from './mention-content-tracker-plugin';
+import { CANCEL_MENTIONS_COMMAND } from './mention-cancellation-plugin';
+import { MentionList } from '../components/mention-list';
 
 interface MentionListPluginProps {
   contacts: ChatContact[];
   onSelectMention?: (contact: ChatContact) => void;
 }
 
+/**
+ * 提及列表插件
+ * 负责：
+ * 1. 监听显示提及命令并显示联系人列表
+ * 2. 监听内容更新并过滤联系人
+ * 3. 监听取消命令并隐藏列表
+ * 4. 处理联系人选择
+ */
 export function MentionListPlugin({ contacts, onSelectMention }: MentionListPluginProps) {
   const [editor] = useLexicalComposerContext();
   const [searchText, setSearchText] = useState('');
@@ -110,7 +47,72 @@ export function MentionListPlugin({ contacts, onSelectMention }: MentionListPlug
     setDropdownOpen(false);
   }, [editor, onSelectMention]);
   
-  // 监听显示提及命令
+  // 获取光标位置
+  const getCursorPosition = useCallback(() => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      if (rect.width > 0 || rect.height > 0) {
+        return {
+          left: rect.right,
+          top: rect.bottom,
+          height: rect.height,
+        };
+      }
+    }
+    return null;
+  }, []);
+  
+  // 计算下拉列表位置，确保它在视窗内
+  const calculateDropdownPosition = useCallback((anchorPosition: { 
+    left: number; 
+    top: number; 
+    height: number 
+  } | null) => {
+    if (!anchorPosition) return { left: 0, top: 0 };
+    
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // 使用光标在视口中的位置
+    let left = anchorPosition.left;
+    let top = anchorPosition.top;
+    
+    // 添加固定的边距
+    const MARGIN = 4;
+    
+    // 宽度和高度的估计值
+    const estimatedWidth = 280;
+    const estimatedHeight = 250;
+    
+    // 检查是否会超出右边界，如果是，则向左调整
+    if (left + estimatedWidth + MARGIN > viewportWidth) {
+      left = Math.max(MARGIN, viewportWidth - estimatedWidth - MARGIN);
+    }
+    
+    // 确保不会超出左边界
+    if (left < MARGIN) {
+      left = MARGIN;
+    }
+    
+    // 检查底部溢出
+    const bottomSpace = viewportHeight - top;
+    if (bottomSpace < estimatedHeight) {
+      // 如果下方空间不足，将下拉列表放在光标上方
+      top = top - estimatedHeight - anchorPosition.height;
+      
+      // 如果上方空间也不足，放在可能的最佳位置
+      if (top < 0) {
+        top = Math.min(anchorPosition.top, viewportHeight - estimatedHeight - MARGIN);
+      }
+    }
+    
+    return { left, top };
+  }, []);
+  
+  // 监听显示提及命令、取消命令和内容更新命令
   useEffect(() => {
     if (!editor) return;
     
@@ -121,30 +123,62 @@ export function MentionListPlugin({ contacts, onSelectMention }: MentionListPlug
       document.body.appendChild(portalRef.current);
     }
     
-    // 监听显示提及命令
+    // 监听显示提及命令 - 从MentionTriggerPlugin触发
     const removeShowListener = editor.registerCommand(
       SHOW_MENTIONS_COMMAND,
       () => {
+        // 初始化搜索文本和选中项
         setSearchText('');
         setSelectedIndex(0);
+        
+        // 获取最新的光标位置
+        const cursorPosition = getCursorPosition();
+        
+        // 如果有位置信息，则更新位置
+        if (cursorPosition) {
+          setPosition(calculateDropdownPosition(cursorPosition));
+        }
+        
+        // 显示下拉列表
         setDropdownOpen(true);
-        return true;
+        return false; // 不阻止其他插件处理
       },
       COMMAND_PRIORITY_HIGH
     );
     
-    // 监听位置更新命令
-    const removePositionListener = editor.registerCommand(
-      MENTION_POSITION_COMMAND,
-      ({ left, top, text }) => {
-        setPosition({ left, top });
-        setSearchText(text);
+    // 监听内容更新命令 - 从MentionContentTrackerPlugin触发
+    const removeContentUpdateListener = editor.registerCommand(
+      MENTION_CONTENT_UPDATE_COMMAND,
+      (payload) => {
+        // 更新搜索文本
+        setSearchText(payload.searchText);
         
-        // 联系人列表保持打开状态
-        setDropdownOpen(true);
-        return true;
+        // 重置选中项
+        setSelectedIndex(0);
+        
+        // 获取最新的光标位置
+        const cursorPosition = getCursorPosition() || payload.anchor;
+        
+        // 如果有位置信息，则更新位置
+        if (cursorPosition) {
+          setPosition(calculateDropdownPosition(cursorPosition));
+        }
+        
+        return false; // 不阻止其他插件处理
       },
       COMMAND_PRIORITY_LOW
+    );
+    
+    // 监听取消提及命令 - 从MentionCancellationPlugin触发
+    const removeCancelListener = editor.registerCommand(
+      CANCEL_MENTIONS_COMMAND,
+      () => {
+        console.log('处理 CANCEL_MENTIONS_COMMAND：隐藏下拉列表');
+        // 关闭下拉列表
+        setDropdownOpen(false);
+        return true; // 阻止其他处理，确保命令被消费
+      },
+      COMMAND_PRIORITY_HIGH // 提高优先级，确保命令被正确处理
     );
     
     // 选择联系人处理
@@ -170,11 +204,25 @@ export function MentionListPlugin({ contacts, onSelectMention }: MentionListPlug
     
     document.addEventListener('mousedown', handleClickOutside);
     
+    // 窗口大小变化时重新计算位置
+    const handleResize = () => {
+      if (dropdownOpen) {
+        const cursorPosition = getCursorPosition();
+        if (cursorPosition) {
+          setPosition(calculateDropdownPosition(cursorPosition));
+        }
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
     return () => {
       removeShowListener();
-      removePositionListener();
+      removeContentUpdateListener();
+      removeCancelListener();
       removeSelectListener();
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', handleResize);
       
       // 清理门户元素
       if (portalRef.current) {
@@ -182,7 +230,7 @@ export function MentionListPlugin({ contacts, onSelectMention }: MentionListPlug
         portalRef.current = null;
       }
     };
-  }, [editor, dropdownOpen, handleSelectContact]);
+  }, [editor, dropdownOpen, handleSelectContact, calculateDropdownPosition, getCursorPosition]);
   
   // 过滤联系人
   const filteredContacts = contacts.filter(contact => 
@@ -202,14 +250,13 @@ export function MentionListPlugin({ contacts, onSelectMention }: MentionListPlug
   
   return dropdownOpen && portalRef.current
     ? createPortal(
-        <div 
-          style={{ 
-            position: 'absolute', 
-            left: position.left, 
-            top: position.top, 
-            zIndex: 100 
-          }}
-        >
+        <div style={{ 
+          position: 'fixed', 
+          left: `${position.left}px`, 
+          top: `${position.top}px`, 
+          zIndex: 9999, 
+          transformOrigin: 'top left' 
+        }}>
           <MentionList 
             contacts={contacts}
             searchText={searchText}

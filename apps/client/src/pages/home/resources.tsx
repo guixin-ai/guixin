@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLoaderData } from 'react-router-dom';
+import { useNavigate, useLoaderData, useRevalidator } from 'react-router-dom';
 import { Search, Plus, FileText, Image, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
@@ -15,14 +15,14 @@ import { ResourceItem, ResourceType } from '@/types/resource';
 // 定义加载器返回数据的类型
 interface ResourceLoaderData {
   resources: ResourceItem[];
-  error?: string;
 }
 
 const ResourcesPage = () => {
   const navigate = useNavigate();
+  const { revalidate } = useRevalidator();
   
-  // 使用useLoaderData获取路由加载器提供的数据
-  const { resources = [], error } = useLoaderData() as ResourceLoaderData;
+  // 使用useLoaderData获取路由加载器提供的数据，使用泛型而不是类型断言
+  const { resources = [] } = useLoaderData<ResourceLoaderData>();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,8 +55,8 @@ const ResourcesPage = () => {
       setLoading(true);
       await resourceService.deleteResource(resourceId);
       
-      // 刷新页面以获取最新资源列表
-      navigate('/guichat/resources', { replace: true });
+      // 刷新loader数据而不是跳转页面
+      revalidate();
     } catch (error) {
       console.error('删除资源失败:', error);
     } finally {
@@ -86,8 +86,8 @@ const ResourcesPage = () => {
             file.name.split('.')[0] // 使用文件名作为资源名称
           );
           
-          // 刷新页面以获取最新资源列表
-          navigate('/guichat/resources', { replace: true });
+          // 刷新loader数据而不是跳转页面
+          revalidate();
         } catch (error) {
           console.error('添加图片资源失败:', error);
         } finally {
@@ -120,8 +120,8 @@ const ResourcesPage = () => {
           name
         );
         
-        // 刷新页面以获取最新资源列表
-        navigate('/guichat/resources', { replace: true });
+        // 刷新loader数据而不是跳转页面
+        revalidate();
       } catch (error) {
         console.error('添加文本资源失败:', error);
       } finally {
@@ -143,20 +143,6 @@ const ResourcesPage = () => {
         return null;
     }
   };
-
-  // 显示加载错误
-  if (error && !loading && filteredResources.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <Button onClick={() => navigate('/guichat/resources', { replace: true })}>
-            重试
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <DelayedLoading loading={loading}>

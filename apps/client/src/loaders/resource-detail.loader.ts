@@ -10,25 +10,20 @@ export const resourceDetailLoader = async ({ params }: { params: { resourceId?: 
   const { resourceId } = params;
 
   if (!resourceId) {
-    return { resource: null, error: '资源ID不能为空' };
+    throw new Error('资源ID不能为空');
   }
 
-  try {
-    const resource = await resourceService.getResourceDetails(resourceId);
+  const resource = await resourceService.getResourceDetails(resourceId);
 
-    // 处理URL拼接
-    const appData = await appDataDir();
-    const fullPath = await join(appData, resource.url);
-    const assetUrl = convertFileSrc(fullPath);
+  // 处理URL拼接
+  const appData = await appDataDir();
+  const fullPath = await join(appData, resource.url);
+  const assetUrl = convertFileSrc(fullPath);
 
-    return {
-      resource: {
-        ...resource,
-        url: assetUrl,
-      },
-    };
-  } catch (error) {
-    console.error('获取资源详情失败:', error);
-    return { resource: null, error: '获取资源详情失败' };
-  }
+  return {
+    resource: {
+      ...resource,
+      url: assetUrl,
+    },
+  };
 }; 

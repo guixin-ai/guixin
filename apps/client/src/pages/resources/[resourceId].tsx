@@ -1,8 +1,9 @@
-import { useNavigate, useParams, useLoaderData, useRevalidator } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLoaderData } from 'react-router-dom';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ResourceItem } from '@/types/resource';
-import { resourceService } from '@/services/resource.service';
+import { resourceCommands } from '@/commands/resource.commands';
 
 // 定义加载器返回数据的类型
 interface ResourceDetailLoaderData {
@@ -12,10 +13,13 @@ interface ResourceDetailLoaderData {
 const ResourceDetailPage = () => {
   const navigate = useNavigate();
   const { resourceId } = useParams<{ resourceId: string }>();
-  const { revalidate } = useRevalidator();
   
   // 使用useLoaderData获取路由加载器提供的数据，使用泛型
   const { resource } = useLoaderData<ResourceDetailLoaderData>();
+  
+  // 文本内容状态
+  const [textContent, setTextContent] = useState<string>('');
+  const [loadingText, setLoadingText] = useState(false);
 
   // 返回资源列表
   const handleBackToList = () => {
@@ -27,7 +31,8 @@ const ResourceDetailPage = () => {
     if (!resourceId) return;
     
     try {
-      await resourceService.deleteResource(resourceId);
+      // 直接调用指令层删除资源
+      await resourceCommands.deleteResource({ id: resourceId });
       
       // 删除后返回列表页
       navigate('/home/resources', { replace: true });
@@ -35,6 +40,26 @@ const ResourceDetailPage = () => {
       console.error('删除资源失败:', error);
     }
   };
+  
+  // 加载文本内容
+  useEffect(() => {
+    const loadTextContent = async () => {
+      if (resource.type === 'text' && resourceId) {
+        try {
+          setLoadingText(true);
+          // 直接调用指令层读取文本内容
+          const content = await resourceCommands.readTextResource({ id: resourceId });
+          setTextContent(content);
+        } catch (error) {
+          console.error('读取文本内容失败:', error);
+        } finally {
+          setLoadingText(false);
+        }
+      }
+    };
+    
+    loadTextContent();
+  }, [resource.type, resourceId]);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
@@ -83,10 +108,13 @@ const ResourceDetailPage = () => {
           
           {resource.type === 'text' && (
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                {/* 这里应该显示文本内容，示例中只显示URL */}
-                {resource.url}
-              </p>
+              {loadingText ? (
+                <p className="text-gray-500 dark:text-gray-400">正在加载文本内容...</p>
+              ) : (
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {textContent || '无内容'}
+                </p>
+              )}
             </div>
           )}
         </div>

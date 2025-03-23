@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
 import DelayedLoading from '../../components/delayed-loading';
-import { resourceService } from '@/services/resource.service';
+import { resourceCommands } from '@/commands/resource.commands';
 import { ResourceItem, ResourceType } from '@/types/resource';
 
 // 定义加载器返回数据的类型
@@ -53,7 +53,8 @@ const ResourcesPage = () => {
     
     try {
       setLoading(true);
-      await resourceService.deleteResource(resourceId);
+      // 直接调用指令层删除资源
+      await resourceCommands.deleteResource({ id: resourceId });
       
       // 刷新loader数据而不是跳转页面
       revalidate();
@@ -80,11 +81,16 @@ const ResourcesPage = () => {
         setLoading(true);
         
         try {
-          // 上传图片资源
-          await resourceService.uploadImageResource(
-            file,
-            file.name.split('.')[0] // 使用文件名作为资源名称
-          );
+          // 读取文件为ArrayBuffer
+          const arrayBuffer = await file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // 直接调用指令层上传图片
+          await resourceCommands.uploadCurrentUserImage({
+            imageData: Array.from(uint8Array),
+            name: file.name.split('.')[0], // 使用文件名作为资源名称
+            file_name: file.name
+          });
           
           // 刷新loader数据而不是跳转页面
           revalidate();
@@ -114,11 +120,11 @@ const ResourcesPage = () => {
       setLoading(true);
       
       try {
-        // 上传文本资源
-        await resourceService.uploadTextResource(
+        // 直接调用指令层上传文本
+        await resourceCommands.uploadCurrentUserText({
           content,
           name
-        );
+        });
         
         // 刷新loader数据而不是跳转页面
         revalidate();

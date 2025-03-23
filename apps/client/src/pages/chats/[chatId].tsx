@@ -10,18 +10,18 @@ import { ArrowLeft, Mic, MoreVertical, Paperclip, Send, Smile } from 'lucide-rea
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
-import ChatInfoPage from '../components/chat-info';
-import DelayedLoading from '../components/delayed-loading';
+import ChatInfoPage from '../../components/chat-info';
+import DelayedLoading from '../../components/delayed-loading';
 import {
   VirtuosoMessage,
   VirtuosoMessageListMethods,
-} from '../components/lib/virtuoso-message/virtuoso-message';
-import MessageItemContent, { VirtuosoMessageItem } from '../components/message-item';
-import NewChat from '../components/new-chat';
-import { Button } from '../components/ui/button';
-import { useChatStore } from '../models/chat.model';
-import { useContactStore } from '../models/contact.model';
-import { OllamaMessage } from '../services/ollama.service';
+} from '../../components/lib/virtuoso-message/virtuoso-message';
+import MessageItemContent, { VirtuosoMessageItem } from '../../components/message-item';
+import NewChat from '../../components/new-chat';
+import { Button } from '../../components/ui/button';
+import { useChatStore } from '../../models/chat.model';
+import { useContactStore } from '../../models/contact.model';
+import { OllamaMessage } from '../../services/ollama.service';
 import { chatService } from '@/services/chat.service';
 
 // 联系人类型

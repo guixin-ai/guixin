@@ -1,5 +1,5 @@
 import { data } from 'react-router-dom';
-import { contactService } from '@/services/contact.service';
+import { contactCommands } from '@/commands';
 import { Contact } from '@/types/contact';
 
 /**
@@ -9,8 +9,15 @@ import { Contact } from '@/types/contact';
 export const newChatLoader = async () => {
   try {
     // 获取联系人列表
-    const contactsResponse = await contactService.getContacts();
-    const contacts: Contact[] = contactsResponse.contacts || [];
+    const contactsFromApi = await contactCommands.getCurrentUserContacts();
+    
+    // 转换为前端所需的联系人格式
+    const contacts: Contact[] = contactsFromApi.map(contact => ({
+      id: contact.id,
+      name: contact.name,
+      avatar: contact.name.charAt(0),
+      pinyin: '' // 拼音在此处不再处理，如果需要可在UI层处理
+    }));
 
     // 返回成功响应
     return data({ 

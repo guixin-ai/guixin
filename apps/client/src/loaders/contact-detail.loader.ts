@@ -1,5 +1,5 @@
 import { LoaderFunctionArgs } from 'react-router-dom';
-import { contactService } from '@/services/contact.service';
+import { contactCommands } from '@/commands';
 
 /**
  * 联系人详情页面加载器
@@ -18,10 +18,11 @@ export const contactDetailLoader = async ({ params }: LoaderFunctionArgs) => {
   }
   
   try {
-    // 使用contactService获取联系人详情
-    const response = await contactService.getContactDetail(contactId);
+    // 从联系人列表中查找指定ID的联系人
+    const contacts = await contactCommands.getCurrentUserContacts();
+    const contact = contacts.find(c => c.id === contactId);
     
-    if (!response) {
+    if (!contact) {
       return {
         success: false,
         error: `联系人 ${contactId} 不存在`,
@@ -29,10 +30,15 @@ export const contactDetailLoader = async ({ params }: LoaderFunctionArgs) => {
       };
     }
     
-    // 返回成功响应
+    // 返回成功响应，格式化联系人详情
     return {
       success: true,
-      contact: response.contact
+      contact: {
+        id: contact.id,
+        name: contact.name,
+        description: contact.description || undefined,
+        avatar: contact.name.charAt(0)
+      }
     };
   } catch (error) {
     console.error(`加载联系人详情失败:`, error);

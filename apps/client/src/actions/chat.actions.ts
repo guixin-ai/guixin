@@ -1,6 +1,6 @@
 import { ActionFunctionArgs, data } from "react-router-dom";
 import { z } from "zod";
-import { chatService } from "@/services/chat.service";
+import { chatCommands } from "@/commands";
 
 /**
  * 创建群聊的action
@@ -30,8 +30,8 @@ export async function createGroupChatAction({ request }: ActionFunctionArgs) {
       }, { status: 400 });
     }
     
-    // 调用服务而不是store来创建群聊
-    const response = await chatService.createGroupChat(validatedData.contactIds);
+    // 调用指令层创建群聊
+    const response = await chatCommands.createGroupChat(validatedData.contactIds);
     const chatId = response.chatId;
     
     console.log('群聊创建成功:', chatId);
@@ -82,8 +82,8 @@ export async function sendChatMessageAction({ request }: ActionFunctionArgs) {
     
     console.log('验证后的数据:', validatedData);
     
-    // 调用服务发送消息
-    const response = await chatService.sendMessage(
+    // 调用指令层发送消息
+    const response = await chatCommands.sendMessage(
       validatedData.chatId, 
       validatedData.content,
       validatedData.tempId

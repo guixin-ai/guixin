@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLoaderData, useFetcher } from 'react-router-dom';
 import { ArrowLeft, Trash2, AlertCircle, Edit, MessageSquare } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { contactService } from '@/services/contact.service';
 import { ContactDetail } from '@/types/contact';
 
 // 定义加载器返回数据的类型

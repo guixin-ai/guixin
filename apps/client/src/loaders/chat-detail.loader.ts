@@ -1,6 +1,6 @@
 import { data } from 'react-router-dom';
-import { chatService } from '@/services/chat.service';
-import { ChatDetail } from '@/types/chat';
+import { chatCommands } from '@/commands';
+import { ChatDetail, ChatMessage } from '@/types/chat';
 
 /**
  * 聊天详情页面的数据加载器
@@ -19,8 +19,10 @@ export const chatDetailLoader = async ({ params }: { params: { chatId?: string }
   }
 
   try {
-    // 获取聊天详情
-    const chatItem = await chatService.getChatById(chatId);
+    // 获取聊天列表
+    const chatListResponse = await chatCommands.getCurrentUserChatList();
+    // 从列表中查找指定ID的聊天
+    const chatItem = chatListResponse.chats.find(chat => chat.id === chatId);
     
     if (!chatItem) {
       return data({
@@ -31,14 +33,14 @@ export const chatDetailLoader = async ({ params }: { params: { chatId?: string }
       }, { status: 404 });
     }
 
-    // 获取聊天消息
-    const messages = await chatService.getChatMessages(chatId);
+    // 暂时没有获取聊天消息的接口，返回空数组
+    const messages: ChatMessage[] = [];
     
     // 创建聊天详情对象
     const chatDetail: ChatDetail = {
       id: chatItem.id,
       name: chatItem.name,
-      avatar: chatItem.avatar,
+      avatar: [chatItem.avatar], // 确保avatar是数组格式
       isAI: true, // 假设所有聊天都是AI
       members: [
         {
@@ -50,7 +52,7 @@ export const chatDetailLoader = async ({ params }: { params: { chatId?: string }
         {
           id: chatItem.id,
           name: chatItem.name,
-          avatar: chatItem.avatar[0],
+          avatar: chatItem.avatar,
           isAI: true,
           username: '@自如'
         }

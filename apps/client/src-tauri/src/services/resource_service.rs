@@ -5,7 +5,7 @@ use uuid::Uuid;
 use anyhow::anyhow;
 use diesel::connection::Connection;
 
-use crate::db::DbPool;
+use crate::db::{DbPool, RESOURCES_DIR_NAME, IMAGES_DIR_NAME, TEXTS_DIR_NAME};
 use crate::models::Resource;
 use crate::repositories::resource_repository::ResourceRepository;
 use crate::repositories::error::RepositoryError;
@@ -35,7 +35,7 @@ impl ResourceService {
         let unique_file_name = format!("{}.{}", Uuid::new_v4(), extension);
         
         // 创建图片目录
-        let images_dir = app_resource_path.join("images");
+        let images_dir = app_resource_path.join(IMAGES_DIR_NAME);
         if !images_dir.exists() {
             fs::create_dir_all(&images_dir)
                 .map_err(|e| anyhow!("创建图片目录失败: {}", e))?;
@@ -48,15 +48,16 @@ impl ResourceService {
         fs::write(&image_path, image_data)
             .map_err(|e| anyhow!("保存图片失败: {}", e))?;
         
-        // 获取URL
-        let url = format!("asset://{}", image_path.to_string_lossy());
+        // 存储相对路径结构
+        let relative_url = format!("{}/{}/{}",
+            RESOURCES_DIR_NAME, IMAGES_DIR_NAME, unique_file_name);
         
         // 创建资源记录
         let resource = ResourceRepository::create(
             pool,
             name,
             "image",
-            &url,
+            &relative_url,
             &unique_file_name,
             description,
             user_id,
@@ -78,7 +79,7 @@ impl ResourceService {
         let unique_file_name = format!("{}.txt", Uuid::new_v4());
         
         // 创建文本目录
-        let texts_dir = app_resource_path.join("texts");
+        let texts_dir = app_resource_path.join(TEXTS_DIR_NAME);
         if !texts_dir.exists() {
             fs::create_dir_all(&texts_dir)
                 .map_err(|e| anyhow!("创建文本目录失败: {}", e))?;
@@ -91,15 +92,16 @@ impl ResourceService {
         fs::write(&text_path, content)
             .map_err(|e| anyhow!("保存文本失败: {}", e))?;
         
-        // 获取URL
-        let url = format!("asset://{}", text_path.to_string_lossy());
+        // 存储相对路径结构
+        let relative_url = format!("{}/{}/{}",
+            RESOURCES_DIR_NAME, TEXTS_DIR_NAME, unique_file_name);
         
         // 创建资源记录
         let resource = ResourceRepository::create(
             pool,
             name,
             "text",
-            &url,
+            &relative_url,
             &unique_file_name,
             description,
             user_id,
@@ -170,8 +172,8 @@ impl ResourceService {
             
             // 2. 删除文件
             let file_path = match resource.type_.as_str() {
-                "image" => app_resource_path.join("images").join(&resource.file_name),
-                "text" => app_resource_path.join("texts").join(&resource.file_name),
+                "image" => app_resource_path.join(IMAGES_DIR_NAME).join(&resource.file_name),
+                "text" => app_resource_path.join(TEXTS_DIR_NAME).join(&resource.file_name),
                 _ => return Err(anyhow!("未知的资源类型: {}", resource.type_)),
             };
             
@@ -201,7 +203,7 @@ impl ResourceService {
         }
         
         // 构建文件路径并读取内容
-        let file_path = app_resource_path.join("texts").join(&resource.file_name);
+        let file_path = app_resource_path.join(TEXTS_DIR_NAME).join(&resource.file_name);
         let content = fs::read_to_string(&file_path)
             .map_err(|e| anyhow!("读取文本内容失败: {}", e))?;
         

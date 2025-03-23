@@ -6,6 +6,12 @@ use dirs::data_dir;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
+// 应用和资源目录常量
+pub const APP_DIR_NAME: &str = "guixin";
+pub const RESOURCES_DIR_NAME: &str = "resources";
+pub const IMAGES_DIR_NAME: &str = "images";
+pub const TEXTS_DIR_NAME: &str = "texts";
+
 // 嵌入迁移文件
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -16,7 +22,7 @@ pub type DbConnection = r2d2::PooledConnection<ConnectionManager<SqliteConnectio
 // 获取数据库路径
 fn get_database_path() -> Result<PathBuf> {
     let data_dir = data_dir().ok_or_else(|| anyhow!("无法确定数据目录"))?;
-    let app_dir = data_dir.join("guixin");
+    let app_dir = data_dir.join(APP_DIR_NAME);
     
     // 确保应用数据目录存在
     std::fs::create_dir_all(&app_dir)
@@ -29,14 +35,38 @@ fn get_database_path() -> Result<PathBuf> {
 // 获取应用资源目录路径
 pub fn get_app_resource_path() -> Result<PathBuf> {
     let data_dir = data_dir().ok_or_else(|| anyhow!("无法确定数据目录"))?;
-    let app_dir = data_dir.join("guixin");
-    let resource_dir = app_dir.join("resources");
+    let app_dir = data_dir.join(APP_DIR_NAME);
+    let resource_dir = app_dir.join(RESOURCES_DIR_NAME);
     
     // 确保资源目录存在
     std::fs::create_dir_all(&resource_dir)
         .map_err(|e| anyhow!("无法创建资源目录: {}", e))?;
     
     Ok(resource_dir)
+}
+
+// 获取图片目录路径
+pub fn get_images_dir_path() -> Result<PathBuf> {
+    let resource_dir = get_app_resource_path()?;
+    let images_dir = resource_dir.join(IMAGES_DIR_NAME);
+    
+    // 确保图片目录存在
+    std::fs::create_dir_all(&images_dir)
+        .map_err(|e| anyhow!("无法创建图片目录: {}", e))?;
+    
+    Ok(images_dir)
+}
+
+// 获取文本目录路径
+pub fn get_texts_dir_path() -> Result<PathBuf> {
+    let resource_dir = get_app_resource_path()?;
+    let texts_dir = resource_dir.join(TEXTS_DIR_NAME);
+    
+    // 确保文本目录存在
+    std::fs::create_dir_all(&texts_dir)
+        .map_err(|e| anyhow!("无法创建文本目录: {}", e))?;
+    
+    Ok(texts_dir)
 }
 
 // 创建数据库连接池

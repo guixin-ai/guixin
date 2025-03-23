@@ -194,20 +194,6 @@ class ResourceCommands {
   }
   
   /**
-   * 获取图片URL
-   * 调用后端 get_image_url 命令
-   * @param fileName 图片文件名
-   */
-  public async getImageUrl(fileName: string): Promise<string> {
-    try {
-      return await invoke<string>('get_image_url', { file_name: fileName });
-    } catch (error) {
-      console.error('获取图片URL失败:', error);
-      throw new Error(`获取图片URL失败: ${error}`);
-    }
-  }
-  
-  /**
    * 获取当前用户的所有资源
    * 调用后端 get_current_user_resources 命令
    */

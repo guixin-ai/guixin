@@ -14,6 +14,8 @@ pub struct AppState {
     db_pool: Mutex<db::DbPool>,
     current_user: Mutex<User>,
     app_resource_path: PathBuf,  // 应用资源目录路径
+    images_dir_path: PathBuf,    // 图片目录路径
+    texts_dir_path: PathBuf,     // 文本目录路径
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,6 +25,8 @@ pub fn run() {
 
     // 获取应用资源目录路径
     let app_resource_path = db::get_app_resource_path().expect("获取资源目录失败");
+    let images_dir_path = db::get_images_dir_path().expect("获取图片目录失败");
+    let texts_dir_path = db::get_texts_dir_path().expect("获取文本目录失败");
 
     // 获取默认用户
     let current_user = {
@@ -35,6 +39,8 @@ pub fn run() {
             db_pool: Mutex::new(db_pool),
             current_user: Mutex::new(current_user),
             app_resource_path,
+            images_dir_path,
+            texts_dir_path,
         })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -47,7 +53,6 @@ pub fn run() {
             commands::create_current_user_ai_contact,
             commands::get_current_user_contacts,
             commands::upload_current_user_image,
-            commands::get_image_url,
             commands::upload_current_user_text,
             commands::get_current_user_resources,
             commands::get_current_user_image_resources,

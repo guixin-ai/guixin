@@ -3,8 +3,5 @@
   "identifier": "images-capability",
   "description": "允许访问图片资源",
   "windows": ["main"],
-  "permissions": [
-    "core:path:default",
-    "core:resources:default"
-  ]
-} 
+  "permissions": ["core:path:default", "core:resources:default"]
+}

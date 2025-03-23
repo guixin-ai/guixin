@@ -3,6 +3,7 @@ use tauri::State;
 use crate::AppState;
 use crate::services::resource_service::ResourceService;
 use crate::models::Resource;
+use crate::db::{APP_DIR_NAME, RESOURCES_DIR_NAME, IMAGES_DIR_NAME};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResourceResponse {
@@ -124,29 +125,6 @@ pub async fn upload_current_user_text(
     Ok(UploadTextResponse {
         resource: ResourceResponse::from(resource),
     })
-}
-
-/// 获取图片URL
-/// 
-/// 根据图片文件名获取可访问的URL
-///
-/// ## 数据库影响
-/// - 读取操作：无
-/// - 无写入、修改或删除操作
-#[tauri::command]
-pub async fn get_image_url(
-    state: State<'_, AppState>,
-    file_name: String
-) -> Result<String, String> {
-    // 从全局状态获取应用资源目录
-    let app_resource_path = &state.app_resource_path;
-    let image_path = app_resource_path.join("images").join(&file_name);
-    
-    if !image_path.exists() {
-        return Err(format!("图片不存在: {}", file_name));
-    }
-    
-    Ok(format!("asset://{}", image_path.to_string_lossy()))
 }
 
 /// 获取当前用户的所有资源

@@ -1,7 +1,7 @@
 import { ChatContact } from '..';
-import { MentionDisplayPlugin } from './mention-display-plugin';
-import { MentionFilterPlugin } from './mention-filter-plugin';
-import { MentionPositionPlugin } from './mention-position-plugin';
+import { MentionDisplayPlugin } from './mention-display.plugin';
+import { MentionFilterPlugin } from './mention-filter.plugin';
+import { MentionPositionPlugin } from './mention-position.plugin';
 
 interface MentionListPluginProps {
   contacts: ChatContact[];

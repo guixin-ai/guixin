@@ -10,10 +10,9 @@ import type { JSX } from 'react';
 
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { TreeView } from '@lexical/react/LexicalTreeView';
-import * as React from 'react';
 
 // 引入组件专用样式
-import './tree-view-plugin.css';
+import './tree-view.plugin.css';
 
 export function TreeViewPlugin(): JSX.Element {
   const [editor] = useLexicalComposerContext();

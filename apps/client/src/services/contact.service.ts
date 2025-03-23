@@ -121,19 +121,37 @@ class ContactService {
         return null;
       }
       
-      // 从指令层获取用户详情数据
-      const userData = await userCommands.getUser({ id });
-      
-      const contactDetail: ContactDetail = {
-        id: userData.id,
-        name: userData.name,
-        description: userData.description || undefined,
-        avatar: userData.name.charAt(0)
-      };
-      
-      return {
-        contact: contactDetail
-      };
+      try {
+        // 从指令层获取用户详情数据
+        // 注意：由于后端暂时缺少get_user命令，这里可能会失败
+        // 使用get_current_user作为临时方案
+        const userData = await userCommands.getUser({ id });
+        
+        const contactDetail: ContactDetail = {
+          id: userData.id,
+          name: userData.name,
+          description: userData.description || undefined,
+          avatar: userData.name.charAt(0)
+        };
+        
+        return {
+          contact: contactDetail
+        };
+      } catch (error) {
+        // 如果获取用户详情失败，则使用基本联系人信息构建详情
+        console.warn(`无法获取用户详情，使用基本联系人信息作为替代。错误:`, error);
+        
+        const contactDetail: ContactDetail = {
+          id: contact.id,
+          name: contact.name,
+          description: undefined,
+          avatar: contact.name.charAt(0)
+        };
+        
+        return {
+          contact: contactDetail
+        };
+      }
     } catch (error) {
       console.error(`获取联系人 ${id} 详情失败:`, error);
       throw new ContactDetailFetchException(id);

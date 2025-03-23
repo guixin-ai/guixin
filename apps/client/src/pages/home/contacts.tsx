@@ -45,10 +45,10 @@ const ContactsPage = () => {
     navigate('/contacts/new');
   };
 
-  // 查看联系人详情 - 打开聊天
+  // 查看联系人详情 - 导航到联系人详情页面
   const handleContactClick = (contact: Contact) => {
-    // 这里可以导航到聊天页面
-    navigate(`/chats/${contact.id}`);
+    // 导航到联系人详情页面
+    navigate(`/contacts/${contact.id}`);
   };
 
   // 删除联系人

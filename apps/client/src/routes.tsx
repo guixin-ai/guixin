@@ -8,12 +8,14 @@ import GuiChatResourceDetail from './pages/resources/[resourceId]';
 import NewTextResourcePage from './pages/resources/new-text';
 import GuiChatChat from './pages/chats/[chatId]';
 import NewContactPage from './pages/contacts/new-contact';
+import ContactDetailPage from './pages/contacts/[contactId]';
 import NotFoundPage from './pages/not-found';
 import RouteErrorBoundary from './components/route-error-boundary';
 // 导入 loaders
 import { resourcesLoader } from './loaders/resources.loader';
 import { resourceDetailLoader } from './loaders/resource-detail.loader';
 import { contactsLoader } from './loaders/contacts.loader';
+import { contactDetailLoader } from './loaders/contact-detail.loader';
 // 导入 actions
 import { 
   createTextResourceAction, 
@@ -72,6 +74,12 @@ const routes: RouteObject[] = [
         // 添加联系人页面
         path: 'contacts/new',
         element: <NewContactPage />,
+      },
+      {
+        // 联系人详情页面
+        path: 'contacts/:contactId',
+        element: <ContactDetailPage />,
+        loader: contactDetailLoader,
       },
       {
         // 添加文本资源页面 - 不再包含action，改用API路由处理

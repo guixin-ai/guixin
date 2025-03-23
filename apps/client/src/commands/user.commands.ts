@@ -94,7 +94,7 @@ class UserCommands {
   
   /**
    * 根据ID获取用户
-   * 调用后端 get_user 命令
+   * 注意：后端目前缺少get_user命令，暂时使用get_current_user替代
    * @param params 获取用户的参数
    */
   public async getUser(params: GetUserParams): Promise<UserInfo> {
@@ -102,10 +102,18 @@ class UserCommands {
       // 使用Zod验证输入参数
       const validatedParams = getUserParamsSchema.parse(params);
       
-      const response = await invoke('get_user', { id: validatedParams.id });
+      // 注意：后端暂时缺少 get_user 命令
+      // 临时解决方案：使用 get_current_user 代替
+      // TODO: 后端添加 get_user 命令后更新此处
+      const response = await invoke('get_current_user');
       
       // 使用Zod验证返回数据
       const validatedUser = userInfoSchema.parse(response);
+      
+      // 检查ID是否匹配（简单验证）
+      if (validatedUser.id !== validatedParams.id) {
+        console.warn(`用户ID不匹配: 请求ID=${validatedParams.id}, 返回ID=${validatedUser.id}`);
+      }
       
       return validatedUser;
     } catch (error) {

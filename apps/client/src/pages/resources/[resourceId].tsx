@@ -1,16 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useParams, useLoaderData, useFetcher } from 'react-router-dom';
 import { ArrowLeft, Trash2, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ResourceItem } from '@/types/resource';
-import { resourceCommands } from '@/commands/resource.commands';
-
-// 定义加载器返回数据的类型
-interface ResourceDetailLoaderData {
-  success?: boolean;
-  error?: string;
-  resource: ResourceItem | null;
-}
+import { ResourceDetailLoaderData } from '@/loaders/resource-detail.loader';
 
 // 定义删除资源操作返回数据类型
 interface DeleteFetcherData {
@@ -22,20 +15,23 @@ const ResourceDetailPage = () => {
   const navigate = useNavigate();
   const { resourceId } = useParams<{ resourceId: string }>();
   
-  // 使用useLoaderData获取路由加载器提供的数据，使用泛型
+  // 使用useLoaderData获取路由加载器提供的数据
   const data = useLoaderData<ResourceDetailLoaderData>();
   
-  // 兼容处理，确保能同时处理旧版和新版loader返回的数据
-  const resource = data.resource || null;
+  // 提取共同属性
+  const resource = data.resource;
   const hasError = data.success === false;
-  const errorMessage = data.error;
+  const errorMessage = hasError ? data.error : undefined;
+  
+  // 判断是否有文本内容错误
+  const hasTextError = data.success === true && 'textError' in data;
+  const textError = hasTextError ? data.textError : undefined;
+  
+  // 获取文本内容（如果有）
+  const textContent = data.success === true && 'textContent' in data ? data.textContent || '' : '';
 
   // 使用fetcher替代直接调用resourceCommands
   const deleteFetcher = useFetcher<DeleteFetcherData>();
-  
-  // 文本内容状态
-  const [textContent, setTextContent] = useState<string>('');
-  const [loadingText, setLoadingText] = useState(false);
 
   // 返回资源列表
   const handleBackToList = () => {
@@ -59,28 +55,6 @@ const ResourceDetailPage = () => {
       navigate('/home/resources', { replace: true });
     }
   }, [deleteFetcher.state, deleteFetcher.data, navigate]);
-  
-  // 加载文本内容
-  useEffect(() => {
-    const loadTextContent = async () => {
-      if (resource?.type === 'text' && resourceId) {
-        try {
-          setLoadingText(true);
-          // 直接调用指令层读取文本内容
-          const content = await resourceCommands.readTextResource({ id: resourceId });
-          setTextContent(content);
-        } catch (error) {
-          console.error('读取文本内容失败:', error);
-        } finally {
-          setLoadingText(false);
-        }
-      }
-    };
-    
-    if (resource) {
-      loadTextContent();
-    }
-  }, [resource?.type, resourceId, resource]);
 
   // 如果出现错误，显示错误信息
   if (hasError) {
@@ -172,8 +146,14 @@ const ResourceDetailPage = () => {
           
           {resource.type === 'text' && (
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-              {loadingText ? (
-                <p className="text-gray-500 dark:text-gray-400">正在加载文本内容...</p>
+              {hasTextError ? (
+                <div className="p-3 bg-destructive/15 text-destructive rounded-md">
+                  <div className="flex items-center mb-2">
+                    <AlertCircle size={18} className="mr-2" />
+                    <span className="font-medium">文本内容加载失败</span>
+                  </div>
+                  <p>{textError}</p>
+                </div>
               ) : (
                 <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                   {textContent || '无内容'}

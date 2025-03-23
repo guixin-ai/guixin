@@ -17,6 +17,16 @@ export interface ErrorContext {
   details?: any;
 }
 
+// 错误日志结构
+export interface ErrorLog {
+  timestamp: string;
+  level: LogLevel;
+  name: string;
+  message: string;
+  stack?: string;
+  context: ErrorContext;
+}
+
 /**
  * 全局错误处理器（单例模式）
  */
@@ -56,7 +66,7 @@ export class ErrorHandler {
       : '';
     
     // 构建错误日志
-    const errorLog = {
+    const errorLog: ErrorLog = {
       timestamp: new Date().toISOString(),
       level,
       name: errorName,
@@ -66,6 +76,24 @@ export class ErrorHandler {
     };
     
     // 输出到控制台
+    this.logError(errorLog);
+    
+    // 这里可以添加错误上报逻辑，如发送到服务器或第三方监控平台
+    
+    // 如果是致命错误，可以显示全局错误页面
+    if (level === LogLevel.FATAL) {
+      // 显示全局错误页面的逻辑
+      this.handleFatalError(errorLog);
+    }
+  }
+  
+  /**
+   * 记录错误日志到控制台
+   * @param errorLog 错误日志对象
+   */
+  private logError(errorLog: ErrorLog): void {
+    const { level } = errorLog;
+    
     switch (level) {
       case LogLevel.INFO:
         console.info('[ErrorHandler]', errorLog);
@@ -80,13 +108,16 @@ export class ErrorHandler {
         console.error('[ErrorHandler] FATAL:', errorLog);
         break;
     }
-    
-    // 这里可以添加错误上报逻辑，如发送到服务器或第三方监控平台
-    
-    // 如果是致命错误，可以显示全局错误页面
-    if (level === LogLevel.FATAL) {
-      // 显示全局错误页面的逻辑
-    }
+  }
+  
+  /**
+   * 处理致命错误
+   * @param errorLog 错误日志对象
+   */
+  private handleFatalError(errorLog: ErrorLog): void {
+    // 处理致命错误的特殊逻辑
+    // 例如显示全局错误页面、重置应用状态等
+    console.error('处理致命错误:', errorLog);
   }
   
   /**

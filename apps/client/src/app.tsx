@@ -1,9 +1,8 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import { useAIQueueStore } from './models/ai-queue.model';
 import { aiProcessor } from './services/ai-processor.service';
-import { userCommands } from '@/commands';
-import { convertUserInfoToUser } from '@/converters';
+import { useEffect } from 'react';
 
 // 定义 App 组件的属性类型
 interface AppProps {
@@ -11,58 +10,6 @@ interface AppProps {
 }
 
 function App({ children }: AppProps) {
-  const [loading, setLoading] = useState(true);
-  const [showLoading, setShowLoading] = useState(false);
-
-  // 添加延迟加载逻辑
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-
-    if (loading) {
-      // 如果进入加载状态，设置延迟计时器
-      timer = setTimeout(() => {
-        setShowLoading(true);
-      }, 300); // 300ms延迟
-    } else {
-      // 如果退出加载状态，立即隐藏加载UI
-      setShowLoading(false);
-    }
-
-    // 清理函数，在组件卸载或依赖变化时清除计时器
-    return () => {
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
-    };
-  }, [loading]);
-
-  // 在应用加载时初始化基础数据
-  useEffect(() => {
-    const initializeAppData = async () => {
-      try {
-        setLoading(true);
-
-        // 直接从命令层获取当前用户
-        const userInfo = await userCommands.getCurrentUser();
-        
-        if (userInfo) {
-          // 将UserInfo转换为User，然后传入初始化方法
-          const user = convertUserInfoToUser(userInfo);
-          console.log('应用基础数据初始化完成');
-        } else {
-          console.error('无法获取当前用户');
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('应用基础数据初始化失败:', error);
-        setLoading(false);
-      }
-    };
-
-    initializeAppData();
-  }, []);
-
   // 全局监听AI队列变化并并行处理
   useEffect(() => {
     // 处理单个聊天的消息队列
@@ -164,16 +111,6 @@ function App({ children }: AppProps) {
     <>
       <Toaster richColors />
       {children}
-      
-      {/* 加载指示器 */}
-      {loading && showLoading && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/10">
-          <div className="flex flex-col items-center justify-center">
-            <div className="w-12 h-12 border-4 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-300 font-medium">加载中...</p>
-          </div>
-        </div>
-      )}
     </>
   );
 }

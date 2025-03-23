@@ -2,15 +2,10 @@ import { useCallback, useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
   COMMAND_PRIORITY_HIGH,
-  createCommand,
 } from 'lexical';
 import { SHOW_MENTIONS_COMMAND } from './mention-trigger-plugin';
 import { MENTION_CONTENT_UPDATE_COMMAND } from './mention-content-tracker-plugin';
-
-// 定义位置更新命令
-export const MENTION_POSITION_UPDATE_COMMAND = createCommand<{
-  position: { left: number; top: number };
-}>();
+import { MENTION_POSITION_UPDATE_COMMAND } from './mention-display-plugin';
 
 /**
  * 提及位置插件

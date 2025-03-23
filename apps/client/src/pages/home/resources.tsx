@@ -8,10 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { ResourceType } from '../../models/resource.model';
 import DelayedLoading from '../../components/delayed-loading';
-import { ResourceItem } from '../../models/resource.model';
 import { resourceService } from '@/services/resource.service';
+import { ResourceItem, ResourceType } from '@/types/resource';
 
 // 定义加载器返回数据的类型
 interface ResourceLoaderData {

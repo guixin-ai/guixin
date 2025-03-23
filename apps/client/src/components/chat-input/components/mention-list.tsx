@@ -32,7 +32,7 @@ export function MentionList({
   // 如果没有匹配的联系人，显示提示
   if (filteredContacts.length === 0) {
     return (
-      <div className="absolute z-10 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1" style={{ width }}>
+      <div className="bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1" style={{ width }}>
         <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
           未找到匹配的联系人
         </div>
@@ -42,7 +42,7 @@ export function MentionList({
   
   return (
     <div 
-      className="absolute z-10 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 overflow-y-auto" 
+      className="bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 overflow-y-auto" 
       style={{ maxHeight, width }}
     >
       {filteredContacts.map((contact, index) => (

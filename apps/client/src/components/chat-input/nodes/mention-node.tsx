@@ -31,8 +31,8 @@ export class MentionNode extends ElementNode {
 
   constructor(mentionName: string, mentionId: string, key?: NodeKey) {
     super(key);
-    this.__mention = mentionName;
-    this.__mentionId = mentionId;
+    this.__mention = mentionName || '未知用户';
+    this.__mentionId = mentionId || 'unknown';
   }
 
   createDOM(config: EditorConfig): HTMLElement {
@@ -49,7 +49,7 @@ export class MentionNode extends ElementNode {
   }
 
   updateDOM(prevNode: MentionNode, dom: HTMLElement, config: EditorConfig): boolean {
-    const isUpdated = prevNode.__mention !== this.__mention;
+    const isUpdated = prevNode.__mention !== this.__mention || prevNode.__mentionId !== this.__mentionId;
     if (isUpdated) {
       dom.innerHTML = `<span class="mr-0.5">@</span><span>${this.__mention}</span>`;
       dom.dataset.mentionId = this.__mentionId;
@@ -78,7 +78,7 @@ export class MentionNode extends ElementNode {
   exportDOM(): DOMExportOutput {
     const element = document.createElement('span');
     element.setAttribute('data-lexical-mention', 'true');
-    element.className = 'bg-blue-100 rounded-md text-blue-700 px-1.5 py-0.5 mx-[1px] inline-flex items-center';
+    element.className = 'bg-blue-100 dark:bg-blue-800/30 rounded-md text-blue-700 dark:text-blue-300 px-1.5 py-0.5 mx-[1px] inline-flex items-center';
     element.innerHTML = `<span class="mr-0.5">@</span><span>${this.__mention}</span>`;
     element.dataset.mentionId = this.__mentionId;
     return { element };
@@ -125,22 +125,22 @@ export class MentionNode extends ElementNode {
   }
 
   getMention(): string {
-    return this.__mention;
+    return this.__mention || '未知用户';
   }
 
   getMentionId(): string {
-    return this.__mentionId;
+    return this.__mentionId || 'unknown';
   }
 }
 
 function convertMentionElement(domNode: HTMLElement): DOMConversionOutput {
-  const mentionId = domNode.dataset.mentionId || '';
+  const mentionId = domNode.dataset.mentionId || 'unknown';
   let mentionName = '';
   const textContent = domNode.textContent || '';
   if (textContent.startsWith('@')) {
-    mentionName = textContent.substring(1);
+    mentionName = textContent.substring(1) || '未知用户';
   } else {
-    mentionName = textContent;
+    mentionName = textContent || '未知用户';
   }
   
   const node = $createMentionNode(mentionName, mentionId);
@@ -148,7 +148,9 @@ function convertMentionElement(domNode: HTMLElement): DOMConversionOutput {
 }
 
 export function $createMentionNode(mentionName: string, mentionId: string): MentionNode {
-  return new MentionNode(mentionName, mentionId);
+  const name = mentionName || '未知用户';
+  const id = mentionId || 'unknown';
+  return new MentionNode(name, id);
 }
 
 export function $isMentionNode(node: LexicalNode | null | undefined): node is MentionNode {

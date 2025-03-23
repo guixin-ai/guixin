@@ -1,351 +1,392 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { 
-  TextNode, 
-  $getSelection, 
-  $createTextNode, 
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  LexicalEditor,
+  $getSelection,
   $isRangeSelection,
-  COMMAND_PRIORITY_CRITICAL,
-  KEY_DOWN_COMMAND,
+  COMMAND_PRIORITY_NORMAL,
+  COMMAND_PRIORITY_LOW,
+  KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_UP_COMMAND,
+  KEY_ENTER_COMMAND,
+  KEY_ESCAPE_COMMAND,
+  KEY_TAB_COMMAND,
+  TextNode,
+  $createTextNode,
+  $getNodeByKey,
   createCommand,
+  COMMAND_PRIORITY_CRITICAL,
 } from 'lexical';
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { $createMentionNode } from '../nodes';
+import { mergeRegister } from '@lexical/utils';
 import { ChatContact } from '..';
-import { $createMentionNode } from '../nodes/mention-node';
 
 // 创建一个自定义命令用于触发提及功能
 export const SHOW_MENTIONS_COMMAND = createCommand('SHOW_MENTIONS_COMMAND');
 
-// 正则表达式 - 匹配@后面跟着的文本，允许前面有任意字符
-const AT_MATCH_REGEX = /@(\S*)$/;
-
-// 提及弹出框的位置
-type MentionPopupPosition = {
-  top: number;
-  left: number;
+// 修改过滤逻辑，使其根据输入的名称过滤联系人
+const filterContacts = (contacts: ChatContact[], searchText: string): ChatContact[] => {
+  const searchLower = searchText.toLowerCase();
+  return contacts.filter(contact => 
+    contact.name.toLowerCase().includes(searchLower) || contact.id.toLowerCase().includes(searchLower)
+  );
 };
 
-export function MentionsPlugin({ contacts = [] }: { contacts: ChatContact[] }) {
+interface MentionsPluginProps {
+  contacts: ChatContact[];
+}
+
+export function MentionsPlugin({ contacts }: MentionsPluginProps) {
   const [editor] = useLexicalComposerContext();
-  const [queryString, setQueryString] = useState<string | null>(null);
-  const [popupPosition, setPopupPosition] = useState<MentionPopupPosition | null>(null);
-  const [selectedContactIndex, setSelectedContactIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-
-  // 过滤联系人 - 确保始终有内容显示
-  const filteredContacts = useMemo(() => {
-    if (queryString === null) {
-      return contacts;
-    }
-    
-    const filtered = contacts.filter((contact) => 
-      contact.name.toLowerCase().includes(queryString.toLowerCase())
-    );
-    
-    // 如果没有匹配项，返回所有联系人
-    return filtered.length > 0 ? filtered : contacts;
-  }, [contacts, queryString]);
-
-  // 检查文本是否包含@符号
-  const checkForMentions = useCallback(() => {
-    editor.getEditorState().read(() => {
-      const selection = $getSelection();
-      if (!$isRangeSelection(selection)) {
-        return;
-      }
-      
-      // 获取选择的文本内容
-      const textContent = selection.getTextContent();
-      const node = selection.anchor.getNode();
-      
-      // 如果是最后一个字符是@，直接显示
-      if (textContent === '@' || textContent.endsWith('@')) {
-        setQueryString('');
-        setIsVisible(true);
-        
-        // 计算弹出框位置
-        calculatePopupPosition();
-        return;
-      }
-      
-      // 否则尝试找@符号后面的内容
-      const match = AT_MATCH_REGEX.exec(textContent);
-      
-      if (match) {
-        // 找到@后面的内容
-        const matchingString = match[1] || '';
-        setQueryString(matchingString);
-        setIsVisible(true);
-        
-        // 计算弹出框位置
-        calculatePopupPosition();
-      } else {
-        // 没有@，关闭弹出框
-        setIsVisible(false);
-      }
-    });
-  }, [editor]);
+  const [queryString, setQueryString] = useState<string>('');
+  const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
+  const [filteredContacts, setFilteredContacts] = useState<ChatContact[]>([]);
+  const [selectedContactIndex, setSelectedContactIndex] = useState<number>(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLDivElement | null>(null);
   
-  // 计算弹出框位置
-  const calculatePopupPosition = useCallback(() => {
-    const editorElement = editor.getRootElement();
-    if (!editorElement) return;
-    
-    const editorRect = editorElement.getBoundingClientRect();
-    
-    const domSelection = window.getSelection();
-    if (domSelection && domSelection.rangeCount > 0) {
-      const range = domSelection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      
-      if (rect.width > 0 && rect.height > 0) {
-        // 有效的选择范围位置，使用光标位置
-        setPopupPosition({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
-        });
-      } else {
-        // 无效的选择范围，使用编辑器位置加偏移
-        setPopupPosition({
-          top: editorRect.top + 30 + window.scrollY,
-          left: editorRect.left + 30 + window.scrollX,
-        });
-      }
-    } else {
-      // 无选择，使用编辑器位置
-      setPopupPosition({
-        top: editorRect.top + 30 + window.scrollY,
-        left: editorRect.left + 30 + window.scrollX,
-      });
-    }
-  }, [editor]);
-
-  // 插入@提及
-  const insertMention = useCallback((contact: ChatContact) => {
-    editor.update(() => {
-      const selection = $getSelection();
-      if (!$isRangeSelection(selection)) {
-        return;
-      }
-
-      const anchorNode = selection.anchor.getNode();
-      const textContent = anchorNode.getTextContent();
-      const anchorOffset = selection.anchor.offset;
-      
-      // 处理有@字符的情况
-      const match = AT_MATCH_REGEX.exec(textContent);
-      
-      if (match) {
-        // 计算@符号的位置
-        const matchText = match[0]; // 完整匹配文本，如"@abc"
-        const startOffset = anchorOffset - matchText.length;
+  // 保存触发位置的状态
+  const [triggerPosition, setTriggerPosition] = useState<{ left: number; top: number; height: number } | null>(null);
+  
+  // 处理提及触发逻辑
+  const handleMentionTrigger = useCallback(
+    (textNode: TextNode) => {
+      if (textNode) {
+        const textContent = textNode.getTextContent();
+        const lastAtPos = textContent.lastIndexOf('@');
         
-        // 设置选择范围从@符号开始到当前光标位置
-        selection.setTextNodeRange(
-          anchorNode as TextNode,
-          startOffset,
-          anchorNode as TextNode,
-          anchorOffset
-        );
-        
-        // 删除选中的内容（@及后面的查询文本）
-        selection.deleteCharacter(true);
-        
-        // 创建并插入提及节点
-        const mentionNode = $createMentionNode(contact.name, contact.id);
-        selection.insertNodes([mentionNode]);
-        
-        // 添加空格以方便继续输入
-        selection.insertText(' ');
-      } else if (textContent === '@' || textContent.endsWith('@')) {
-        // 处理刚输入@的情况
-        let startOffset;
-        if (textContent === '@') {
-          startOffset = 0;
+        if (lastAtPos !== -1) {
+          // 获取@后的搜索文本
+          const searchText = textContent.substring(lastAtPos + 1);
+          
+          // 更新状态
+          setQueryString(searchText);
+          setDropdownOpen(true);
+          setSelectedContactIndex(0);
+          
+          // 筛选匹配的联系人
+          setFilteredContacts(filterContacts(contacts, searchText));
+          
+          // 获取@符号的位置
+          editor.getEditorState().read(() => {
+            const domSelection = window.getSelection();
+            const domRange = domSelection?.getRangeAt(0);
+            
+            if (domRange) {
+              // 创建一个临时范围用于定位@符号
+              const tempRange = document.createRange();
+              tempRange.setStart(domRange.startContainer, lastAtPos);
+              tempRange.setEnd(domRange.startContainer, lastAtPos + 1);
+              
+              // 获取@符号的边界框
+              const rect = tempRange.getBoundingClientRect();
+              
+              // 如果编辑器挂载在文档中
+              if (rect && inputRef.current) {
+                const editorRect = inputRef.current.getBoundingClientRect();
+                
+                // 计算相对于编辑器的位置
+                setTriggerPosition({
+                  left: rect.left - editorRect.left,
+                  top: rect.bottom - editorRect.top,
+                  height: rect.height,
+                });
+              } else if (inputRef.current) {
+                // 处理特殊情况，如编辑器为空时，使用编辑器的起始位置
+                const editorRect = inputRef.current.getBoundingClientRect();
+                
+                setTriggerPosition({
+                  left: 0,
+                  top: 20, // 行高默认
+                  height: 20, // 预估行高
+                });
+              }
+            }
+          });
         } else {
-          startOffset = anchorOffset - 1; // 只删除@符号
+          // 如果没有@符号或它已被删除，关闭下拉列表
+          setDropdownOpen(false);
+        }
+      } else {
+        // 如果没有文本节点，关闭下拉列表
+        setDropdownOpen(false);
+      }
+    },
+    [contacts, editor]
+  );
+  
+  // 插入提及节点
+  const insertMention = useCallback(
+    (contact: ChatContact) => {
+      editor.update(() => {
+        const selection = $getSelection();
+        
+        if ($isRangeSelection(selection)) {
+          const anchor = selection.anchor;
+          const focus = selection.focus;
+          const anchorNode = anchor.getNode();
+          
+          if (anchorNode instanceof TextNode) {
+            const textContent = anchorNode.getTextContent();
+            const lastAtPos = textContent.lastIndexOf('@');
+            
+            if (lastAtPos !== -1) {
+              // 创建提及节点 - 只传递名称和ID两个参数
+              const mentionNode = $createMentionNode(contact.name, contact.id);
+              
+              // 分割文本节点，删除@和搜索文本
+              if (lastAtPos > 0) {
+                anchorNode.splitText(lastAtPos);
+              }
+              
+              // 替换文本节点中的@+查询文本
+              const textNodeKey = anchorNode.getKey();
+              const textNode = $getNodeByKey(textNodeKey);
+              
+              if (textNode && textNode instanceof TextNode) {
+                textNode.setTextContent(textContent.substring(0, lastAtPos));
+                textNode.insertAfter(mentionNode);
+                
+                // 在提及节点后插入一个空格节点
+                const spaceNode = $createTextNode(' ');
+                mentionNode.insertAfter(spaceNode);
+                
+                // 将选择移到空格节点后
+                spaceNode.select();
+              }
+            }
+          }
         }
         
-        // 设置选择范围
-        selection.setTextNodeRange(
-          anchorNode as TextNode,
-          startOffset,
-          anchorNode as TextNode,
-          anchorOffset
-        );
+        // 关闭下拉列表
+        setDropdownOpen(false);
         
-        // 删除@符号
-        selection.deleteCharacter(true);
-        
-        // 创建并插入提及节点
-        const mentionNode = $createMentionNode(contact.name, contact.id);
-        selection.insertNodes([mentionNode]);
-        
-        // 添加空格以方便继续输入
-        selection.insertText(' ');
-      }
-
-      // 强制编辑器更新，确保视图刷新
-      setTimeout(() => {
-        // 触发编辑器重新渲染
-        editor.update(() => {
-          // 空更新，仅用于触发视图刷新
+        // 确保编辑器保持焦点
+        setTimeout(() => {
+          editor.focus();
+        }, 0);
+      });
+    },
+    [editor]
+  );
+  
+  // 设置键盘监听和事件处理
+  useEffect(() => {
+    if (!editor) return;
+    
+    // 获取编辑器DOM引用
+    const rootElement = editor.getRootElement();
+    if (rootElement) {
+      inputRef.current = rootElement.closest('div.relative') || null;
+    }
+    
+    // 注册命令和侦听器
+    return mergeRegister(
+      // 监听输入变化
+      editor.registerUpdateListener(({ editorState }) => {
+        editorState.read(() => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection)) return;
+          
+          const anchor = selection.anchor;
+          const anchorNode = anchor.getNode();
+          
+          if (anchorNode instanceof TextNode) {
+            handleMentionTrigger(anchorNode);
+          } else if (dropdownOpen) {
+            // 如果不再是文本节点，关闭下拉列表
+            setDropdownOpen(false);
+          }
         });
-      }, 0);
-
-      // 关闭弹出框
-      setIsVisible(false);
-    });
-  }, [editor]);
-
-  // 处理按键事件
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // 如果弹出框不可见，不处理
-    if (!isVisible || !popupPosition || filteredContacts.length === 0) {
-      return false;
-    }
-
-    // 上下键选择
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedContactIndex(prev => 
-        prev < filteredContacts.length - 1 ? prev + 1 : 0
-      );
-      return true;
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedContactIndex(prev => 
-        prev > 0 ? prev - 1 : filteredContacts.length - 1
-      );
-      return true;
-    } 
-    // 回车键或Tab键确认选择
-    else if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
-      insertMention(filteredContacts[selectedContactIndex]);
-      return true;
-    } 
-    // Esc键关闭
-    else if (e.key === 'Escape') {
-      e.preventDefault();
-      setIsVisible(false);
-      return true;
-    }
-    
-    return false;
-  }, [isVisible, popupPosition, filteredContacts, selectedContactIndex, insertMention]);
-
-  // 处理点击联系人项
-  const handleContactClick = useCallback((contact: ChatContact) => {
-    insertMention(contact);
-    // 防止冒泡到document导致关闭弹出框
-    setTimeout(() => setIsVisible(false), 0);
-  }, [insertMention]);
-
-  // 检测@字符输入
-  const handleAtCharInput = useCallback((text: string) => {
-    if (text === '@') {
-      // 立即设置可见状态和计算位置
-      setQueryString('');
-      setIsVisible(true);
+      }),
       
-      // 延迟一点计算位置，确保DOM已更新
-      setTimeout(() => {
-        calculatePopupPosition();
-      }, 10);
-      
-      return true;
-    }
-    return false;
-  }, [calculatePopupPosition]);
-
-  // 点击事件监听，点击外部关闭弹出框
-  useEffect(() => {
-    const onClickOutside = () => {
-      setIsVisible(false);
-    };
-
-    document.addEventListener('click', onClickOutside);
-    
-    return () => {
-      document.removeEventListener('click', onClickOutside);
-    };
-  }, []);
-
-  // 更新监听
-  useEffect(() => {
-    return editor.registerUpdateListener(() => {
-      checkForMentions();
-    });
-  }, [editor, checkForMentions]);
-
-  // 按键监听
-  useEffect(() => {
-    return editor.registerCommand(
-      KEY_DOWN_COMMAND,
-      (event: KeyboardEvent) => {
-        return handleKeyDown(event);
-      },
-      COMMAND_PRIORITY_CRITICAL
-    );
-  }, [editor, handleKeyDown]);
-
-  // 文本输入监听
-  useEffect(() => {
-    const removeTextContentListener = editor.registerTextContentListener(
-      (text) => {
-        // 当文本变化时，检查是否输入了@
-        const lastChar = text.charAt(text.length - 1);
-        if (lastChar === '@') {
-          handleAtCharInput('@');
+      // 特殊处理空编辑器情况下的@输入
+      editor.registerTextContentListener((text) => {
+        if (text.length === 1 && text === '@') {
+          setQueryString('');
+          setDropdownOpen(true);
+          setSelectedContactIndex(0);
+          setFilteredContacts(contacts);
+          
+          // 如果编辑器挂载在文档中
+          if (inputRef.current) {
+            const editorRect = inputRef.current.getBoundingClientRect();
+            
+            // 设置触发位置为编辑器的起始位置
+            setTriggerPosition({
+              left: 0,
+              top: 20, // 行高默认
+              height: 20, // 预估行高
+            });
+          }
         }
-      }
+      }),
+      
+      // 监听SHOW_MENTIONS_COMMAND命令
+      editor.registerCommand(
+        SHOW_MENTIONS_COMMAND,
+        () => {
+          setQueryString('');
+          setDropdownOpen(true);
+          setSelectedContactIndex(0);
+          setFilteredContacts(contacts);
+          
+          // 延迟一下计算位置，确保DOM已更新
+          setTimeout(() => {
+            if (inputRef.current) {
+              const selection = window.getSelection();
+              if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                const editorRect = inputRef.current.getBoundingClientRect();
+                
+                if (rect.width > 0 && rect.height > 0) {
+                  setTriggerPosition({
+                    left: rect.left - editorRect.left,
+                    top: rect.bottom - editorRect.top,
+                    height: rect.height,
+                  });
+                } else {
+                  // 空编辑器情况
+                  setTriggerPosition({
+                    left: 0,
+                    top: 20,
+                    height: 20,
+                  });
+                }
+              }
+            }
+          }, 0);
+          return true;
+        },
+        COMMAND_PRIORITY_CRITICAL
+      ),
+      
+      // 监听按键导航
+      editor.registerCommand(
+        KEY_ARROW_DOWN_COMMAND,
+        () => {
+          if (dropdownOpen && filteredContacts.length > 0) {
+            const nextIndex = (selectedContactIndex + 1) % filteredContacts.length;
+            setSelectedContactIndex(nextIndex);
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
+      
+      editor.registerCommand(
+        KEY_ARROW_UP_COMMAND,
+        () => {
+          if (dropdownOpen && filteredContacts.length > 0) {
+            const prevIndex = (selectedContactIndex - 1 + filteredContacts.length) % filteredContacts.length;
+            setSelectedContactIndex(prevIndex);
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
+      
+      editor.registerCommand(
+        KEY_ENTER_COMMAND,
+        () => {
+          if (dropdownOpen && filteredContacts.length > 0) {
+            insertMention(filteredContacts[selectedContactIndex]);
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
+      
+      editor.registerCommand(
+        KEY_TAB_COMMAND,
+        () => {
+          if (dropdownOpen && filteredContacts.length > 0) {
+            insertMention(filteredContacts[selectedContactIndex]);
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
+      
+      editor.registerCommand(
+        KEY_ESCAPE_COMMAND,
+        () => {
+          if (dropdownOpen) {
+            setDropdownOpen(false);
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_LOW
+      )
     );
-    
-    return () => {
-      removeTextContentListener();
-    };
-  }, [editor, handleAtCharInput]);
-
-  // 没有弹出框位置或不可见时不渲染
-  if (!isVisible || !popupPosition || filteredContacts.length === 0) {
+  }, [
+    editor,
+    handleMentionTrigger,
+    dropdownOpen,
+    filteredContacts,
+    selectedContactIndex,
+    insertMention,
+    contacts,
+  ]);
+  
+  // 如果没有要显示的内容，不渲染任何东西
+  if (!dropdownOpen || !triggerPosition) {
     return null;
   }
-
+  
   return (
-    <div 
-      className="absolute z-10 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto w-56"
+    <div
+      ref={dropdownRef}
+      className="absolute z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-auto max-h-60 w-64"
       style={{
-        left: `${popupPosition.left}px`,
-        top: `${popupPosition.top}px`,
+        top: `${triggerPosition.top + triggerPosition.height}px`,
+        left: `${triggerPosition.left}px`,
       }}
-      onClick={(e) => e.stopPropagation()} // 防止冒泡到document
     >
-      <div className="p-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-        {queryString ? `搜索 "${queryString}"` : '选择联系人'}
-      </div>
-      <ul className="py-1">
-        {filteredContacts.map((contact, index) => (
-          <li 
-            key={contact.id}
-            className={`px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center ${
-              index === selectedContactIndex ? 'bg-gray-100 dark:bg-gray-700' : ''
-            }`}
-            onClick={() => handleContactClick(contact)}
-            onMouseEnter={() => setSelectedContactIndex(index)}
-          >
-            <div className="flex items-center space-x-2 w-full">
-              <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-                contact.isAI ? 'bg-blue-500' : 'bg-gray-500'
-              } text-white text-xs font-medium`}>
-                {contact.avatar || contact.name.charAt(0)}
+      {filteredContacts.length === 0 ? (
+        <div className="p-2 text-gray-500 dark:text-gray-400">未找到联系人</div>
+      ) : (
+        <ul>
+          {filteredContacts.map((contact, index) => (
+            <li
+              key={contact.id}
+              className={`p-2 cursor-pointer flex items-center ${
+                index === selectedContactIndex
+                  ? 'bg-blue-100 dark:bg-blue-900'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+              onClick={() => insertMention(contact)}
+            >
+              {contact.avatar && (
+                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 mr-2 flex-shrink-0">
+                  <img
+                    src={contact.avatar}
+                    alt={contact.name}
+                    className="w-full h-full rounded-full"
+                  />
+                </div>
+              )}
+              {!contact.avatar && (
+                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-600 mr-2 flex items-center justify-center flex-shrink-0">
+                  {contact.name.charAt(0)}
+                </div>
+              )}
+              <div className="flex flex-col">
+                <span className="font-medium">{contact.name}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {contact.isAI ? '人工智能' : '用户'}
+                </span>
               </div>
-              <span className="text-sm truncate">
-                {contact.name}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 } 

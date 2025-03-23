@@ -1,5 +1,5 @@
 import React from 'react';
-import { createBrowserRouter, Navigate, RouteObject, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom';
 import GuiChatLayout from './pages/home';
 import GuiChatChats from './pages/home/chats';
 import GuiChatContacts from './pages/home/contacts';
@@ -7,49 +7,25 @@ import GuiChatResources from './pages/home/resources';
 import GuiChatResourceDetail from './pages/resources/[resourceId]';
 import GuiChatChat from './pages/chats/[chatId]';
 import NotFoundPage from './pages/not-found';
-import ErrorBoundary from './components/error-boundary';
-import { ErrorHandler, LogLevel } from './utils/error-handler';
+import RouteErrorBoundary from './components/route-error-boundary';
 // 导入 loaders
 import { resourcesLoader, resourceDetailLoader } from './loaders';
-
-/**
- * 错误边界布局组件
- *
- * 使用Outlet在一个错误边界内渲染子路由
- */
-const ErrorBoundaryLayout = () => {
-  return (
-    <ErrorBoundary
-      onError={(error, errorInfo) => {
-        // 使用错误处理工具记录路由错误
-        ErrorHandler.getInstance().handleError(
-          error,
-          {
-            component: 'RouteErrorBoundary',
-            details: errorInfo.componentStack,
-          },
-          LogLevel.ERROR
-        );
-      }}
-    >
-      <Outlet />
-    </ErrorBoundary>
-  );
-};
 
 // 创建路由配置
 const routes: RouteObject[] = [
   {
-    // 错误边界布局路由
-    element: <ErrorBoundaryLayout />,
+    // 根路由
+    path: '/',
+    // 为根路由设置错误边界，捕获所有子路由的错误
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
-        path: '/',
+        index: true,
         element: <Navigate to="/home" replace />,
       },
       {
-        // guichat主路由，包含底部导航栏和子路由
-        path: '/home',
+        // 主路由，包含底部导航栏和子路由
+        path: 'home',
         element: <GuiChatLayout />,
         children: [
           {
@@ -78,17 +54,17 @@ const routes: RouteObject[] = [
       },
       {
         // 资源详情页面
-        path: '/resources/:resourceId',
+        path: 'resources/:resourceId',
         element: <GuiChatResourceDetail />,
         loader: resourceDetailLoader,
       },
       {
         // 聊天详情页，显示与特定联系人的聊天记录
-        path: '/chats/:chatId',
+        path: 'chats/:chatId',
         element: <GuiChatChat />,
       },
       {
-        // 处理所有未匹配的路径，重定向到主布局
+        // 处理所有未匹配的路径
         path: '*',
         element: <NotFoundPage />,
       },

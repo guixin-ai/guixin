@@ -8,7 +8,7 @@ import {
   ChatMessagesFetchException 
 } from '@/errors/service.errors';
 import { invoke } from '@tauri-apps/api/core';
-import { formatChatTime } from '@/utils/date-utils';
+import { formatDate } from '@/utils/date-utils';
 
 /**
  * 后端返回的聊天列表项接口
@@ -63,12 +63,12 @@ class ChatService {
       // 将后端数据转换为前端所需格式
       const chats: ChatItem[] = response.chats.map(item => {
         // 格式化时间戳，优先使用created_at，如果没有则使用updated_at
-        const timestamp = formatChatTime(item.created_at || item.updated_at);
+        const timestamp = formatDate(item.created_at || item.updated_at);
         
         return {
           id: item.id,
           name: item.name,
-          avatar: item.avatar,
+          avatar: [item.avatar],
           lastMessage: item.last_message || '',
           timestamp,
           unread: item.unread || undefined

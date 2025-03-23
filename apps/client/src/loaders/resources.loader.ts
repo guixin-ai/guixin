@@ -34,4 +34,4 @@ export const resourcesLoader = async () => {
     console.error('加载资源列表失败:', error);
     return { resources: [], error: '加载资源失败' };
   }
-}; 
+};

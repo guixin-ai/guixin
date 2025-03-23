@@ -3,7 +3,7 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
-import { ResourceType } from '@/models/resource.model';
+import { ResourceType } from '@/types/resource';
 
 /**
  * 资源响应接口

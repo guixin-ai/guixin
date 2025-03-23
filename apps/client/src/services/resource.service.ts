@@ -1,25 +1,10 @@
-import { ResourceItem, ResourceType } from '@/models/resource.model';
+import { ResourceItem, ResourceType } from '@/types/resource';
 import { resourceCommands, ResourceResponse } from '@/commands/resource.commands';
-import { convertFileSrc } from '@tauri-apps/api/core';
-import { appDataDir, join } from '@tauri-apps/api/path';
 
 export interface GetResourcesResponse {
   resources: ResourceItem[];
   total: number;
 }
-
-// 将后端资源响应转换为前端模型
-const convertResourceResponseToItem = async (resource: ResourceResponse): Promise<ResourceItem> => {
-  return {
-    id: resource.id,
-    name: resource.name,
-    type: resource.type_ as ResourceType,
-    url: resource.url,
-    fileName: resource.file_name,
-    createdAt: resource.created_at,
-    description: resource.description || undefined,
-  };
-};
 
 export const resourceService = {
   /**
@@ -32,7 +17,15 @@ export const resourceService = {
       const resources = await resourceCommands.getCurrentUserResources();
 
       // 转换为前端模型
-      const resourceItems = await Promise.all(resources.map(convertResourceResponseToItem));
+      const resourceItems = resources.map(resource => ({
+        id: resource.id,
+        name: resource.name,
+        type: resource.type_ as ResourceType,
+        url: resource.url,
+        fileName: resource.file_name,
+        createdAt: resource.created_at,
+        description: resource.description || undefined,
+      }));
 
       return {
         resources: resourceItems,
@@ -54,7 +47,15 @@ export const resourceService = {
       const resources = await resourceCommands.getCurrentUserImageResources();
 
       // 转换为前端模型
-      const resourceItems = await Promise.all(resources.map(convertResourceResponseToItem));
+      const resourceItems = resources.map(resource => ({
+        id: resource.id,
+        name: resource.name,
+        type: resource.type_ as ResourceType,
+        url: resource.url,
+        fileName: resource.file_name,
+        createdAt: resource.created_at,
+        description: resource.description || undefined,
+      }));
 
       return {
         resources: resourceItems,
@@ -76,7 +77,15 @@ export const resourceService = {
       const resources = await resourceCommands.getCurrentUserTextResources();
 
       // 转换为前端模型
-      const resourceItems = await Promise.all(resources.map(convertResourceResponseToItem));
+      const resourceItems = resources.map(resource => ({
+        id: resource.id,
+        name: resource.name,
+        type: resource.type_ as ResourceType,
+        url: resource.url,
+        fileName: resource.file_name,
+        createdAt: resource.created_at,
+        description: resource.description || undefined,
+      }));
 
       return {
         resources: resourceItems,
@@ -110,7 +119,15 @@ export const resourceService = {
       });
 
       // 转换为前端模型
-      return await convertResourceResponseToItem(resource);
+      return {
+        id: resource.id,
+        name: resource.name,
+        type: resource.type_ as ResourceType,
+        url: resource.url,
+        fileName: resource.file_name,
+        createdAt: resource.created_at,
+        description: resource.description || undefined,
+      };
     } catch (error) {
       console.error('上传图片资源失败:', error);
       throw error;
@@ -138,7 +155,15 @@ export const resourceService = {
       });
 
       // 转换为前端模型
-      return await convertResourceResponseToItem(resource);
+      return {
+        id: resource.id,
+        name: resource.name,
+        type: resource.type_ as ResourceType,
+        url: resource.url,
+        fileName: resource.file_name,
+        createdAt: resource.created_at,
+        description: resource.description || undefined,
+      };
     } catch (error) {
       console.error('上传文本资源失败:', error);
       throw error;
@@ -156,7 +181,15 @@ export const resourceService = {
       const resource = await resourceCommands.getResource({ id });
 
       // 转换为前端模型
-      return await convertResourceResponseToItem(resource);
+      return {
+        id: resource.id,
+        name: resource.name,
+        type: resource.type_ as ResourceType,
+        url: resource.url,
+        fileName: resource.file_name,
+        createdAt: resource.created_at,
+        description: resource.description || undefined,
+      };
     } catch (error) {
       console.error('获取资源详情失败:', error);
       throw error;

@@ -1,6 +1,6 @@
 import { AIMember, useAIQueueStore } from '@/models/ai-queue.model';
 import { ChatMember, ChatMessage } from '@/types/chat';
-import { ArrowLeft, Mic, MoreVertical, Paperclip, Send, Smile } from 'lucide-react';
+import { ArrowLeft, MoreVertical } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLoaderData } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -12,14 +12,7 @@ import MessageItemContent, { VirtuosoMessageItem } from '../../../components/mes
 import { Button } from '../../../components/ui/button';
 import { OllamaMessage } from '../../../services/ollama.service';
 import { useFetcher } from 'react-router-dom';
-
-// 联系人类型
-interface Contact {
-  id: string;
-  name: string;
-  avatar: string;
-  isAI?: boolean;
-}
+import { ChatInput, ChatContact } from '../../../components/chat-input';
 
 // 聊天详情页加载器数据类型
 interface ChatDetailLoaderData {
@@ -59,15 +52,10 @@ const ChatPage = () => {
   const errorMessage = data.error;
   
   const virtuosoRef = useRef<VirtuosoMessageListMethods<VirtuosoMessageItem>>(null);
-  const [inputValue, setInputValue] = useState('');
-  const [contact, setContact] = useState<Contact | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [contact, setContact] = useState<ChatContact | null>(null);
   const [isAIResponding, setIsAIResponding] = useState(false);
   const [isMessagesInitialized, setIsMessagesInitialized] = useState(false);
   const [messages, setMessages] = useState<VirtuosoMessageItem[]>([]);
-
-  // 添加输入框引用，用于保持焦点
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 获取AI队列相关方法
   const aiQueueStore = useAIQueueStore(
@@ -265,11 +253,11 @@ const ChatPage = () => {
   };
 
   // 发送消息
-  const handleSend = () => {
+  const handleSend = (message: string) => {
     if (!chatId) return;
     
     // 如果没有输入内容或AI正在响应，则不发送消息
-    if (!inputValue.trim() || isAIResponding) return;
+    if (!message.trim() || isAIResponding) return;
 
     const userMessageId = `user-${Date.now()}`;
     const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -277,7 +265,7 @@ const ChatPage = () => {
     // 创建用户消息
     const userMessage: VirtuosoMessageItem = {
       key: userMessageId,
-      content: inputValue,
+      content: message,
       isSelf: true,
       timestamp: currentTime,
     };
@@ -297,16 +285,12 @@ const ChatPage = () => {
       setIsMessagesInitialized(true);
     }
 
-    // 保存用户输入，然后清空输入框
-    const currentInput = inputValue;
-    setInputValue('');
-
     // 将用户消息保存到后端 - 使用fetcher发送消息
     messageFetcher.submit(
       { 
         chatId, 
         messageId: userMessageId,
-        content: currentInput,
+        content: message,
         isSelf: 'true',
         timestamp: currentTime
       },
@@ -317,7 +301,7 @@ const ChatPage = () => {
     // 准备历史消息 - 包括刚才的用户消息
     const allCurrentMessages = [...initialMessages, {
       id: userMessageId,
-      content: currentInput,
+      content: message,
       isSelf: true,
       timestamp: currentTime
     }];
@@ -361,24 +345,6 @@ const ChatPage = () => {
         },
       });
     });
-
-    // 保持输入框焦点
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  };
-
-  // 按回车发送消息
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // 阻止默认行为，防止输入框换行
-
-      // 只有在AI没有响应时才发送消息
-      if (!isAIResponding) {
-        handleSend();
-      }
-      // 如果AI正在响应，不做任何操作，但保持焦点在输入框上
-    }
   };
 
   // 修改取消生成函数，使用aiQueueStore
@@ -391,30 +357,17 @@ const ChatPage = () => {
     setIsAIResponding(false);
   };
 
-  // 添加一个新的状态来控制显示加载UI
-  const [showLoading, setShowLoading] = useState(false);
-  
-  // 修改loading状态变化监听
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-
-    if (loading) {
-      // 如果进入加载状态，设置延迟计时器
-      timer = setTimeout(() => {
-        setShowLoading(true);
-      }, 300); // 300ms延迟
-    } else {
-      // 如果退出加载状态，立即隐藏加载UI
-      setShowLoading(false);
-    }
-
-    // 清理函数，在组件卸载或依赖变化时清除计时器
-    return () => {
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
-    };
-  }, [loading]);
+  // 获取聊天成员作为联系人列表
+  const getContactsFromMembers = (): ChatContact[] => {
+    if (!chatDetail || !chatDetail.members) return [];
+    
+    return chatDetail.members.map(member => ({
+      id: member.id,
+      name: member.name,
+      avatar: typeof member.avatar === 'string' ? member.avatar : member.avatar[0],
+      isAI: member.isAI || false
+    }));
+  };
 
   // 聊天页面
   return (
@@ -478,102 +431,41 @@ const ChatPage = () => {
 
       {/* 输入区域 */}
       <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center">
-          <div className="flex-1 relative">
-            <textarea
-              ref={inputRef}
-              className="w-full h-11 px-4 py-2 pr-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 focus:outline-none resize-none"
-              placeholder="输入消息..."
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyPress}
-              disabled={isAIResponding || messageFetcher.state === 'submitting'}
-            />
-            <div className="absolute right-3 top-2 flex items-center space-x-2">
-              <Button variant="ghost" size="icon" className="text-gray-400 w-7 h-7">
-                <Smile size={18} />
-              </Button>
+        <ChatInput 
+          onSend={handleSend}
+          placeholder="输入消息..."
+          loading={isAIResponding || messageFetcher.state === 'submitting'}
+          contacts={getContactsFromMembers()}
+        />
+        
+        {isAIResponding && (
+          <div className="flex items-center mt-2 px-2">
+            <div className="text-gray-500 text-xs mr-2 flex items-center">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
+              <div
+                className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
+                style={{ animationDelay: '0.2s' }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                style={{ animationDelay: '0.4s' }}
+              ></div>
             </div>
-          </div>
-          <div className="flex items-center ml-2">
-            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300 mx-1">
-              <Paperclip size={20} />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300 mx-1">
-              <Mic size={20} />
-            </Button>
             <Button
-              className="bg-blue-500 hover:bg-blue-600 text-white ml-1 w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-50"
-              disabled={!inputValue.trim() || isAIResponding || messageFetcher.state === 'submitting'}
-              onClick={handleSend}
+              variant="ghost"
+              size="sm"
+              className="text-red-500 text-xs ml-1"
+              onClick={cancelCurrentGeneration}
             >
-              <Send size={18} />
+              终止生成
             </Button>
           </div>
-        </div>
-
-        <div className="flex mt-2 px-2">
-          <div className="flex-1">
-            {messageFetcher.state === "submitting" && (
-              <div className="text-gray-500 text-xs">发送中...</div>
-            )}
-            
-            {hasError && (
-              <div className="text-red-500 text-xs">{errorMessage}</div>
-            )}
-
-            {/* 底部操作提示区 */}
-            <div className="flex justify-between">
-              {!inputValue.trim() && !isAIResponding && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-500 text-xs"
-                    onClick={() => setInputValue('')}
-                  >
-                    清空
-                  </Button>
-                </>
-              )}
-
-              {isAIResponding && (
-                <div className="flex items-center">
-                  <div className="text-gray-500 text-xs mr-2 flex items-center">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                    <div
-                      className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"
-                      style={{ animationDelay: '0.2s' }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-green-500 rounded-full animate-pulse"
-                      style={{ animationDelay: '0.4s' }}
-                    ></div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 text-xs ml-1"
-                    onClick={cancelCurrentGeneration}
-                  >
-                    终止生成
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        )}
+        
+        {hasError && (
+          <div className="text-red-500 text-xs mt-2 px-2">{errorMessage}</div>
+        )}
       </div>
-      
-      {/* 加载指示器 */}
-      {loading && showLoading && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/10">
-          <div className="flex flex-col items-center justify-center">
-            <div className="w-12 h-12 border-4 border-gray-200 border-t-green-500 rounded-full animate-spin"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-300 font-medium">加载中...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

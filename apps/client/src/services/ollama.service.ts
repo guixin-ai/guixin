@@ -247,9 +247,15 @@ export interface OllamaVersionResponse {
   version: string;
 }
 
-// 添加可取消的聊天流方法
+// Ollama 添加可取消的聊天流方法
 export interface ChatStreamOptions {
   signal?: AbortSignal;
+}
+
+// 添加流式聊天结果接口
+export interface OllamaChatStreamResult {
+  fullResponse: OllamaMessage;
+  chunks: OllamaChatResponse[];
 }
 
 /**
@@ -356,185 +362,134 @@ class OllamaService {
   }
 
   /**
-   * 使用 AbortSignal 进行流式聊天
+   * 使用 for await 循环的流式聊天
    * @param request 聊天请求
    * @param options 附加选项，包含 AbortSignal
-   * @param onChunk 块响应回调
-   * @param onComplete 完成回调
-   * @param onError 错误回调
+   * @returns 异步迭代器，可用于 for await...of 循环
    */
-  async chatStream(
+  async *chatStream(
     request: OllamaChatRequest,
-    options: ChatStreamOptions = {},
-    onChunk: (chunk: OllamaChatResponse) => void,
-    onComplete?: (fullResponse: OllamaMessage) => void,
-    onError?: (error: Error) => void
-  ): Promise<void> {
+    options: ChatStreamOptions = {}
+  ): AsyncGenerator<OllamaChatResponse, OllamaMessage, undefined> {
     // 确保流模式开启
     request.stream = true;
 
-    try {
-      const response = await fetch(`${OLLAMA_API_BASE_URL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-        signal: options.signal, // 使用传入的AbortSignal，如果没有则为undefined
-      });
+    const response = await fetch(`${OLLAMA_API_BASE_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+      signal: options.signal,
+    });
 
-      if (!response.ok) {
-        // 使用自定义逻辑处理流式聊天的错误，因为我们需要特殊处理
-        const errorText = await response.text();
-        let errorMessage = `状态码: ${response.status}`;
-        let error: Error;
-
-        try {
-          const errorJson = JSON.parse(errorText);
-          if (errorJson.error) {
-            errorMessage = errorJson.error;
-          }
-        } catch {
-          errorMessage = `${errorMessage}, ${errorText}`;
-        }
-
-        // 根据状态码创建合适的错误对象
-        if (response.status === 404) {
-          error = new OllamaModelNotFoundError(request.model, response.status, errorMessage, errorText);
-        } else if (response.status === 500 && errorMessage.includes("failed to load model")) {
-          error = new OllamaModelLoadError(request.model, response.status, errorMessage, errorText);
-        } else {
-          error = new OllamaChatStreamError(response.status, errorMessage, false, errorText);
-        }
-        
-        // 使用回调处理错误而不是抛出
-        if (onError) {
-          onError(error);
-          return;
-        }
-        
-        // 如果没有提供错误回调，则抛出异常（向后兼容）
-        throw error;
-      }
-
-      if (!response.body) {
-        const error = new OllamaChatStreamError(0, '响应没有可读取的内容');
-        if (onError) {
-          onError(error);
-          return;
-        }
-        throw error;
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = '';
-      let buffer = '';
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `状态码: ${response.status}`;
 
       try {
-        while (true) {
-          const { done, value } = await reader.read();
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error) {
+          errorMessage = errorJson.error;
+        }
+      } catch {
+        errorMessage = `${errorMessage}, ${errorText}`;
+      }
 
-          if (done) {
-            break;
-          }
+      if (response.status === 404) {
+        throw new OllamaModelNotFoundError(request.model, response.status, errorMessage, errorText);
+      } else if (response.status === 500 && errorMessage.includes("failed to load model")) {
+        throw new OllamaModelLoadError(request.model, response.status, errorMessage, errorText);
+      } else {
+        throw new OllamaChatStreamError(response.status, errorMessage, false, errorText);
+      }
+    }
 
-          // 解码二进制数据为文本
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
+    if (!response.body) {
+      throw new OllamaChatStreamError(0, '响应没有可读取的内容');
+    }
 
-          // 处理可能包含多个或不完整的 JSON 对象的响应
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // 保留最后一行，可能是不完整的
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let buffer = '';
 
-          for (const line of lines) {
-            if (!line.trim()) continue;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-            try {
-              const jsonChunk = JSON.parse(line) as OllamaChatResponse;
-              onChunk(jsonChunk);
+        if (done) {
+          break;
+        }
 
-              if (jsonChunk.message?.content && typeof jsonChunk.message.content === 'string') {
-                fullContent += jsonChunk.message.content;
-              }
-            } catch (e) {
-              console.warn('解析 JSON 响应失败:', line, e);
-              // 不中断流，只记录解析错误
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          try {
+            const jsonChunk = JSON.parse(line) as OllamaChatResponse;
+            
+            if (jsonChunk.message?.content && typeof jsonChunk.message.content === 'string') {
+              fullContent += jsonChunk.message.content;
             }
+            
+            // 使用yield返回每个块
+            yield jsonChunk;
+          } catch (e) {
+            console.warn('解析 JSON 响应失败:', line, e);
           }
         }
-      } catch (error: any) {
-        // 处理中断错误
-        if (error.name === 'AbortError') {
-          console.log('流式生成被用户中断');
-          const abortError = new OllamaStreamAbortedError();
-          if (onError) {
-            onError(abortError);
-            return;
-          }
-          throw abortError;
-        }
-        
-        // 处理其他读取错误
-        if (onError) {
-          onError(error);
-          return;
-        }
-        throw error;
       }
 
       // 处理缓冲区中的最后一个不完整行
       if (buffer.trim()) {
         try {
           const jsonChunk = JSON.parse(buffer) as OllamaChatResponse;
-          onChunk(jsonChunk);
-
+          
           if (jsonChunk.message?.content && typeof jsonChunk.message.content === 'string') {
             fullContent += jsonChunk.message.content;
           }
+          
+          yield jsonChunk;
         } catch (e) {
           console.warn('解析最终 JSON 响应失败:', buffer, e);
-          // 记录但不抛出异常，因为这可能只是部分响应
         }
       }
 
-      if (onComplete) {
-        onComplete({
-          role: 'assistant',
-          content: fullContent,
-        });
-      }
+      // 迭代结束后返回完整响应
+      return {
+        role: 'assistant',
+        content: fullContent,
+      };
     } catch (error: any) {
-      // 处理所有其他错误，使用通用错误处理逻辑
+      // 处理中断错误
+      if (error.name === 'AbortError') {
+        console.log('流式生成被用户中断');
+        throw new OllamaStreamAbortedError();
+      }
+      
+      // 处理其他错误
       let handledError: Error;
       
-      // 如果是已知的Ollama异常，直接使用
       if (error instanceof OllamaBaseError) {
         handledError = error;
-      } 
-      // 网络错误
-      else if (error instanceof TypeError && error.message.includes('fetch')) {
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
         handledError = new OllamaConnectionError(error.message, error);
-      }
-      // 中断错误
-      else if (error instanceof DOMException && error.name === 'AbortError') {
+      } else if (error instanceof DOMException && error.name === 'AbortError') {
         handledError = new OllamaTimeoutError(0, error);
-      }
-      // 未知错误
-      else {
+      } else {
         handledError = new OllamaUnknownError(
           error instanceof Error ? error.message : String(error),
           error
         );
       }
       
-      if (onError) {
-        onError(handledError);
-        return;
-      }
-      
-      // 如果没有提供错误回调，则使用原始的错误处理逻辑（向后兼容）
-      handleCommonErrors(error);
+      throw handledError;
     }
   }
 

@@ -88,8 +88,8 @@ class AIProcessorService {
       // 收集AI回复内容
       let fullContent = '';
       
-      // 使用 Ollama 服务生成回复
-      await ollamaService.chatStream(
+      // 使用 Ollama 服务生成回复 - 使用for await循环处理流
+      const chatStreamGenerator = ollamaService.chatStream(
         {
           model: modelName || this.DEFAULT_MODEL,
           messages: allMessages,
@@ -99,8 +99,17 @@ class AIProcessorService {
             top_p: 0.9,
           },
         },
-        { signal: abortController?.signal },
-        (chunk: OllamaChatResponse) => {
+        { signal: abortController?.signal }
+      );
+      
+      try {
+        let lastChunk: OllamaChatResponse | null = null;
+        
+        // 使用for await循环处理每个响应块
+        for await (const chunk of chatStreamGenerator) {
+          // 保存最后一个块，通常包含done=true
+          lastChunk = chunk;
+          
           // 处理每个响应块
           if (chunk.message?.content && typeof chunk.message.content === 'string') {
             // 更新完整内容
@@ -109,45 +118,37 @@ class AIProcessorService {
             // 通知内容更新
             callbacks?.onContent?.(chatId, messageId, fullContent);
           }
-        },
-        (fullResponse: OllamaMessage) => {
-          // 完成时处理
-          const finalContent = fullResponse.content as string;
-          
-          // 通知完成
-          callbacks?.onComplete?.(chatId, messageId, finalContent);
-        },
-        (error: Error) => {
-          // 使用 ollama 服务的错误回调
-          let errorMessage = '抱歉，我暂时无法回答您的问题。';
-          
-          if (error instanceof OllamaStreamAbortedError) {
-            errorMessage = '(已中断)';
-          } else if (error instanceof OllamaModelNotFoundError) {
-            errorMessage = `抱歉，所需的模型 ${error.modelName} 不存在。请确保该模型已安装。`;
-          } else if (error instanceof OllamaModelLoadError) {
-            errorMessage = `抱歉，模型 ${error.modelName} 加载失败。请检查模型是否损坏或重新安装。`;
-          } else if (error instanceof OllamaServiceUnavailableError) {
-            errorMessage = '抱歉，Ollama服务不可用。请确保Ollama服务已启动并正常运行。';
-          } else if (error instanceof OllamaConnectionError) {
-            errorMessage = '抱歉，连接到Ollama服务失败。请检查网络连接和服务状态。';
-          } else if (error instanceof OllamaBaseError) {
-            errorMessage = `抱歉，Ollama服务出现错误: ${error.message}`;
-          } else {
-            console.error('调用Ollama服务失败:', error);
-            errorMessage = '抱歉，处理您的请求时发生了错误。';
-          }
-          
-          // 通知错误
-          callbacks?.onError?.(chatId, messageId, new Error(errorMessage));
         }
-      );
+        
+        // 流处理完成后，通知完成
+        // 由于完整的fullContent已经积累，直接使用它
+        callbacks?.onComplete?.(chatId, messageId, fullContent);
+      } catch (streamError) {
+        // 处理流处理过程中的错误
+        throw streamError;
+      }
       
       return fullContent;
     } catch (error: any) {
-      // 处理其他未捕获的错误
-      console.error('处理AI消息时发生未捕获的错误:', error);
-      const errorMessage = '抱歉，处理您的请求时发生了未预期的错误。';
+      // 使用 ollama 服务的错误处理
+      let errorMessage = '抱歉，我暂时无法回答您的问题。';
+      
+      if (error instanceof OllamaStreamAbortedError) {
+        errorMessage = '(已中断)';
+      } else if (error instanceof OllamaModelNotFoundError) {
+        errorMessage = `抱歉，所需的模型 ${error.modelName} 不存在。请确保该模型已安装。`;
+      } else if (error instanceof OllamaModelLoadError) {
+        errorMessage = `抱歉，模型 ${error.modelName} 加载失败。请检查模型是否损坏或重新安装。`;
+      } else if (error instanceof OllamaServiceUnavailableError) {
+        errorMessage = '抱歉，Ollama服务不可用。请确保Ollama服务已启动并正常运行。';
+      } else if (error instanceof OllamaConnectionError) {
+        errorMessage = '抱歉，连接到Ollama服务失败。请检查网络连接和服务状态。';
+      } else if (error instanceof OllamaBaseError) {
+        errorMessage = `抱歉，Ollama服务出现错误: ${error.message}`;
+      } else {
+        console.error('调用Ollama服务失败:', error);
+        errorMessage = '抱歉，处理您的请求时发生了错误。';
+      }
       
       // 通知错误
       callbacks?.onError?.(chatId, messageId, new Error(errorMessage));

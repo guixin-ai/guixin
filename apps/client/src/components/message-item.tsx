@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChatMember } from '@/types/chat';
+import { ChatContact } from './chat-input';
 
 // 虚拟消息类型
 export interface VirtuosoMessageItem {
@@ -11,17 +12,17 @@ export interface VirtuosoMessageItem {
   senderId?: string;
 }
 
-// 联系人类型
-interface Contact {
+// 接口重命名为 MessageSender 并与 ChatContact 保持一致
+interface MessageSender {
   id: string;
   name: string;
-  avatar: string;
+  avatar?: string;
   isAI?: boolean;
 }
 
 interface MessageItemContentProps {
   data: VirtuosoMessageItem;
-  contact: Contact | null;
+  contact: ChatContact | null;
   aiMembers?: ChatMember[];
 }
 
@@ -42,8 +43,9 @@ export const MessageItemContent: React.FC<MessageItemContentProps> = ({
       const sender = aiMembers.find(member => member.id === data.senderId);
       if (sender) {
         return {
+          id: sender.id,
           name: sender.name,
-          avatar: sender.avatar,
+          avatar: typeof sender.avatar === 'string' ? sender.avatar : sender.avatar[0],
           isAI: sender.isAI || false
         };
       }
@@ -62,7 +64,7 @@ export const MessageItemContent: React.FC<MessageItemContentProps> = ({
         {!data.isSelf && sender && (
           <div className="flex items-start max-w-[80%]">
             <div className="w-8 h-8 rounded-md bg-green-500 flex items-center justify-center text-white font-semibold text-xs mr-2 mt-1">
-              {sender.avatar}
+              {sender.avatar || sender.name[0]}
             </div>
             <div>
               {/* 显示发送者名称 */}

@@ -10,22 +10,11 @@ export interface GetResourcesResponse {
 
 // 将后端资源响应转换为前端模型
 const convertResourceResponseToItem = async (resource: ResourceResponse): Promise<ResourceItem> => {
-  let url = resource.url;
-
-  // 获取应用数据目录
-  const appData = await appDataDir();
-  console.log('appData', appData);
-  // 构建完整路径（appData目录 + 相对路径）
-  const fullPath = await join(appData, url);
-  console.log('fullPath', fullPath);
-  // 转换为asset协议URL
-  url = convertFileSrc(fullPath);
-
   return {
     id: resource.id,
     name: resource.name,
     type: resource.type_ as ResourceType,
-    url: url,
+    url: resource.url,
     fileName: resource.file_name,
     createdAt: resource.created_at,
     description: resource.description || undefined,

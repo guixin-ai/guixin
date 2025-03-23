@@ -6,11 +6,8 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { devtools } from 'zustand/middleware';
 
-// 资源类型枚举
-export enum ResourceType {
-  TEXT = 'text',
-  IMAGE = 'image'
-}
+// 资源类型联合类型
+export type ResourceType = 'text' | 'image';
 
 // 资源项接口
 export interface ResourceItem {

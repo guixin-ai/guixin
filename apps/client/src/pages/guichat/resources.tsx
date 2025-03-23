@@ -13,6 +13,8 @@ import DelayedLoading from '../../components/delayed-loading';
 import { useShallow } from 'zustand/react/shallow';
 import { ResourceItem } from '../../models/resource.model';
 import { resourceService } from '@/services/resource.service';
+import { convertFileSrc } from '@tauri-apps/api/core';
+import { appDataDir, join } from '@tauri-apps/api/path';
 
 const ResourcesPage = () => {
   const navigate = useNavigate();
@@ -51,8 +53,27 @@ const ResourcesPage = () => {
 
         // 如果未初始化，才调用服务获取数据
         const response = await resourceService.getResources();
+        
+        // 处理URL拼接
+        const processedResources = await Promise.all(
+          response.resources.map(async (resource) => {
+            // 获取应用数据目录
+            const appData = await appDataDir();
+            // 构建完整路径（appData目录 + 相对路径）
+            const fullPath = await join(appData, resource.url);
+            // 转换为asset协议URL
+            const assetUrl = convertFileSrc(fullPath);
+            
+            // 返回处理后的资源
+            return {
+              ...resource,
+              url: assetUrl
+            };
+          })
+        );
+        
         // 调用模型层的初始化方法设置数据和初始化标记
-        initializeList(response.resources);
+        initializeList(processedResources);
         setLoading(false);
       } catch (error) {
         console.error('加载资源列表失败:', error);
@@ -65,12 +86,37 @@ const ResourcesPage = () => {
 
   // 处理资源详情
   useEffect(() => {
-    if (resourceId && initializedList) {
-      const resource = resources.find(r => r.id === resourceId) || null;
-      setSelectedResource(resource);
-    } else {
-      setSelectedResource(null);
-    }
+    const loadSelectedResource = async () => {
+      if (resourceId && initializedList) {
+        // 尝试从本地状态找到资源
+        let resource = resources.find(r => r.id === resourceId) || null;
+        
+        // 如果找不到资源，尝试从服务获取
+        if (!resource) {
+          try {
+            const fetchedResource = await resourceService.getResourceDetails(resourceId);
+            
+            // 处理URL拼接
+            const appData = await appDataDir();
+            const fullPath = await join(appData, fetchedResource.url);
+            const assetUrl = convertFileSrc(fullPath);
+            
+            resource = {
+              ...fetchedResource,
+              url: assetUrl
+            };
+          } catch (error) {
+            console.error('获取资源详情失败:', error);
+          }
+        }
+        
+        setSelectedResource(resource);
+      } else {
+        setSelectedResource(null);
+      }
+    };
+    
+    loadSelectedResource();
   }, [resourceId, resources, initializedList]);
 
   // 过滤后的资源列表
@@ -127,8 +173,16 @@ const ResourcesPage = () => {
           file.name.split('.')[0] // 使用文件名作为资源名称
         );
         
+        // 处理URL拼接
+        const appData = await appDataDir();
+        const fullPath = await join(appData, resource.url);
+        const assetUrl = convertFileSrc(fullPath);
+        
         // 添加到状态管理
-        addResource(resource);
+        addResource({
+          ...resource,
+          url: assetUrl
+        });
       };
       
       input.click();
@@ -153,8 +207,16 @@ const ResourcesPage = () => {
         name
       );
       
+      // 处理URL拼接
+      const appData = await appDataDir();
+      const fullPath = await join(appData, resource.url);
+      const assetUrl = convertFileSrc(fullPath);
+      
       // 添加到状态管理
-      addResource(resource);
+      addResource({
+        ...resource,
+        url: assetUrl
+      });
     } catch (error) {
       console.error('添加文本资源失败:', error);
     }
@@ -163,9 +225,9 @@ const ResourcesPage = () => {
   // 资源类型图标组件
   const ResourceTypeIcon = ({ type }: { type: ResourceType }) => {
     switch (type) {
-      case ResourceType.TEXT:
+      case 'text':
         return <FileText size={16} className="text-blue-500" />;
-      case ResourceType.IMAGE:
+      case 'image':
         return <Image size={16} className="text-green-500" />;
       default:
         return null;
@@ -283,7 +345,7 @@ const ResourcesPage = () => {
                 </div>
                 
                 {/* 根据资源类型显示不同内容 */}
-                {selectedResource.type === ResourceType.IMAGE && (
+                {selectedResource.type === 'image' && (
                   <div className="mt-4">
                     <img 
                       src={selectedResource.url} 
@@ -293,7 +355,7 @@ const ResourcesPage = () => {
                   </div>
                 )}
                 
-                {selectedResource.type === ResourceType.TEXT && (
+                {selectedResource.type === 'text' && (
                   <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
                     <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                       {/* 这里应该显示文本内容，示例中只显示URL */}

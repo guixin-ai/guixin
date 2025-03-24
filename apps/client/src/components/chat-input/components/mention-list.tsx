@@ -29,6 +29,16 @@ export function MentionList({
     contact.id.toLowerCase().includes(searchText.toLowerCase())
   );
   
+  // 处理选择联系人事件，阻止冒泡以防止编辑器失去焦点
+  const handleContactInteraction = (e: React.MouseEvent, contact: ChatContact) => {
+    // 阻止事件冒泡到文档
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 调用选择联系人回调
+    onSelectContact(contact);
+  };
+  
   // 如果没有匹配的联系人，显示提示
   if (filteredContacts.length === 0) {
     return (
@@ -44,6 +54,8 @@ export function MentionList({
     <div 
       className="bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 overflow-y-auto" 
       style={{ maxHeight, width }}
+      // 阻止整个列表的鼠标事件冒泡，比如点击滚动条
+      onMouseDown={(e) => e.preventDefault()}
     >
       {filteredContacts.map((contact, index) => (
         <div
@@ -53,7 +65,7 @@ export function MentionList({
               ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300'
               : 'hover:bg-gray-100 dark:hover:bg-gray-700/30'
           }`}
-          onClick={() => onSelectContact(contact)}
+          onMouseDown={(e) => handleContactInteraction(e, contact)}
         >
           {contact.avatar ? (
             <img

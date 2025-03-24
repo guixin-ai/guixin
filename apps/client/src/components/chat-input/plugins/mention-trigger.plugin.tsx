@@ -8,6 +8,10 @@ import {
   TextNode
 } from 'lexical';
 import { SHOW_MENTIONS_COMMAND } from '../commands';
+import { createLogger } from '../utils/logger';
+
+// 创建日志记录器
+const logger = createLogger('提及触发');
 
 /**
  * 提及触发插件
@@ -25,12 +29,15 @@ export function MentionTriggerPlugin() {
       KEY_DOWN_COMMAND,
       (event: KeyboardEvent) => {
         if (event.key === '@') {
+          logger.debug('检测到@符号输入');
+          
           // 读取编辑器状态来获取光标位置
           editor.getEditorState().read(() => {
             const selection = $getSelection();
             
             // 只处理范围选择（光标选择）的情况
             if (!$isRangeSelection(selection)) {
+              logger.debug('非范围选择，跳过处理');
               return;
             }
             
@@ -38,13 +45,19 @@ export function MentionTriggerPlugin() {
             const anchorNode = anchor.getNode();
             const offset = anchor.offset;
             
+            logger.debug('光标位置信息:', {
+              nodeType: anchorNode.getType(),
+              nodeText: anchorNode instanceof TextNode ? anchorNode.getTextContent() : '非文本节点',
+              offset
+            });
+            
             // 检查是否在文本节点中
             if (anchorNode instanceof TextNode) {
               const textContent = anchorNode.getTextContent();
               
               // 条件1：@符号在文本的开头位置
               if (offset === 0) {
-                console.log('SHOW_MENTIONS_COMMAND - 文本开头');
+                logger.info('触发提及菜单 - 文本开头位置');
                 editor.dispatchCommand(SHOW_MENTIONS_COMMAND, undefined);
                 return;
               }
@@ -52,20 +65,29 @@ export function MentionTriggerPlugin() {
               // 条件2：@符号前面是空格
               if (offset > 0) {
                 const charBeforeCursor = textContent.charAt(offset - 1);
+                logger.debug('光标前的字符:', {
+                  char: charBeforeCursor,
+                  charCode: charBeforeCursor.charCodeAt(0)
+                });
+                
                 if (charBeforeCursor === ' ') {
-                  console.log('SHOW_MENTIONS_COMMAND - 空格后');
+                  logger.info('触发提及菜单 - 空格后位置');
                   editor.dispatchCommand(SHOW_MENTIONS_COMMAND, undefined);
                   return;
+                } else {
+                  logger.debug('前一个字符不是空格，不触发提及');
                 }
               }
             } else {
               // 在非文本节点的开始位置，如空段落等
               if (offset === 0) {
-                console.log('SHOW_MENTIONS_COMMAND - 非文本节点开头');
+                logger.info('触发提及菜单 - 非文本节点开头');
                 editor.dispatchCommand(SHOW_MENTIONS_COMMAND, undefined);
                 return;
               }
             }
+            
+            logger.debug('不满足触发条件，忽略@符号');
           });
         }
         return false;
@@ -73,8 +95,11 @@ export function MentionTriggerPlugin() {
       COMMAND_PRIORITY_NORMAL
     );
 
+    logger.debug('提及触发插件已初始化');
+
     return () => {
       removeKeyDownListener();
+      logger.debug('提及触发插件已销毁');
     };
   }, [editor]);
 

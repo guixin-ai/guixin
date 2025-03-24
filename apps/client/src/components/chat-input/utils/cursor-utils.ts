@@ -6,20 +6,10 @@ import {
   TextNode,
 } from 'lexical';
 import { $isMentionNode } from '../nodes';
+import { createLogger } from './logger';
 
-// 调试前缀
-const DEBUG_PREFIX = '[光标工具]';
-// 调试开关
-const DEBUG_ENABLED = true;
-
-/**
- * 调试日志
- */
-function debug(...args: any[]) {
-  if (DEBUG_ENABLED) {
-    console.log(DEBUG_PREFIX, ...args);
-  }
-}
+// 创建日志记录器
+const logger = createLogger('光标工具');
 
 /**
  * 检查节点是否是零宽空格节点（包含匹配，更宽容）
@@ -32,8 +22,8 @@ function isZeroWidthSpaceNode(node: LexicalNode | null): boolean {
   const text = node.getTextContent();
   const hasZWS = text.includes('\u200B');
   
-  if (DEBUG_ENABLED && hasZWS && text !== '\u200B') {
-    debug('检测到非纯净的零宽空格节点:', { 
+  if (hasZWS && text !== '\u200B') {
+    logger.debug('检测到非纯净的零宽空格节点:', { 
       text,
       containsZWS: hasZWS,
       textLength: text.length,
@@ -57,7 +47,7 @@ function isCursorOnZeroWidthSpace(node: TextNode, offset: number): boolean {
   const isOnZWS = charBeforeCursor === '\u200B' || charAfterCursor === '\u200B';
   
   if (!isOnZWS) {
-    debug('光标不在零宽空格字符上:', {
+    logger.debug('光标不在零宽空格字符上:', {
       offset,
       textContent: text,
       charBeforeCursor,
@@ -88,7 +78,7 @@ export function isCursorBeforeMentionNode() {
   const currentNode = anchor.getNode();
   const offset = anchor.offset;
   
-  debug('isCursorBeforeMentionNode 检查:', {
+  logger.debug('isCursorBeforeMentionNode 检查:', {
     nodeType: currentNode.getType(),
     textContent: currentNode instanceof TextNode ? currentNode.getTextContent() : null,
     offset
@@ -101,7 +91,7 @@ export function isCursorBeforeMentionNode() {
     
     // 如果零宽空格不在开头，并且光标恰好在零宽空格前
     if (zwsIndex > 0 && offset === zwsIndex) {
-      debug('光标在混合节点中零宽空格前');
+      logger.debug('光标在混合节点中零宽空格前');
       // 检查下一个节点是否是提及节点
       const nextSibling = currentNode.getNextSibling();
       
@@ -110,6 +100,7 @@ export function isCursorBeforeMentionNode() {
         const afterZeroWidthSpace = nextSibling.getNextSibling();
         
         if (isZeroWidthSpaceNode(afterZeroWidthSpace)) {
+          logger.debug('找到完整的提及结构，光标在提及节点前');
           return {
             position: 'before',
             mentionNode: nextSibling,
@@ -135,6 +126,7 @@ export function isCursorBeforeMentionNode() {
         const afterZeroWidthSpace = nextSibling.getNextSibling();
         
         if (isZeroWidthSpaceNode(afterZeroWidthSpace)) {
+          logger.debug('找到完整的提及结构，光标在零宽空格节点的开头');
           return {
             position: 'before',
             mentionNode: nextSibling,
@@ -154,6 +146,7 @@ export function isCursorBeforeMentionNode() {
             const afterZeroWidthSpace = mentionNode.getNextSibling();
             
             if (isZeroWidthSpaceNode(afterZeroWidthSpace)) {
+              logger.debug('找到完整的提及结构，光标在段落节点的开头');
               return {
                 position: 'before',
                 mentionNode: mentionNode,
@@ -187,7 +180,7 @@ export function isCursorAfterMentionNode() {
   const currentNode = anchor.getNode();
   const offset = anchor.offset;
   
-  debug('isCursorAfterMentionNode 检查:', {
+  logger.debug('isCursorAfterMentionNode 检查:', {
     nodeType: currentNode.getType(),
     textContent: currentNode instanceof TextNode ? currentNode.getTextContent() : null,
     offset
@@ -216,7 +209,7 @@ export function isCursorAfterMentionNode() {
     const isAtEnd = offset === nodeLength || offset >= 1;
     
     if (!isAtEnd) {
-      debug('光标不在零宽节点末尾:', { offset, nodeLength });
+      logger.debug('光标不在零宽节点末尾:', { offset, nodeLength });
       return null;
     }
   }
@@ -230,7 +223,7 @@ export function isCursorAfterMentionNode() {
     const beforeZeroWidthSpace = previousSibling.getPreviousSibling();
     
     if (isZeroWidthSpaceNode(beforeZeroWidthSpace)) {
-      debug('找到光标在提及节点后的位置');
+      logger.debug('找到光标在提及节点后的位置');
       return {
         position: 'after',
         mentionNode: previousSibling,
@@ -260,7 +253,7 @@ export function isCursorBeforeMentionGap() {
   const currentNode = anchor.getNode();
   const offset = anchor.offset;
   
-  debug('isCursorBeforeMentionGap 检查:', {
+  logger.debug('isCursorBeforeMentionGap 检查:', {
     nodeType: currentNode.getType(),
     textContent: currentNode instanceof TextNode ? currentNode.getTextContent() : null,
     offset
@@ -287,7 +280,7 @@ export function isCursorBeforeMentionGap() {
     const isAtEnd = offset === nodeLength || offset >= 1;
     
     if (!isAtEnd) {
-      debug('光标不在零宽节点末尾:', { offset, nodeLength });
+      logger.debug('光标不在零宽节点末尾:', { offset, nodeLength });
       return null;
     }
   }
@@ -296,7 +289,7 @@ export function isCursorBeforeMentionGap() {
   
   // 下一个节点必须是提及节点
   if (nextSibling && $isMentionNode(nextSibling)) {
-    debug('找到光标在提及节点前的夹缝位置');
+    logger.debug('找到光标在提及节点前的夹缝位置');
     return {
       position: 'beforeMention',
       mentionNode: nextSibling,
@@ -325,7 +318,7 @@ export function isCursorAfterMentionGap() {
   const currentNode = anchor.getNode();
   const offset = anchor.offset;
   
-  debug('isCursorAfterMentionGap 检查:', {
+  logger.debug('isCursorAfterMentionGap 检查:', {
     nodeType: currentNode.getType(),
     textContent: currentNode instanceof TextNode ? currentNode.getTextContent() : null,
     offset
@@ -357,7 +350,7 @@ export function isCursorAfterMentionGap() {
   
   // 前一个节点必须是提及节点
   if (previousSibling && $isMentionNode(previousSibling)) {
-    debug('找到光标在提及节点后的夹缝位置');
+    logger.debug('找到光标在提及节点后的夹缝位置');
     return {
       position: 'afterMention',
       mentionNode: previousSibling,
@@ -384,7 +377,7 @@ export function getMentionNodeBeforePosition(mentionNode: LexicalNode) {
   const previousSibling = mentionNode.getPreviousSibling();
   
   if (!previousSibling || !isZeroWidthSpaceNode(previousSibling)) {
-    debug('提及节点前没有零宽空格节点:', {
+    logger.debug('提及节点前没有零宽空格节点:', {
       previousNodeType: previousSibling ? previousSibling.getType() : 'null',
       text: previousSibling instanceof TextNode ? previousSibling.getTextContent() : null
     });
@@ -400,7 +393,7 @@ export function getMentionNodeBeforePosition(mentionNode: LexicalNode) {
       // 找到零宽空格在文本中的位置
       const zwsIndex = nodeText.indexOf('\u200B');
       if (zwsIndex !== -1) {
-        debug('提及节点前是混合节点，光标定位到零宽空格前:', { 
+        logger.debug('提及节点前是混合节点，光标定位到零宽空格前:', { 
           mixedNodeText: nodeText,
           zwsIndex: zwsIndex
         });
@@ -416,7 +409,7 @@ export function getMentionNodeBeforePosition(mentionNode: LexicalNode) {
   }
   
   // 对于非混合节点或未找到零宽空格的情况，返回节点开头位置
-  debug('提及节点前是纯零宽空格节点，光标定位到节点开头');
+  logger.debug('提及节点前是纯零宽空格节点，光标定位到节点开头');
   return {
     nodeKey: previousSibling.getKey(),
     offset: 0, // 使用0，即节点开头
@@ -440,7 +433,7 @@ export function getMentionNodeAfterPosition(mentionNode: LexicalNode) {
   const nextSibling = mentionNode.getNextSibling();
   
   if (!nextSibling || !isZeroWidthSpaceNode(nextSibling)) {
-    debug('提及节点后没有零宽空格节点:', {
+    logger.debug('提及节点后没有零宽空格节点:', {
       nextNodeType: nextSibling ? nextSibling.getType() : 'null',
       text: nextSibling instanceof TextNode ? nextSibling.getTextContent() : null
     });
@@ -455,6 +448,11 @@ export function getMentionNodeAfterPosition(mentionNode: LexicalNode) {
     // 找到零宽空格在文本中的位置
     const zwsIndex = nodeText.indexOf('\u200B');
     if (zwsIndex !== -1) {
+      logger.debug('提及节点后是混合节点，光标定位到零宽空格后:', { 
+        mixedNodeText: nodeText,
+        zwsIndex: zwsIndex
+      });
+      
       // 将光标定位在零宽空格后面
       return {
         nodeKey: nextSibling.getKey(),
@@ -467,6 +465,7 @@ export function getMentionNodeAfterPosition(mentionNode: LexicalNode) {
   // 获取当前节点的文本长度
   const nodeLength = nodeText.length;
   
+  logger.debug('提及节点后是纯零宽空格节点，光标定位到节点末尾');
   // 获取后面位置（零宽字符后面）
   return {
     nodeKey: nextSibling.getKey(),

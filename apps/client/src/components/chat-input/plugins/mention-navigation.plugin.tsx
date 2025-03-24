@@ -19,19 +19,10 @@ import {
   getMentionNodeBeforePosition,
   getMentionNodeAfterPosition
 } from '../utils/cursor-utils';
+import { createLogger } from '../utils/logger';
 
-// 调试日志前缀
-const LOG_PREFIX = '[提及导航]';
-
-// 是否启用调试日志
-const DEBUG_ENABLED = true;
-
-// 打印调试日志
-function debug(...args: any[]) {
-  if (DEBUG_ENABLED) {
-    console.log(LOG_PREFIX, ...args);
-  }
-}
+// 创建日志记录器
+const logger = createLogger('提及导航');
 
 /**
  * 提及导航插件
@@ -49,18 +40,18 @@ export function MentionNavigationPlugin() {
   useEffect(() => {
     if (!editor) return;
 
-    debug('插件已初始化');
+    logger.debug('插件已初始化');
 
     // 监听左方向键事件
     const removeLeftArrowListener = editor.registerCommand(
       KEY_ARROW_LEFT_COMMAND,
       (event) => {
-        debug('检测到左方向键按下');
+        logger.debug('检测到左方向键按下');
         
         // 获取当前选择
         const selection = $getSelection();
         if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
-          debug('非范围选择或选择未折叠，跳过处理');
+          logger.debug('非范围选择或选择未折叠，跳过处理');
           return false;
         }
 
@@ -68,7 +59,7 @@ export function MentionNavigationPlugin() {
         const anchor = selection.anchor;
         const currentNode = anchor.getNode();
         const offset = anchor.offset;
-        debug('当前光标位置:', {
+        logger.debug('当前光标位置:', {
           nodeType: currentNode.getType(),
           nodeText: currentNode instanceof TextNode ? currentNode.getTextContent() : '非文本节点',
           offset
@@ -80,7 +71,7 @@ export function MentionNavigationPlugin() {
         const afterNodeInfo = isCursorAfterMentionNode();
         const afterGapInfo = isCursorAfterMentionGap();
         
-        debug('检测结果:', {
+        logger.debug('检测结果:', {
           isCursorAfterMentionNode: !!afterNodeInfo,
           isCursorAfterMentionGap: !!afterGapInfo
         });
@@ -92,12 +83,12 @@ export function MentionNavigationPlugin() {
                               (afterGapInfo ? afterGapInfo.mentionNode : null);
           
           if (mentionNode) {
-            debug('找到需要处理的提及节点:', mentionNode.getTextContent());
+            logger.debug('找到需要处理的提及节点:', mentionNode.getTextContent());
             
             // 获取提及节点前的位置信息
             const beforePosition = getMentionNodeBeforePosition(mentionNode);
             if (beforePosition) {
-              debug('获取到提及节点前位置:', beforePosition);
+              logger.debug('获取到提及节点前位置:', beforePosition);
               event?.preventDefault?.();
               
               editor.update(() => {
@@ -113,30 +104,30 @@ export function MentionNavigationPlugin() {
                   beforePosition.type as 'text' | 'element'
                 );
                 $setSelection(selection);
-                debug('已将光标设置到提及节点前');
+                logger.debug('已将光标设置到提及节点前');
               });
               
               return true;
             } else {
-              debug('未找到提及节点前的位置信息');
+              logger.debug('未找到提及节点前的位置信息');
             }
           } else {
-            debug('未能获取有效的提及节点');
+            logger.debug('未能获取有效的提及节点');
           }
         }
         
         // 检查光标是否在提及节点前面的"夹缝"中
         const beforeGapInfo = isCursorBeforeMentionGap();
-        debug('检测光标是否在提及节点前面夹缝:', { isCursorBeforeMentionGap: !!beforeGapInfo });
+        logger.debug('检测光标是否在提及节点前面夹缝:', { isCursorBeforeMentionGap: !!beforeGapInfo });
         
         if (beforeGapInfo) {
           const { mentionNode } = beforeGapInfo;
-          debug('找到提及节点:', mentionNode.getTextContent());
+          logger.debug('找到提及节点:', mentionNode.getTextContent());
           
           // 获取提及节点前的位置信息
           const beforePosition = getMentionNodeBeforePosition(mentionNode);
           if (beforePosition) {
-            debug('获取到提及节点前位置:', beforePosition);
+            logger.debug('获取到提及节点前位置:', beforePosition);
             event?.preventDefault?.();
             
             editor.update(() => {
@@ -152,16 +143,16 @@ export function MentionNavigationPlugin() {
                 beforePosition.type as 'text' | 'element'
               );
               $setSelection(selection);
-              debug('已将光标设置到提及节点前');
+              logger.debug('已将光标设置到提及节点前');
             });
             
             return true;
           } else {
-            debug('未找到提及节点前的位置信息');
+            logger.debug('未找到提及节点前的位置信息');
           }
         }
         
-        debug('未匹配到需要处理的情况，交由默认处理');
+        logger.debug('未匹配到需要处理的情况，交由默认处理');
         return false;
       },
       COMMAND_PRIORITY_HIGH
@@ -171,12 +162,12 @@ export function MentionNavigationPlugin() {
     const removeRightArrowListener = editor.registerCommand(
       KEY_ARROW_RIGHT_COMMAND,
       (event) => {
-        debug('检测到右方向键按下');
+        logger.debug('检测到右方向键按下');
         
         // 获取当前选择
         const selection = $getSelection();
         if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
-          debug('非范围选择或选择未折叠，跳过处理');
+          logger.debug('非范围选择或选择未折叠，跳过处理');
           return false;
         }
 
@@ -184,7 +175,7 @@ export function MentionNavigationPlugin() {
         const anchor = selection.anchor;
         const currentNode = anchor.getNode();
         const offset = anchor.offset;
-        debug('当前光标位置:', {
+        logger.debug('当前光标位置:', {
           nodeType: currentNode.getType(),
           nodeText: currentNode instanceof TextNode ? currentNode.getTextContent() : '非文本节点',
           offset
@@ -196,7 +187,7 @@ export function MentionNavigationPlugin() {
         const beforeNodeInfo = isCursorBeforeMentionNode();
         const beforeGapInfo = isCursorBeforeMentionGap();
         
-        debug('检测结果:', {
+        logger.debug('检测结果:', {
           isCursorBeforeMentionNode: !!beforeNodeInfo,
           isCursorBeforeMentionGap: !!beforeGapInfo
         });
@@ -208,12 +199,12 @@ export function MentionNavigationPlugin() {
                               (beforeGapInfo ? beforeGapInfo.mentionNode : null);
           
           if (mentionNode) {
-            debug('找到需要处理的提及节点:', mentionNode.getTextContent());
+            logger.debug('找到需要处理的提及节点:', mentionNode.getTextContent());
             
             // 获取提及节点后的位置信息
             const afterPosition = getMentionNodeAfterPosition(mentionNode);
             if (afterPosition) {
-              debug('获取到提及节点后位置:', afterPosition);
+              logger.debug('获取到提及节点后位置:', afterPosition);
               event?.preventDefault?.();
               
               editor.update(() => {
@@ -229,30 +220,30 @@ export function MentionNavigationPlugin() {
                   afterPosition.type as 'text' | 'element'
                 );
                 $setSelection(selection);
-                debug('已将光标设置到提及节点后');
+                logger.debug('已将光标设置到提及节点后');
               });
               
               return true;
             } else {
-              debug('未找到提及节点后的位置信息');
+              logger.debug('未找到提及节点后的位置信息');
             }
           } else {
-            debug('未能获取有效的提及节点');
+            logger.debug('未能获取有效的提及节点');
           }
         }
         
         // 检查光标是否在提及节点后面的"夹缝"中
         const afterGapInfo = isCursorAfterMentionGap();
-        debug('检测光标是否在提及节点后面夹缝:', { isCursorAfterMentionGap: !!afterGapInfo });
+        logger.debug('检测光标是否在提及节点后面夹缝:', { isCursorAfterMentionGap: !!afterGapInfo });
         
         if (afterGapInfo) {
           const { mentionNode } = afterGapInfo;
-          debug('找到提及节点:', mentionNode.getTextContent());
+          logger.debug('找到提及节点:', mentionNode.getTextContent());
           
           // 获取提及节点后的位置信息
           const afterPosition = getMentionNodeAfterPosition(mentionNode);
           if (afterPosition) {
-            debug('获取到提及节点后位置:', afterPosition);
+            logger.debug('获取到提及节点后位置:', afterPosition);
             event?.preventDefault?.();
             
             editor.update(() => {
@@ -268,23 +259,23 @@ export function MentionNavigationPlugin() {
                 afterPosition.type as 'text' | 'element'
               );
               $setSelection(selection);
-              debug('已将光标设置到提及节点后');
+              logger.debug('已将光标设置到提及节点后');
             });
             
             return true;
           } else {
-            debug('未找到提及节点后的位置信息');
+            logger.debug('未找到提及节点后的位置信息');
           }
         }
         
-        debug('未匹配到需要处理的情况，交由默认处理');
+        logger.debug('未匹配到需要处理的情况，交由默认处理');
         return false;
       },
       COMMAND_PRIORITY_HIGH
     );
 
     return () => {
-      debug('插件销毁');
+      logger.debug('插件销毁');
       removeLeftArrowListener();
       removeRightArrowListener();
     };

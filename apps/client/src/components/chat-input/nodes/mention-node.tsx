@@ -13,6 +13,9 @@ import {
   TextNode,
 } from 'lexical';
 import { ChatContact } from '..';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('提及节点');
 
 export type SerializedMentionNode = SerializedElementNode & {
   mentionName: string;

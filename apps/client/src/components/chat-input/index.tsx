@@ -26,6 +26,9 @@ import {
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
+import { createLogger } from './utils/logger';
+
+const logger = createLogger('聊天输入框');
 
 // 聊天联系人接口
 export interface ChatContact {
@@ -80,18 +83,13 @@ export function ChatInput({
 
   // 处理编辑器内容变化
   const handleEditorChange = useCallback(
-    (editorState: EditorState) => {
-      editorState.read(() => {
-        const root = $getRoot();
+    (text: string) => {
+      logger.debug('编辑器内容变化，文本内容:', text);
 
-        // 获取文本内容（会包含提及节点）
-        const text = root.getTextContent();
-
-        // 调用外部onChange回调
-        if (onChange) {
-          onChange(text);
-        }
-      });
+      // 调用外部onChange回调
+      if (onChange) {
+        onChange(text);
+      }
     },
     [onChange]
   );

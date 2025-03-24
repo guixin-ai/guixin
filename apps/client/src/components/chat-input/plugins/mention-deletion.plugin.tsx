@@ -6,11 +6,14 @@ import {
   TextNode,
   KEY_BACKSPACE_COMMAND,
   COMMAND_PRIORITY_LOW,
+  $createRangeSelection,
+  $setSelection,
 } from 'lexical';
 import { $isMentionNode } from '../nodes';
 import { 
   isCursorAfterMentionGap, 
-  isCursorAfterMentionNode
+  isCursorAfterMentionNode,
+  isCursorBeforeMentionGap
 } from '../utils/cursor-utils';
 import { createLogger } from '../utils/logger';
 
@@ -30,6 +33,9 @@ const logger = createLogger('提及删除');
  * 当光标在以下位置时按下退格键将会删除提及节点及其前后的零宽空格：
  * 1. 在提及节点后的零宽空格中
  * 2. 在提及节点后方的"夹缝"中
+ * 
+ * 当光标在以下位置时按下退格键将会删除零宽空格前面的字符或节点：
+ * 1. 在提及节点前方的"夹缝"中
  * 
  * 使用工具函数检测光标位置
  */
@@ -66,6 +72,66 @@ export function MentionDeletionPlugin() {
           nodeText: currentNode instanceof TextNode ? currentNode.getTextContent() : '非文本节点',
           offset
         });
+
+        // 检查光标是否在提及节点前方的"夹缝"中
+        const beforeGapInfo = isCursorBeforeMentionGap();
+        if (beforeGapInfo) {
+          logger.debug('光标在提及节点前的夹缝中');
+          
+          // 阻止默认行为
+          event?.preventDefault?.();
+          
+          const { zeroWidthSpace } = beforeGapInfo;
+          
+          // 在零宽空格前面找到可删除的字符或节点
+          editor.update(() => {
+            if (zeroWidthSpace instanceof TextNode) {
+              const text = zeroWidthSpace.getTextContent();
+              const zwsIndex = text.indexOf('\u200B');
+              
+              logger.debug('零宽空格节点:', {
+                text,
+                zwsIndex,
+                nodeType: zeroWidthSpace.getType()
+              });
+              
+              if (zwsIndex > 0) {
+                // 零宽空格前有普通字符，删除前一个字符
+                logger.debug('从混合节点中删除零宽空格前的字符');
+                const newText = text.substring(0, zwsIndex - 1) + text.substring(zwsIndex);
+                zeroWidthSpace.setTextContent(newText);
+                
+                // 设置光标位置到删除后的位置
+                const selection = $createRangeSelection();
+                selection.anchor.set(zeroWidthSpace.getKey(), zwsIndex - 1, 'text');
+                selection.focus.set(zeroWidthSpace.getKey(), zwsIndex - 1, 'text');
+                $setSelection(selection);
+              } else {
+                // 零宽空格在节点开头，需要删除前一个节点的最后一个字符
+                const prevNode = zeroWidthSpace.getPreviousSibling();
+                
+                if (prevNode instanceof TextNode) {
+                  const prevText = prevNode.getTextContent();
+                  const prevTextLength = prevText.length;
+                  
+                  if (prevTextLength > 0) {
+                    logger.debug('删除前一个节点的最后一个字符');
+                    prevNode.setTextContent(prevText.substring(0, prevTextLength - 1));
+                    
+                    // 设置光标位置到前一个节点删除后的位置
+                    const selection = $createRangeSelection();
+                    selection.anchor.set(prevNode.getKey(), prevTextLength - 1, 'text');
+                    selection.focus.set(prevNode.getKey(), prevTextLength - 1, 'text');
+                    $setSelection(selection);
+                  }
+                }
+              }
+            }
+          });
+          
+          logger.info('光标在前方夹缝，删除零宽空格前的字符');
+          return true;
+        }
 
         // 检查光标是否在提及节点后的"夹缝"中
         const afterGapInfo = isCursorAfterMentionGap();

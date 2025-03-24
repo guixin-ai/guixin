@@ -21,6 +21,8 @@ import {
   MentionContentTrackerPlugin,
   MentionCancellationPlugin,
   FocusDebugPlugin,
+  MentionDeletionPlugin,
+  MentionNavigationPlugin,
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -61,6 +63,8 @@ export interface ChatInputProps {
  * - MentionTransformsPlugin: 将@文本转换为提及节点
  * - MentionNodePlugin: 处理提及节点的特殊行为
  * - MentionCancellationPlugin: 处理取消提及的情况
+ * - MentionDeletionPlugin: 处理删除提及节点的逻辑
+ * - MentionNavigationPlugin: 处理提及节点周围光标移动
  */
 export function ChatInput({
   onChange,
@@ -159,6 +163,8 @@ export function ChatInput({
           <MentionTransformsPlugin contacts={contacts} />
           <MentionNodePlugin />
           <MentionCancellationPlugin />
+          <MentionDeletionPlugin />
+          <MentionNavigationPlugin />
 
           {/* 工具和引用插件 */}
           <EditorRefPlugin onRef={handleEditorRef} />

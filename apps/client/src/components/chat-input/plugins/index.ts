@@ -12,6 +12,8 @@ export * from './mention-node.plugin';
 export * from './mention-content-tracker.plugin';
 export * from './mention-cancellation.plugin';
 export * from './focus-debug.plugin';
+export { MentionDeletionPlugin } from './mention-deletion.plugin';
+export { MentionNavigationPlugin } from './mention-navigation.plugin';
 
 // 注意: 提及相关插件结构
 // - mention-trigger-plugin：监控@输入并触发提及功能

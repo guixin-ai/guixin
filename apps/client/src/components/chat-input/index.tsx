@@ -3,12 +3,12 @@ import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
-import { 
-  EditorState, 
-  LexicalEditor, 
+import {
+  EditorState,
+  LexicalEditor,
   $getRoot,
   $createParagraphNode,
-  $createTextNode
+  $createTextNode,
 } from 'lexical';
 import {
   EditorRefPlugin,
@@ -19,7 +19,7 @@ import {
   MentionTransformsPlugin,
   MentionNodePlugin,
   MentionContentTrackerPlugin,
-  MentionCancellationPlugin
+  MentionCancellationPlugin,
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -45,13 +45,13 @@ export interface ChatInputProps {
 
 /**
  * 聊天输入组件
- * 
+ *
  * 主要功能：
  * 1. 基本文本输入 - 支持普通文本输入
  * 2. @提及功能 - 支持@联系人，显示下拉菜单并选择
  * 3. 自动聚焦 - 可通过autoFocus属性控制是否自动获取焦点
  * 4. 初始内容 - 通过initialContent可设置初始文本
- * 
+ *
  * 提及功能使用细粒度的插件结构：
  * - MentionTriggerPlugin: 监听@符号输入，触发提及功能
  * - MentionContentTrackerPlugin: 追踪@后的内容变化
@@ -90,7 +90,7 @@ export function ChatInput({
     },
     [onChange]
   );
-  
+
   // 创建初始内容的函数
   const prepopulateContent = useCallback(() => {
     if (initialContent) {
@@ -154,7 +154,7 @@ export function ChatInput({
           <MentionTriggerPlugin />
           <MentionContentTrackerPlugin />
           <MentionListPlugin contacts={contacts} />
-          <MentionKeyboardPlugin isDropdownOpen={true} />
+          <MentionKeyboardPlugin />
           <MentionTransformsPlugin contacts={contacts} />
           <MentionNodePlugin />
           <MentionCancellationPlugin />

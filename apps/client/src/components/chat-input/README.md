@@ -47,13 +47,16 @@ flowchart TD
     
     MentionPositionPlugin -- "位置更新命令" --> MentionDisplayPlugin
     
-    MentionDisplayPlugin -- "键盘导航请求" --> MentionKeyboardPlugin[MentionKeyboardPlugin\n键盘导航]
+    MentionKeyboardPlugin[MentionKeyboardPlugin\n键盘导航] <-- "显示/隐藏命令" --> MentionDisplayPlugin
+    
+    MentionKeyboardPlugin -- "移动选择命令" --> MentionDisplayPlugin
     
     MentionKeyboardPlugin -- "选择联系人命令" --> MentionTransformsPlugin[MentionTransformsPlugin\n创建提及节点]
     MentionTransformsPlugin -- "创建提及节点" --> MentionNodePlugin[MentionNodePlugin\n渲染节点]
     
     MentionTriggerPlugin -- "监听" --> MentionCancellationPlugin[MentionCancellationPlugin\n取消提及]
     MentionCancellationPlugin -- "取消命令" --> MentionDisplayPlugin
+    MentionCancellationPlugin -- "取消命令" --> MentionKeyboardPlugin
     
     MentionListPlugin[MentionListPlugin\n聚合插件] -. "包含" .-> MentionDisplayPlugin
     MentionListPlugin -. "包含" .-> MentionFilterPlugin
@@ -95,6 +98,7 @@ flowchart TD
    - 处理联系人选择逻辑
    - 管理下拉列表DOM渲染
    - 处理点击外部关闭列表
+   - 响应键盘移动选择命令更新高亮项
 
 5. `MentionFilterPlugin`:
    - 监听内容更新并过滤联系人
@@ -113,10 +117,12 @@ flowchart TD
    - 向下兼容原有API
 
 8. `MentionKeyboardPlugin`:
+   - 监听提及列表的显示和隐藏状态
    - 处理键盘导航逻辑
    - 响应上下键移动选择
    - 管理回车选择联系人
    - 处理Tab和Esc键的行为
+   - 发送移动选择命令给显示插件
 
 9. `MentionTransformsPlugin`:
    - 创建提及节点并替换文本

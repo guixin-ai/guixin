@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { 
   KEY_ARROW_DOWN_COMMAND,
@@ -11,13 +11,16 @@ import {
   LexicalCommand
 } from 'lexical';
 import { ChatContact } from '..';
-import { SELECT_MENTION_COMMAND } from '../commands';
+import { 
+  SELECT_MENTION_COMMAND, 
+  SHOW_MENTIONS_COMMAND, 
+  CANCEL_MENTIONS_COMMAND 
+} from '../commands';
 
 // 创建移动提及选择命令
 export const MOVE_MENTION_SELECTION_COMMAND: LexicalCommand<'up' | 'down'> = createCommand('MOVE_MENTION_SELECTION_COMMAND');
 
 interface MentionKeyboardPluginProps {
-  isDropdownOpen?: boolean;
   filteredContactsLength?: number;
   onMoveSelection?: (direction: 'up' | 'down') => void;
   onSelectMention?: () => void;
@@ -28,19 +31,39 @@ interface MentionKeyboardPluginProps {
  * 提及键盘导航插件
  * 处理用户在提及列表中的键盘导航
  * 包括上下移动选择和回车/Tab选择等
+ * 监听提及列表的显示和隐藏状态，响应键盘事件
  */
 export function MentionKeyboardPlugin({
-  isDropdownOpen = false,
   filteredContactsLength = 0,
   onMoveSelection,
   onSelectMention,
   onEscape,
 }: MentionKeyboardPluginProps) {
   const [editor] = useLexicalComposerContext();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   useEffect(() => {
     if (!editor) return;
 
+    // 监听显示提及命令
+    const removeShowListener = editor.registerCommand(
+      SHOW_MENTIONS_COMMAND,
+      () => {
+        setIsDropdownOpen(true);
+        return false; // 不阻止其他插件处理
+      },
+      COMMAND_PRIORITY_HIGH
+    );
+    
+    // 监听取消提及命令
+    const removeCancelListener = editor.registerCommand(
+      CANCEL_MENTIONS_COMMAND,
+      () => {
+        setIsDropdownOpen(false);
+        return false; // 不阻止其他插件处理
+      },
+      COMMAND_PRIORITY_HIGH
+    );
     
     // 注册上方向键事件 - 向上移动选择
     const removeUpListener = editor.registerCommand(
@@ -134,6 +157,9 @@ export function MentionKeyboardPlugin({
           
           if (onEscape) {
             onEscape();
+          } else {
+            // 分发取消提及命令
+            editor.dispatchCommand(CANCEL_MENTIONS_COMMAND, undefined);
           }
           
           // 重新聚焦编辑器
@@ -149,6 +175,8 @@ export function MentionKeyboardPlugin({
     );
     
     return () => {
+      removeShowListener();
+      removeCancelListener();
       removeUpListener();
       removeDownListener();
       removeEnterListener();

@@ -10,19 +10,19 @@ import { ChatContact } from '..';
  * 显示提及列表命令
  * 当用户输入@时触发，通知显示提及列表
  */
-export const SHOW_MENTIONS_COMMAND = createCommand<void>();
+export const SHOW_MENTIONS_COMMAND = createCommand<void>('SHOW_MENTIONS_COMMAND');
 
 /**
  * 取消提及命令
  * 当用户按下Esc、删除@字符或输入空格时触发
  */
-export const CANCEL_MENTIONS_COMMAND = createCommand<void>();
+export const CANCEL_MENTIONS_COMMAND = createCommand<void>('CANCEL_MENTIONS_COMMAND');
 
 /**
  * 选择提及联系人命令
  * 当用户选择一个联系人时触发
  */
-export const SELECT_MENTION_COMMAND = createCommand<ChatContact>();
+export const SELECT_MENTION_COMMAND = createCommand<ChatContact>('SELECT_MENTION_COMMAND');
 
 /**
  * 提及内容更新命令
@@ -30,7 +30,7 @@ export const SELECT_MENTION_COMMAND = createCommand<ChatContact>();
  */
 export const MENTION_CONTENT_UPDATE_COMMAND = createCommand<{
   searchText: string;
-}>();
+}>('MENTION_CONTENT_UPDATE_COMMAND');
 
 /**
  * 提及位置更新命令
@@ -38,7 +38,7 @@ export const MENTION_CONTENT_UPDATE_COMMAND = createCommand<{
  */
 export const MENTION_POSITION_UPDATE_COMMAND = createCommand<{
   position: { left: number; top: number };
-}>();
+}>('MENTION_POSITION_UPDATE_COMMAND');
 
 /**
  * 提及过滤更新命令
@@ -47,4 +47,4 @@ export const MENTION_POSITION_UPDATE_COMMAND = createCommand<{
 export const MENTION_FILTER_UPDATE_COMMAND = createCommand<{
   searchText: string;
   filteredContacts: ChatContact[];
-}>(); 
+}>('MENTION_FILTER_UPDATE_COMMAND'); 

@@ -17,6 +17,7 @@ export function MentionTriggerPlugin() {
       KEY_DOWN_COMMAND,
       (event: KeyboardEvent) => {
         if (event.key === '@') {
+          console.log('SHOW_MENTIONS_COMMAND');
           editor.dispatchCommand(SHOW_MENTIONS_COMMAND, undefined);
         }
         return false;

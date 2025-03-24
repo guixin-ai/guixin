@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { createPortal } from 'react-dom';
 import { ChatContact } from '..';
@@ -11,6 +11,7 @@ import {
   MENTION_FILTER_UPDATE_COMMAND
 } from '../commands';
 import { MentionList } from '../components/mention-list';
+import { MOVE_MENTION_SELECTION_COMMAND } from './mention-keyboard.plugin';
 
 interface MentionDisplayPluginProps {
   contacts: ChatContact[];
@@ -24,6 +25,7 @@ interface MentionDisplayPluginProps {
  * 2. 监听取消命令并隐藏列表
  * 3. 处理联系人选择
  * 4. 创建和管理列表的DOM渲染
+ * 5. 响应键盘导航命令并更新选中项
  */
 export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDisplayPluginProps) {
   const [editor] = useLexicalComposerContext();
@@ -32,7 +34,6 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [position, setPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [filteredContacts, setFilteredContacts] = useState<ChatContact[]>(contacts);
-  const portalRef = useRef<HTMLDivElement | null>(null);
   
   // 处理联系人选择
   const handleSelectContact = useCallback((contact: ChatContact) => {
@@ -48,16 +49,22 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
     setDropdownOpen(false);
   }, [editor, onSelectMention]);
   
+  // 处理选择项移动
+  const handleMoveSelection = useCallback((direction: 'up' | 'down') => {
+    if (filteredContacts.length === 0) return;
+    
+    setSelectedIndex(prevIndex => {
+      if (direction === 'up') {
+        return prevIndex > 0 ? prevIndex - 1 : filteredContacts.length - 1;
+      } else {
+        return prevIndex < filteredContacts.length - 1 ? prevIndex + 1 : 0;
+      }
+    });
+  }, [filteredContacts.length]);
+  
   // 监听显示提及命令、取消命令和内容更新命令
   useEffect(() => {
     if (!editor) return;
-    
-    // 确保有一个用于传送门的元素
-    if (!portalRef.current) {
-      portalRef.current = document.createElement('div');
-      portalRef.current.setAttribute('data-mention-portal', 'true');
-      document.body.appendChild(portalRef.current);
-    }
     
     // 监听显示提及命令 - 从MentionTriggerPlugin触发
     const removeShowListener = editor.registerCommand(
@@ -124,18 +131,15 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
       COMMAND_PRIORITY_HIGH
     );
     
-    // 点击外部关闭下拉列表
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownOpen && 
-          portalRef.current && 
-          !portalRef.current.contains(e.target as Node) &&
-          editor.getRootElement() && 
-          !editor.getRootElement()!.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
+    // 处理选择移动命令 - 从MentionKeyboardPlugin触发
+    const removeMoveSelectionListener = editor.registerCommand(
+      MOVE_MENTION_SELECTION_COMMAND,
+      (direction: 'up' | 'down') => {
+        handleMoveSelection(direction);
+        return true; // 阻止其他处理，确保命令被消费
+      },
+      COMMAND_PRIORITY_HIGH
+    );
     
     return () => {
       removeShowListener();
@@ -143,15 +147,9 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
       removeFilterUpdateListener();
       removeCancelListener();
       removeSelectListener();
-      document.removeEventListener('mousedown', handleClickOutside);
-      
-      // 清理门户元素
-      if (portalRef.current) {
-        document.body.removeChild(portalRef.current);
-        portalRef.current = null;
-      }
+      removeMoveSelectionListener();
     };
-  }, [editor, dropdownOpen, handleSelectContact, contacts]);
+  }, [editor, handleSelectContact, contacts, handleMoveSelection]);
   
   // 选中索引边界检查
   useEffect(() => {
@@ -163,7 +161,14 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
     }
   }, [filteredContacts, selectedIndex]);
   
-  return dropdownOpen && portalRef.current
+  // 选择当前高亮的联系人
+  const selectHighlightedContact = useCallback(() => {
+    if (dropdownOpen && filteredContacts.length > 0 && selectedIndex >= 0 && selectedIndex < filteredContacts.length) {
+      handleSelectContact(filteredContacts[selectedIndex]);
+    }
+  }, [dropdownOpen, filteredContacts, selectedIndex, handleSelectContact]);
+  
+  return dropdownOpen
     ? createPortal(
         <div 
           className="mention-list-portal"
@@ -183,7 +188,7 @@ export function MentionDisplayPlugin({ contacts, onSelectMention }: MentionDispl
             onSelectContact={handleSelectContact}
           />
         </div>,
-        portalRef.current
+        document.body
       )
     : null;
 } 

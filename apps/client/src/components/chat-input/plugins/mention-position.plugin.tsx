@@ -87,6 +87,7 @@ export function MentionPositionPlugin() {
     const cursorPosition = getCursorPosition();
     if (cursorPosition) {
       const position = calculateDropdownPosition(cursorPosition);
+      console.log('position', position);
       editor.dispatchCommand(MENTION_POSITION_UPDATE_COMMAND, { position });
     }
   }, [editor, getCursorPosition, calculateDropdownPosition]);

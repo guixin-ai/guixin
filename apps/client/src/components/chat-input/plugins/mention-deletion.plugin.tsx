@@ -8,7 +8,10 @@ import {
   COMMAND_PRIORITY_LOW,
 } from 'lexical';
 import { $isMentionNode } from '../nodes';
-import { getMentionNodeBeforeCursor } from '../utils/cursor-utils';
+import { 
+  isCursorAfterMentionGap, 
+  isCursorAfterMentionNode
+} from '../utils/cursor-utils';
 
 /**
  * 提及删除插件
@@ -20,10 +23,11 @@ import { getMentionNodeBeforeCursor } from '../utils/cursor-utils';
  * 3. 提及节点后: 零宽空格节点 (\u200B)
  * 4. 普通空格节点 (' ')
  * 
- * 当光标在提及节点后方(无论是在零宽空格内部还是在紧随其后的节点起始处)时，
- * 按下退格键将会删除提及节点及其前后的零宽空格。
+ * 当光标在以下位置时按下退格键将会删除提及节点及其前后的零宽空格：
+ * 1. 在提及节点后的零宽空格中
+ * 2. 在提及节点后方的"夹缝"中
  * 
- * 使用工具函数getMentionNodeBeforeCursor处理所有可能的情况，不受光标移动方向的影响。
+ * 使用工具函数检测光标位置
  */
 export function MentionDeletionPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -43,30 +47,79 @@ export function MentionDeletionPlugin() {
           return false;
         }
 
-        // 使用工具函数获取光标前的提及节点信息
-        const mentionInfo = getMentionNodeBeforeCursor();
+        // 检查光标是否在提及节点后的"夹缝"中
+        const afterGapInfo = isCursorAfterMentionGap();
         
-        // 如果光标前有提及节点，且光标位于提及节点后方
-        if (mentionInfo) {
-          const { 
-            mentionNode,            // 提及节点
-            currentZeroWidthSpace,  // 当前光标所在的零宽空格节点
-            beforeZeroWidthSpace,   // 提及节点前的零宽空格节点
-          } = mentionInfo;
+        // 检查光标是否在提及节点后的零宽空格中
+        const afterNodeInfo = isCursorAfterMentionNode();
+        
+        // 如果光标在提及节点的相关位置，需要删除提及节点
+        if (afterGapInfo || afterNodeInfo) {
+          // 获取相关的提及节点
+          let mentionNode = null;
+          let zeroWidthSpace = null;
           
-          // 阻止默认行为
-          event?.preventDefault?.();
+          if (afterGapInfo) {
+            mentionNode = afterGapInfo.mentionNode;
+            zeroWidthSpace = afterGapInfo.zeroWidthSpace;
+          } else if (afterNodeInfo) {
+            mentionNode = afterNodeInfo.mentionNode;
+            zeroWidthSpace = afterNodeInfo.zeroWidthSpace;
+          }
           
-          // 删除提及节点及其前后的零宽空格
-          editor.update(() => {
-            if (beforeZeroWidthSpace) {
-              beforeZeroWidthSpace.remove();
-            }
-            mentionNode.remove();
-            currentZeroWidthSpace.remove();
-          });
-          
-          return true;
+          if (mentionNode) {
+            // 阻止默认行为
+            event?.preventDefault?.();
+            
+            // 获取提及节点前的零宽空格节点
+            const beforeZeroWidthSpace = mentionNode.getPreviousSibling();
+            
+            // 删除提及节点及其前后的零宽空格
+            editor.update(() => {
+              // 如果前面的节点是文本节点，且包含零宽空格
+              if (beforeZeroWidthSpace instanceof TextNode) {
+                const text = beforeZeroWidthSpace.getTextContent();
+                const zwsIndex = text.indexOf('\u200B');
+                
+                // 如果是纯零宽空格节点，直接删除
+                if (text === '\u200B') {
+                  beforeZeroWidthSpace.remove();
+                } 
+                // 如果是混合节点（包含零宽空格和其他字符）
+                else if (zwsIndex !== -1) {
+                  // 如果零宽空格在末尾，删除零宽空格
+                  if (zwsIndex === text.length - 1) {
+                    beforeZeroWidthSpace.setTextContent(text.substring(0, zwsIndex));
+                  }
+                  // 如果零宽空格不在末尾，保留节点，不做操作
+                }
+              }
+              
+              // 删除提及节点
+              mentionNode.remove();
+              
+              // 如果后面的节点是文本节点，且包含零宽空格
+              if (zeroWidthSpace instanceof TextNode) {
+                const text = zeroWidthSpace.getTextContent();
+                const zwsIndex = text.indexOf('\u200B');
+                
+                // 如果是纯零宽空格节点，直接删除
+                if (text === '\u200B') {
+                  zeroWidthSpace.remove();
+                } 
+                // 如果是混合节点（包含零宽空格和其他字符）
+                else if (zwsIndex !== -1) {
+                  // 如果零宽空格在开头，删除零宽空格
+                  if (zwsIndex === 0) {
+                    zeroWidthSpace.setTextContent(text.substring(1));
+                  }
+                  // 如果零宽空格不在开头，保留节点，不做操作
+                }
+              }
+            });
+            
+            return true;
+          }
         }
 
         return false;

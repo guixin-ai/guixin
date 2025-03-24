@@ -73,6 +73,146 @@ flowchart TD
     class MentionListPlugin composite
 ```
 
+### 插件命令交互详细图
+
+提及功能涉及多个插件之间的协作，通过命令进行交互:
+
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant Editor as 编辑器
+    participant Trigger as 提及触发插件
+    participant Content as 提及内容追踪插件
+    participant Filter as 提及过滤插件
+    participant Position as 提及位置插件
+    participant Display as 提及显示插件
+    participant Keyboard as 提及键盘插件
+    participant Transform as 提及转换插件
+    participant Navigation as 提及导航插件
+    participant Deletion as 提及删除插件
+    
+    User->>Editor: 输入@符号
+    Editor->>Trigger: 触发KEY_DOWN_COMMAND
+    
+    Note over Trigger: 检查@符号前是否为空格或开头
+    
+    Trigger->>Editor: 发送SHOW_MENTIONS_COMMAND
+    
+    Editor->>Content: 接收SHOW_MENTIONS_COMMAND
+    Editor->>Filter: 接收SHOW_MENTIONS_COMMAND
+    Editor->>Position: 接收SHOW_MENTIONS_COMMAND
+    Editor->>Display: 接收SHOW_MENTIONS_COMMAND
+    Editor->>Keyboard: 接收SHOW_MENTIONS_COMMAND
+    
+    Content->>Editor: 开始追踪@后内容
+    Filter->>Editor: 初始化联系人列表
+    Position->>Editor: 计算下拉列表位置
+    Position->>Editor: 发送MENTION_POSITION_UPDATE_COMMAND
+    
+    Editor->>Display: 接收MENTION_POSITION_UPDATE_COMMAND
+    Display->>User: 显示联系人下拉列表
+    
+    User->>Editor: 继续输入查询文本
+    Editor->>Content: 更新编辑器内容
+    
+    Content->>Editor: 提取@后内容
+    Content->>Editor: 发送MENTION_CONTENT_UPDATE_COMMAND
+    
+    Editor->>Filter: 接收MENTION_CONTENT_UPDATE_COMMAND
+    Filter->>Editor: 过滤联系人
+    Filter->>Editor: 发送MENTION_FILTER_UPDATE_COMMAND
+    
+    Editor->>Display: 接收MENTION_FILTER_UPDATE_COMMAND
+    Display->>User: 更新过滤后的联系人列表
+    
+    Content->>Editor: 更新编辑器内容位置
+    Content->>Editor: 发送MENTION_CONTENT_UPDATE_COMMAND
+    
+    Editor->>Position: 接收MENTION_CONTENT_UPDATE_COMMAND
+    Position->>Editor: 重新计算位置
+    Position->>Editor: 发送MENTION_POSITION_UPDATE_COMMAND
+    
+    Editor->>Display: 接收MENTION_POSITION_UPDATE_COMMAND
+    Display->>User: 更新下拉列表位置
+    
+    alt 键盘导航
+        User->>Editor: 按下上下方向键
+        Editor->>Keyboard: 触发KEY_ARROW_UP/DOWN_COMMAND
+        Keyboard->>Editor: 发送MOVE_MENTION_SELECTION_COMMAND
+        Editor->>Display: 接收MOVE_MENTION_SELECTION_COMMAND
+        Display->>User: 移动高亮选择项
+    end
+    
+    alt 选择联系人-键盘
+        User->>Editor: 按下回车/Tab键
+        Editor->>Keyboard: 触发KEY_ENTER/TAB_COMMAND
+        Keyboard->>Editor: 发送SELECT_HIGHLIGHTED_MENTION_COMMAND
+        Editor->>Display: 接收SELECT_HIGHLIGHTED_MENTION_COMMAND
+        Display->>Editor: 发送SELECT_MENTION_COMMAND
+    else 选择联系人-点击
+        User->>Display: 点击联系人
+        Display->>Editor: 发送SELECT_MENTION_COMMAND
+    end
+    
+    Editor->>Transform: 接收SELECT_MENTION_COMMAND
+    
+    Transform->>Editor: 查找光标位置的@符号
+    Transform->>Editor: 创建提及节点结构
+    Transform->>Editor: 替换原始@文本
+    
+    Editor->>Display: 发送CANCEL_MENTIONS_COMMAND
+    Editor->>Content: 发送CANCEL_MENTIONS_COMMAND
+    Editor->>Keyboard: 发送CANCEL_MENTIONS_COMMAND
+    
+    Content->>Editor: 停止追踪内容
+    Display->>User: 隐藏联系人列表
+    
+    Editor->>User: 显示提及节点
+    
+    alt 光标导航
+        User->>Editor: 按下左/右方向键
+        Editor->>Navigation: 触发KEY_ARROW_LEFT/RIGHT_COMMAND
+        Navigation->>Editor: 检查光标是否在提及节点附近
+        Navigation->>Editor: 跳过提及节点
+    end
+    
+    alt 删除提及
+        User->>Editor: 按下退格键
+        Editor->>Deletion: 触发KEY_BACKSPACE_COMMAND
+        Deletion->>Editor: 检查是否在提及节点后
+        Deletion->>Editor: 删除整个提及节点及相关字符
+    end
+    
+    alt 取消提及
+        alt 删除@符号
+            User->>Editor: 删除@符号
+            Editor->>Content: 更新编辑器内容
+            Content->>Editor: 检测到@符号被删除
+            Content->>Editor: 发送CANCEL_MENTIONS_COMMAND
+        else 按下ESC键
+            User->>Editor: 按下ESC键
+            Editor->>Keyboard: 触发KEY_ESCAPE_COMMAND
+            Keyboard->>Editor: 发送CANCEL_MENTIONS_COMMAND
+        else 输入空格
+            User->>Editor: 输入空格
+            Editor->>Content: 更新编辑器内容
+            Content->>Editor: 检测到@后有空格
+            Content->>Editor: 发送CANCEL_MENTIONS_COMMAND
+        else 失去焦点
+            User->>Editor: 点击其他地方
+            Editor->>Keyboard: 触发BLUR_COMMAND
+            Keyboard->>Editor: 发送CANCEL_MENTIONS_COMMAND
+        end
+        
+        Editor->>Display: 接收CANCEL_MENTIONS_COMMAND
+        Editor->>Content: 接收CANCEL_MENTIONS_COMMAND
+        Editor->>Keyboard: 接收CANCEL_MENTIONS_COMMAND
+        
+        Display->>User: 隐藏联系人列表
+        Content->>Editor: 停止追踪内容
+    end
+```
+
 ### 插件详细说明
 
 #### @提及功能子插件
@@ -135,11 +275,22 @@ flowchart TD
    - 确保整体删除行为
    - 提供节点的DOM元素
 
+11. `MentionNavigationPlugin`:
+   - 处理提及节点周围的光标键盘导航
+   - 确保左右方向键能跳过提及节点
+   - 提供平滑的光标体验
+   
+12. `MentionDeletionPlugin`:
+   - 监听退格键在提及节点后的行为
+   - 实现整体删除提及节点的功能
+   - 处理零宽空格的删除逻辑
+
 ### 辅助插件
 
 - `EditorRefPlugin`: 提供对编辑器实例的引用
 - `OnChangePlugin`: 处理内容变更事件
 - `TreeViewPlugin`: 调试工具，显示编辑器节点树
+- `FocusDebugPlugin`: 调试工具，监控编辑器获取/失去焦点事件
 
 ## 自定义节点
 

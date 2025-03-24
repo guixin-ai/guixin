@@ -9,6 +9,8 @@ import {
   DOMConversionMap,
   DOMConversionOutput,
   DOMExportOutput,
+  $createTextNode,
+  TextNode,
 } from 'lexical';
 import { ChatContact } from '..';
 
@@ -17,6 +19,13 @@ export type SerializedMentionNode = SerializedElementNode & {
   mentionId: string;
 }
 
+/**
+ * 提及节点
+ * 
+ * 该节点是一个独立节点，包含@提及的用户信息
+ * 在渲染时，节点前后会自动添加零宽空格，后面还会添加一个普通空格
+ * 这样确保光标可以正确定位到节点前后
+ */
 export class MentionNode extends ElementNode {
   __mention: string;
   __mentionId: string;
@@ -147,6 +156,64 @@ function convertMentionElement(domNode: HTMLElement): DOMConversionOutput {
   return { node };
 }
 
+/**
+ * 创建标准的提及节点结构
+ * 
+ * 会自动创建:
+ * 1. 前文本节点：仅包含一个零宽空格
+ * 2. 提及节点：包含联系人信息
+ * 3. 后文本节点：零宽空格+空格字符
+ * 
+ * @param mentionName 提及的用户名
+ * @param mentionId 提及的用户ID
+ * @param textNode 要替换的文本节点
+ * @param atPosition @符号的位置
+ * @param cursorOffset 光标位置
+ * @returns 返回创建的提及节点
+ */
+export function $createMentionNodeWithZeroWidthSpaces(
+  mentionName: string, 
+  mentionId: string,
+  textNode: TextNode,
+  atPosition: number,
+  cursorOffset: number
+): MentionNode {
+  // 创建提及节点
+  const mentionNode = new MentionNode(mentionName || '未知用户', mentionId || 'unknown');
+  
+  // 分割文本，保留@符号前的内容
+  const textBeforeAt = textNode.getTextContent().substring(0, atPosition);
+  const remainingText = textNode.getTextContent().substring(cursorOffset);
+  
+  // 处理前文本节点
+  textNode.setTextContent(textBeforeAt);
+  
+  // 创建零宽空格节点（前置）
+  const beforeZWSNode = $createTextNode('\u200B');
+  textNode.insertAfter(beforeZWSNode);
+  
+  // 插入提及节点
+  beforeZWSNode.insertAfter(mentionNode);
+  
+  // 创建零宽空格+空格节点（后置）
+  const afterZWSNode = $createTextNode('\u200B ');
+  mentionNode.insertAfter(afterZWSNode);
+  
+  // 如果光标后还有文本，创建一个新节点
+  if (remainingText.length > 0) {
+    const remainingTextNode = $createTextNode(remainingText);
+    afterZWSNode.insertAfter(remainingTextNode);
+  }
+  
+  // 设置光标位置在空格后
+  afterZWSNode.select(2);
+  
+  return mentionNode;
+}
+
+/**
+ * 创建提及节点
+ */
 export function $createMentionNode(mentionName: string, mentionId: string): MentionNode {
   const name = mentionName || '未知用户';
   const id = mentionId || 'unknown';

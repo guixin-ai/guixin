@@ -25,6 +25,12 @@ export const CANCEL_MENTIONS_COMMAND = createCommand<void>('CANCEL_MENTIONS_COMM
 export const SELECT_MENTION_COMMAND = createCommand<ChatContact>('SELECT_MENTION_COMMAND');
 
 /**
+ * 选择当前高亮的提及联系人命令
+ * 当用户按下回车键或Tab键选择当前高亮联系人时触发
+ */
+export const SELECT_HIGHLIGHTED_MENTION_COMMAND = createCommand<void>('SELECT_HIGHLIGHTED_MENTION_COMMAND');
+
+/**
  * 提及内容更新命令
  * 当用户在@后输入内容时触发，用于实时更新过滤内容
  */

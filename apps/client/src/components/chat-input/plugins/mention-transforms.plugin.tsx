@@ -25,6 +25,7 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
     const removeSelectMentionListener = editor.registerCommand(
       SELECT_MENTION_COMMAND,
       (contact: ChatContact) => {
+        console.log('SELECT_MENTION_COMMAND received');
         // 在编辑器中插入提及节点
         editor.update(() => {
           const selection = $getSelection();

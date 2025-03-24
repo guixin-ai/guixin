@@ -10,21 +10,18 @@ import {
   createCommand,
   LexicalCommand
 } from 'lexical';
-import { ChatContact } from '..';
 import { 
   SELECT_MENTION_COMMAND, 
   SHOW_MENTIONS_COMMAND, 
-  CANCEL_MENTIONS_COMMAND 
+  CANCEL_MENTIONS_COMMAND,
+  SELECT_HIGHLIGHTED_MENTION_COMMAND
 } from '../commands';
 
 // 创建移动提及选择命令
 export const MOVE_MENTION_SELECTION_COMMAND: LexicalCommand<'up' | 'down'> = createCommand('MOVE_MENTION_SELECTION_COMMAND');
 
 interface MentionKeyboardPluginProps {
-  filteredContactsLength?: number;
-  onMoveSelection?: (direction: 'up' | 'down') => void;
-  onSelectMention?: () => void;
-  onEscape?: () => void;
+  // 移除所有回调属性
 }
 
 /**
@@ -32,13 +29,9 @@ interface MentionKeyboardPluginProps {
  * 处理用户在提及列表中的键盘导航
  * 包括上下移动选择和回车/Tab选择等
  * 监听提及列表的显示和隐藏状态，响应键盘事件
+ * 通过命令与其他插件通信
  */
-export function MentionKeyboardPlugin({
-  filteredContactsLength = 0,
-  onMoveSelection,
-  onSelectMention,
-  onEscape,
-}: MentionKeyboardPluginProps) {
+export function MentionKeyboardPlugin({}: MentionKeyboardPluginProps) {
   const [editor] = useLexicalComposerContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
@@ -73,12 +66,8 @@ export function MentionKeyboardPlugin({
           // 如果下拉列表打开，阻止默认行为并向上移动选择
           event?.preventDefault?.();
           
-          if (onMoveSelection) {
-            onMoveSelection('up');
-          } else {
-            // 分发移动选择命令
-            editor.dispatchCommand(MOVE_MENTION_SELECTION_COMMAND, 'up');
-          }
+          // 分发移动选择命令
+          editor.dispatchCommand(MOVE_MENTION_SELECTION_COMMAND, 'up');
           
           return true;
         }
@@ -95,12 +84,8 @@ export function MentionKeyboardPlugin({
           // 如果下拉列表打开，阻止默认行为并向下移动选择
           event?.preventDefault?.();
           
-          if (onMoveSelection) {
-            onMoveSelection('down');
-          } else {
-            // 分发移动选择命令
-            editor.dispatchCommand(MOVE_MENTION_SELECTION_COMMAND, 'down');
-          }
+          // 分发移动选择命令
+          editor.dispatchCommand(MOVE_MENTION_SELECTION_COMMAND, 'down');
           
           return true;
         }
@@ -117,9 +102,8 @@ export function MentionKeyboardPlugin({
           // 如果下拉列表打开，阻止默认行为并选择当前项
           event?.preventDefault?.();
           
-          if (onSelectMention) {
-            onSelectMention();
-          }
+          // 分发选择高亮提及命令
+          editor.dispatchCommand(SELECT_HIGHLIGHTED_MENTION_COMMAND, undefined);
           
           return true;
         }
@@ -136,9 +120,8 @@ export function MentionKeyboardPlugin({
           // 如果下拉列表打开，阻止默认行为并选择当前项
           event?.preventDefault?.();
           
-          if (onSelectMention) {
-            onSelectMention();
-          }
+          // 分发选择高亮提及命令
+          editor.dispatchCommand(SELECT_HIGHLIGHTED_MENTION_COMMAND, undefined);
           
           return true;
         }
@@ -155,12 +138,8 @@ export function MentionKeyboardPlugin({
           // 如果下拉列表打开，阻止默认行为并关闭下拉列表
           event?.preventDefault?.();
           
-          if (onEscape) {
-            onEscape();
-          } else {
-            // 分发取消提及命令
-            editor.dispatchCommand(CANCEL_MENTIONS_COMMAND, undefined);
-          }
+          // 分发取消提及命令
+          editor.dispatchCommand(CANCEL_MENTIONS_COMMAND, undefined);
           
           // 重新聚焦编辑器
           setTimeout(() => {
@@ -183,7 +162,7 @@ export function MentionKeyboardPlugin({
       removeTabListener();
       removeEscListener();
     };
-  }, [editor, isDropdownOpen, filteredContactsLength, onMoveSelection, onSelectMention, onEscape]);
+  }, [editor, isDropdownOpen]);
   
   return null;
 } 

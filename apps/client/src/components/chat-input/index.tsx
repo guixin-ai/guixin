@@ -20,6 +20,7 @@ import {
   MentionNodePlugin,
   MentionContentTrackerPlugin,
   MentionCancellationPlugin,
+  FocusDebugPlugin,
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -162,6 +163,9 @@ export function ChatInput({
           {/* 工具和引用插件 */}
           <EditorRefPlugin onRef={handleEditorRef} />
           {onChange && <OnChangePlugin onChange={handleEditorChange} />}
+          
+          {/* 焦点调试插件 */}
+          <FocusDebugPlugin />
 
           {/* 渲染额外的插件 */}
           {children}

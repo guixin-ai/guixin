@@ -51,24 +51,43 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
                 // 创建提及节点
                 const mentionNode = $createMentionNode(contact.name, contact.id);
 
-                // 分割文本节点，删除@和搜索文本
+                // 分割文本节点，确保在@符号处进行分割
+                let textBeforeAt = '';
                 if (lastAtPos > 0) {
+                  // 保存@符号前的文本内容
+                  textBeforeAt = textContent.substring(0, lastAtPos);
+                  // 在@符号处分割节点
                   anchorNode.splitText(lastAtPos);
                 }
 
-                // 替换文本节点中的@+查询文本
-                const textNodeKey = anchorNode.getKey();
+                // 获取最新的文本节点引用
                 const textNode = anchorNode.getLatest();
 
                 if (textNode && textNode instanceof TextNode) {
-                  textNode.setTextContent(textContent.substring(0, lastAtPos));
-                  
-                  // 在提及节点前插入零宽空格节点
-                  const beforeZeroWidthSpaceNode = $createTextNode('\u200B');
-                  textNode.insertAfter(beforeZeroWidthSpaceNode);
-                  
-                  // 插入提及节点
-                  beforeZeroWidthSpaceNode.insertAfter(mentionNode);
+                  // 如果@符号前有内容，保留该内容，否则移除整个节点
+                  if (textBeforeAt.length > 0) {
+                    textNode.setTextContent(textBeforeAt);
+                    
+                    // 在提及节点前插入零宽空格节点
+                    const beforeZeroWidthSpaceNode = $createTextNode('\u200B');
+                    textNode.insertAfter(beforeZeroWidthSpaceNode);
+                    
+                    // 插入提及节点
+                    beforeZeroWidthSpaceNode.insertAfter(mentionNode);
+                  } else {
+                    // 如果@符号在开头，直接移除节点并替换为提及节点
+                    // 先创建零宽空格节点
+                    const beforeZeroWidthSpaceNode = $createTextNode('\u200B');
+                    
+                    // 将零宽空格节点插入到文本节点之前
+                    textNode.insertBefore(beforeZeroWidthSpaceNode);
+                    
+                    // 将提及节点插入到零宽空格节点之后
+                    beforeZeroWidthSpaceNode.insertAfter(mentionNode);
+                    
+                    // 移除包含@符号的原始文本节点
+                    textNode.remove();
+                  }
 
                   // 在提及节点后插入零宽空格节点
                   const afterZeroWidthSpaceNode = $createTextNode('\u200B');

@@ -22,9 +22,10 @@ const logger = createLogger('提及节点删除');
  * 当光标在提及节点后的文本节点开始位置按下退格键时，删除提及节点
  * 
  * 特殊处理：
- * 1. 删除提及节点后，检查前后文本节点并合并
- * 2. 如果合并后的文本节点包含非零宽字符，则删除所有零宽字符
- * 3. 如果合并后的文本节点只包含零宽字符，则只保留一个零宽字符
+ * 1. 删除前检查前后是否有只含零宽字符的文本节点，且不在两个提及节点之间，则一并删除
+ * 2. 删除提及节点后，检查前后文本节点并合并
+ * 3. 如果合并后的文本节点包含非零宽字符，则删除所有零宽字符
+ * 4. 如果合并后的文本节点只包含零宽字符，则只保留一个零宽字符
  */
 export function MentionNodeDeletionPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -77,13 +78,62 @@ export function MentionNodeDeletionPlugin() {
               const currentTextNode = currentNode;
               const beforeMentionNode = prevNode.getPreviousSibling();
               
+              // 检查前面的节点是否是只包含零宽字符的文本节点
+              let shouldDeleteBeforeNode = false;
+              if (beforeMentionNode instanceof TextNode && 
+                  beforeMentionNode.getTextContent() === '\u200B') {
+                // 检查这个零宽字符节点的前面是否是提及节点
+                const nodeBefore = beforeMentionNode.getPreviousSibling();
+                if (!nodeBefore || !$isMentionNode(nodeBefore)) {
+                  // 如果前面不是提及节点，标记为需要删除
+                  shouldDeleteBeforeNode = true;
+                  logger.debug('提及节点前是只包含零宽字符的文本节点，且不在两个提及节点之间，将一并删除');
+                }
+              }
+              
+              // 检查当前节点是否是只包含零宽字符的文本节点
+              let shouldDeleteCurrentNode = false;
+              if (currentTextNode.getTextContent() === '\u200B') {
+                // 检查这个零宽字符节点的后面是否是提及节点
+                const nodeAfter = currentTextNode.getNextSibling();
+                if (!nodeAfter || !$isMentionNode(nodeAfter)) {
+                  // 如果后面不是提及节点，标记为需要删除
+                  shouldDeleteCurrentNode = true;
+                  logger.debug('提及节点后是只包含零宽字符的文本节点，且不在两个提及节点之间，将一并删除');
+                }
+              }
+              
               // 删除提及节点
               logger.debug('删除提及节点:', prevNode.getMention());
               prevNode.remove();
               
+              // 根据判断删除只包含零宽字符的前置节点
+              if (shouldDeleteBeforeNode && beforeMentionNode) {
+                beforeMentionNode.remove();
+                logger.debug('删除提及节点前的零宽字符节点');
+              }
+              
+              // 根据判断删除只包含零宽字符的后置节点
+              if (shouldDeleteCurrentNode) {
+                currentTextNode.remove();
+                logger.debug('删除提及节点后的零宽字符节点');
+                
+                // 设置光标位置到合适的位置
+                if (beforeMentionNode instanceof TextNode && !shouldDeleteBeforeNode) {
+                  const selection = $createRangeSelection();
+                  selection.anchor.set(beforeMentionNode.getKey(), beforeMentionNode.getTextContent().length, 'text');
+                  selection.focus.set(beforeMentionNode.getKey(), beforeMentionNode.getTextContent().length, 'text');
+                  $setSelection(selection);
+                }
+                
+                // 如果已经删除了节点，不需要继续合并
+                return;
+              }
+              
               // 处理前后文本节点合并
-              // 如果提及节点前后都是文本节点，则需要合并
-              if (beforeMentionNode instanceof TextNode && currentTextNode instanceof TextNode) {
+              // 如果提及节点前后都是文本节点（且未被删除），则需要合并
+              if (beforeMentionNode instanceof TextNode && !shouldDeleteBeforeNode && 
+                  currentTextNode instanceof TextNode && !shouldDeleteCurrentNode) {
                 logger.debug('提及节点前后都是文本节点，准备合并');
                 
                 // 获取两个文本节点的内容

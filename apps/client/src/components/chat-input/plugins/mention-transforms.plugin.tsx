@@ -110,16 +110,9 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
           });
           
           // 前置节点处理
-          // 检查是否为段落节点的开头位置（提及节点是段落的第一个子节点）
-          const isAtParagraphStart = !prevNode && mentionNode.getParent() && $isParagraphNode(mentionNode.getParent());
-          
-          if (isAtParagraphStart) {
-            // 如果提及节点是段落的第一个子节点，在其前创建零宽字符节点
-            logger.debug('提及节点位于段落开头，创建零宽字符节点');
-            const beforeZWSNode = $createTextNode('\u200B');
-            mentionNode.insertBefore(beforeZWSNode);
-          } else if (!prevNode) {
-            // 如果不是段落开头但前面没有节点，创建零宽字符节点
+          // 简化判断，只检查前面是否有节点
+          if (!prevNode) {
+            // 如果前面没有节点，创建零宽字符节点
             logger.debug('提及节点前没有节点，创建零宽字符节点');
             const beforeZWSNode = $createTextNode('\u200B');
             mentionNode.insertBefore(beforeZWSNode);

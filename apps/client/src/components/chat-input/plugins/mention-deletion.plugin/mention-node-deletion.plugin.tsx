@@ -20,6 +20,7 @@ const logger = createLogger('提及节点删除');
  * 
  * 该插件负责处理提及节点的删除
  * 当光标在提及节点后的文本节点开始位置按下退格键时，删除提及节点
+ * 或者当文本节点内容为零宽字符且光标位于零宽字符后面位置按退格键时，也删除提及节点
  * 
  * 特殊处理：
  * 1. 删除前检查前后是否有只含零宽字符的文本节点，且不在两个提及节点之间，则一并删除
@@ -61,13 +62,20 @@ export function MentionNodeDeletionPlugin() {
           offset
         });
 
-        // 当前节点是文本节点，且光标在开始位置，且前一个节点是提及节点
-        if (currentNode instanceof TextNode && offset === 0) {
+        // 当前节点是文本节点
+        if (currentNode instanceof TextNode) {
+          const nodeText = currentNode.getTextContent();
           const prevNode = currentNode.getPreviousSibling();
           
+          // 满足以下两种条件之一：
+          // 1. 光标在文本节点开始位置
+          // 2. 文本节点内容是零宽字符，且光标位置在零宽字符后面
+          const isAtStart = offset === 0;
+          const isAfterZeroWidth = nodeText === '\u200B' && offset === 1;
+          
           // 判断前一个节点是否是提及节点
-          if (prevNode && $isMentionNode(prevNode)) {
-            logger.debug('光标在文本节点开始位置，前面是提及节点，准备删除');
+          if (prevNode && $isMentionNode(prevNode) && (isAtStart || isAfterZeroWidth)) {
+            logger.debug('光标在文本节点开始位置或零宽字符后，前面是提及节点，准备删除');
             
             // 阻止默认行为
             event?.preventDefault?.();

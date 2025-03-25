@@ -24,6 +24,7 @@ const logger = createLogger('提及节点相邻文本退格处理');
  * 
  * 特殊处理:
  * - 确保与提及节点相邻时，至少保留一个零宽字符节点作为分隔
+ * - 如果删除的最后一个字符已经是零宽字符，则跳过处理，交给其他处理程序
  */
 export function MentionAdjacentTextBackspacePlugin() {
   const [editor] = useLexicalComposerContext();
@@ -63,6 +64,12 @@ export function MentionAdjacentTextBackspacePlugin() {
             
             // 如果前面或后面是提及节点，且将要删除最后一个字符
             if ((isPrevMention || isNextMention) && nodeText.length === 1) {
+              // 如果最后一个字符已经是零宽字符，跳过处理
+              if (nodeText === '\u200B') {
+                logger.debug('最后一个字符已经是零宽字符，跳过处理');
+                return false;
+              }
+              
               logger.debug('即将删除与提及节点相邻的文本节点最后一个字符');
               
               // 阻止默认行为

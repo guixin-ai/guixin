@@ -25,6 +25,7 @@ import {
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
 import { createLogger } from './utils/logger';
+import {HistoryPlugin} from '@lexical/react/LexicalHistoryPlugin';
 
 const logger = createLogger('聊天输入框');
 
@@ -163,7 +164,7 @@ export function ChatInput({
           {/* 工具和引用插件 */}
           <EditorRefPlugin onRef={handleEditorRef} />
           {onChange && <OnChangePlugin onChange={handleEditorChange} />}
-          
+          <HistoryPlugin />
           {/* 焦点调试插件 */}
           <FocusDebugPlugin />
 

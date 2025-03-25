@@ -110,10 +110,25 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
           });
           
           // 前置节点处理
+          // 判断当前节点是否在段落开始位置
+          let isAtParagraphStart = false;
+          const parentNode = mentionNode.getParent();
+          
+          if (parentNode && $isParagraphNode(parentNode)) {
+            const firstChild = parentNode.getFirstChild();
+            
+            // 检查提及节点是否是段落的第一个子节点，或者其前置节点是空文本节点
+            if (firstChild === mentionNode || 
+                (prevNode instanceof TextNode && prevNode.getTextContent() === '')) {
+              isAtParagraphStart = true;
+              logger.debug('提及节点位于段落开始位置');
+            }
+          }
+          
           // 简化判断，只检查前面是否有节点
-          if (!prevNode) {
-            // 如果前面没有节点，创建零宽字符节点
-            logger.debug('提及节点前没有节点，创建零宽字符节点');
+          if (!prevNode || isAtParagraphStart) {
+            // 如果前面没有节点或在段落开始位置，创建零宽字符节点
+            logger.debug('提及节点前没有节点或在段落开始位置，创建零宽字符节点');
             const beforeZWSNode = $createTextNode('\u200B');
             mentionNode.insertBefore(beforeZWSNode);
           } else if (!(prevNode instanceof TextNode)) {

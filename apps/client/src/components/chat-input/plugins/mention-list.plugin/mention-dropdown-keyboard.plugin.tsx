@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { 
   KEY_ARROW_DOWN_COMMAND,
@@ -12,10 +12,13 @@ import {
 } from 'lexical';
 import { 
   SELECT_MENTION_COMMAND, 
-  SHOW_MENTIONS_COMMAND, 
-  CANCEL_MENTIONS_COMMAND,
-  SELECT_HIGHLIGHTED_MENTION_COMMAND
+  SELECT_HIGHLIGHTED_MENTION_COMMAND,
+  CANCEL_MENTIONS_COMMAND
 } from '../../commands';
+import { useMentionState } from '../../models';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('提及键盘导航');
 
 // 创建移动提及选择命令
 export const MOVE_MENTION_SELECTION_COMMAND: LexicalCommand<'up' | 'down'> = createCommand('MOVE_MENTION_SELECTION_COMMAND');
@@ -28,35 +31,16 @@ interface MentionDropdownKeyboardPluginProps {
  * 提及键盘导航插件
  * 处理用户在提及列表中的键盘导航
  * 包括上下移动选择和回车/Tab选择等
- * 监听提及列表的显示和隐藏状态，响应键盘事件
+ * 使用全局状态管理监听提及列表的显示状态，响应键盘事件
  * 通过命令与其他插件通信
  */
 export function MentionDropdownKeyboardPlugin({}: MentionDropdownKeyboardPluginProps) {
   const [editor] = useLexicalComposerContext();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  // 使用全局状态替代本地状态
+  const { isDropdownOpen } = useMentionState();
   
   useEffect(() => {
     if (!editor) return;
-
-    // 监听显示提及命令
-    const removeShowListener = editor.registerCommand(
-      SHOW_MENTIONS_COMMAND,
-      () => {
-        setIsDropdownOpen(true);
-        return false; // 不阻止其他插件处理
-      },
-      COMMAND_PRIORITY_HIGH
-    );
-    
-    // 监听取消提及命令
-    const removeCancelListener = editor.registerCommand(
-      CANCEL_MENTIONS_COMMAND,
-      () => {
-        setIsDropdownOpen(false);
-        return false; // 不阻止其他插件处理
-      },
-      COMMAND_PRIORITY_HIGH
-    );
     
     // 注册上方向键事件 - 向上移动选择
     const removeUpListener = editor.registerCommand(
@@ -99,6 +83,7 @@ export function MentionDropdownKeyboardPlugin({}: MentionDropdownKeyboardPluginP
       KEY_ENTER_COMMAND,
       (event) => {
         if (isDropdownOpen) {
+          logger.debug('提及状态下拉框打开状态下，拦截回车事件');
           // 如果下拉列表打开，阻止默认行为并选择当前项
           event?.preventDefault?.();
           
@@ -154,8 +139,6 @@ export function MentionDropdownKeyboardPlugin({}: MentionDropdownKeyboardPluginP
     );
     
     return () => {
-      removeShowListener();
-      removeCancelListener();
       removeUpListener();
       removeDownListener();
       removeEnterListener();

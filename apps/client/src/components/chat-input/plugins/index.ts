@@ -12,6 +12,7 @@ export * from './mention-cancellation.plugin';
 export * from './focus-debug.plugin';
 export { MentionDeletionPlugin } from './mention-deletion.plugin/index';
 export { MentionNavigationPlugin } from './mention-navigation.plugin';
+export * from './mention-state.plugin';
 
 // 新增插件
 export * from './enter-to-line-break.plugin';

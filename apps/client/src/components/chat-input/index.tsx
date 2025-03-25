@@ -22,6 +22,7 @@ import {
   MentionDeletionPlugin,
   MentionNavigationPlugin,
   EnterToLineBreakPlugin,
+  MentionStatePlugin,
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -152,6 +153,9 @@ export function ChatInput({
 
           {/* 根据参数控制是否添加自动聚焦插件 */}
           {autoFocus && <AutoFocusPlugin defaultSelection="rootEnd" />}
+
+          {/* 提及状态管理插件 - 需要放在最前面 */}
+          <MentionStatePlugin />
 
           {/* 提及功能插件组 */}
           <MentionTriggerPlugin />

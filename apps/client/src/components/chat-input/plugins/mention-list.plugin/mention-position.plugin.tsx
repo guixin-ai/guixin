@@ -5,7 +5,7 @@ import {
   SHOW_MENTIONS_COMMAND,
   MENTION_CONTENT_UPDATE_COMMAND,
   MENTION_POSITION_UPDATE_COMMAND
-} from '../commands';
+} from '../../commands';
 
 /**
  * 提及位置插件

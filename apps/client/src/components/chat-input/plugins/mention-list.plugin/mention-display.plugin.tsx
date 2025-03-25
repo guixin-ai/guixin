@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { createPortal } from 'react-dom';
-import { ChatContact } from '..';
+import { ChatContact } from '../..';
 import { COMMAND_PRIORITY_HIGH } from 'lexical';
 import {
   SHOW_MENTIONS_COMMAND,
@@ -10,9 +10,9 @@ import {
   MENTION_POSITION_UPDATE_COMMAND,
   MENTION_FILTER_UPDATE_COMMAND,
   SELECT_HIGHLIGHTED_MENTION_COMMAND,
-} from '../commands';
-import { MentionList } from '../components/mention-list';
-import { MOVE_MENTION_SELECTION_COMMAND } from './mention-keyboard.plugin';
+} from '../../commands';
+import { MentionList } from '../../components/mention-list';
+import { MOVE_MENTION_SELECTION_COMMAND } from './mention-dropdown-keyboard.plugin';
 
 interface MentionDisplayPluginProps {
   contacts: ChatContact[];

@@ -15,9 +15,7 @@ import {
   OnChangePlugin,
   MentionTriggerPlugin,
   MentionListPlugin,
-  MentionKeyboardPlugin,
   MentionTransformsPlugin,
-  MentionNodePlugin,
   MentionContentTrackerPlugin,
   MentionCancellationPlugin,
   FocusDebugPlugin,
@@ -157,9 +155,7 @@ export function ChatInput({
           <MentionTriggerPlugin />
           <MentionContentTrackerPlugin />
           <MentionListPlugin contacts={contacts} />
-          <MentionKeyboardPlugin />
           <MentionTransformsPlugin contacts={contacts} />
-          <MentionNodePlugin />
           <MentionCancellationPlugin />
           <MentionDeletionPlugin />
           <MentionNavigationPlugin />

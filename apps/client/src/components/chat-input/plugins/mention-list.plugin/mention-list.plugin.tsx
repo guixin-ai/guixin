@@ -1,8 +1,8 @@
-import { ChatContact } from '..';
+import { ChatContact } from '../..';
 import { MentionDisplayPlugin } from './mention-display.plugin';
 import { MentionFilterPlugin } from './mention-filter.plugin';
 import { MentionPositionPlugin } from './mention-position.plugin';
-
+import { MentionDropdownKeyboardPlugin } from './mention-dropdown-keyboard.plugin';
 interface MentionListPluginProps {
   contacts: ChatContact[];
   onSelectMention?: (contact: ChatContact) => void;
@@ -22,6 +22,7 @@ export function MentionListPlugin(props: MentionListPluginProps) {
       <MentionDisplayPlugin contacts={props.contacts} onSelectMention={props.onSelectMention} />
       <MentionFilterPlugin contacts={props.contacts} />
       <MentionPositionPlugin />
+      <MentionDropdownKeyboardPlugin />
     </>
   );
 } 

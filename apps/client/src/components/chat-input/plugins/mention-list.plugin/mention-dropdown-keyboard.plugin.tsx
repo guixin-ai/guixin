@@ -15,12 +15,12 @@ import {
   SHOW_MENTIONS_COMMAND, 
   CANCEL_MENTIONS_COMMAND,
   SELECT_HIGHLIGHTED_MENTION_COMMAND
-} from '../commands';
+} from '../../commands';
 
 // 创建移动提及选择命令
 export const MOVE_MENTION_SELECTION_COMMAND: LexicalCommand<'up' | 'down'> = createCommand('MOVE_MENTION_SELECTION_COMMAND');
 
-interface MentionKeyboardPluginProps {
+interface MentionDropdownKeyboardPluginProps {
   // 移除所有回调属性
 }
 
@@ -31,7 +31,7 @@ interface MentionKeyboardPluginProps {
  * 监听提及列表的显示和隐藏状态，响应键盘事件
  * 通过命令与其他插件通信
  */
-export function MentionKeyboardPlugin({}: MentionKeyboardPluginProps) {
+export function MentionDropdownKeyboardPlugin({}: MentionDropdownKeyboardPluginProps) {
   const [editor] = useLexicalComposerContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   

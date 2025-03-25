@@ -35,7 +35,7 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [position, setPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [filteredContacts, setFilteredContacts] = useState<ChatContact[]>(contacts);
-  
+
   // 使用全局状态替代本地状态
   const { isDropdownOpen, openDropdown, closeDropdown } = useMentionState();
 

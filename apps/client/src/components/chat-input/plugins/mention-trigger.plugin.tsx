@@ -5,10 +5,13 @@ import {
   COMMAND_PRIORITY_NORMAL,
   $getSelection,
   $isRangeSelection,
-  TextNode
+  TextNode,
+  ParagraphNode,
+  $isParagraphNode
 } from 'lexical';
 import { SHOW_MENTIONS_COMMAND } from '../commands';
 import { createLogger } from '../utils/logger';
+import { isAnchorAndFocusOverlapping } from '../utils';
 
 // 创建日志记录器
 const logger = createLogger('提及触发');
@@ -17,8 +20,11 @@ const logger = createLogger('提及触发');
  * 提及触发插件
  * 专门负责监听@符号的键盘输入，并发出触发命令
  * 条件：
- * 1. @符号前面是空格，或者
- * 2. @符号在文本的开头位置
+ * 1. 文本节点：
+ *    a. @符号前面是空格，或者
+ *    b. @符号在文本的开头位置
+ * 2. 段落节点：
+ *    a. @符号只能在段落开头位置触发
  */
 export function MentionTriggerPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -41,6 +47,12 @@ export function MentionTriggerPlugin() {
               return;
             }
             
+            // 检查锚点和焦点是否重叠（无文本选择范围）
+            if (!isAnchorAndFocusOverlapping(selection)) {
+              logger.debug('锚点和焦点不重叠（存在文本选择范围），跳过处理');
+              return;
+            }
+            
             const anchor = selection.anchor;
             const anchorNode = anchor.getNode();
             const offset = anchor.offset;
@@ -51,8 +63,9 @@ export function MentionTriggerPlugin() {
               offset
             });
             
-            // 检查是否在文本节点中
+            // 处理文本节点情况
             if (anchorNode instanceof TextNode) {
+              // 获取文本内容
               const textContent = anchorNode.getTextContent();
               
               // 条件1：@符号在文本的开头位置
@@ -78,13 +91,19 @@ export function MentionTriggerPlugin() {
                   logger.debug('前一个字符不是空格，不触发提及');
                 }
               }
-            } else {
-              // 在非文本节点的开始位置，如空段落等
+            } 
+            // 处理段落节点情况
+            else if ($isParagraphNode(anchorNode)) {
+              // 段落节点只有在开头位置才触发提及
               if (offset === 0) {
-                logger.info('触发提及菜单 - 非文本节点开头');
+                logger.info('触发提及菜单 - 段落开头位置');
                 editor.dispatchCommand(SHOW_MENTIONS_COMMAND, undefined);
                 return;
+              } else {
+                logger.debug('不在段落开头位置，不触发提及');
               }
+            } else {
+              logger.debug('不支持的节点类型，跳过处理', anchorNode);
             }
             
             logger.debug('不满足触发条件，忽略@符号');

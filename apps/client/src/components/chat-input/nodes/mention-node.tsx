@@ -162,47 +162,12 @@ function convertMentionElement(domNode: HTMLElement): DOMConversionOutput {
 /**
  * 创建提及节点
  * 
- * 不再自动创建前后的文本节点，只创建提及节点本身
- * 调用者需要自行处理前后的文本节点
+ * 注意：此方法只创建提及节点本身，不处理前后文本节点
+ * 调用者需要自行处理前后的文本节点以确保光标正确定位
  * 
  * @param mentionName 提及的用户名
  * @param mentionId 提及的用户ID
- * @param textNode 要替换的文本节点
- * @param atPosition @符号的位置
- * @param cursorOffset 光标位置
- * @returns 返回创建的提及节点
- */
-export function $createMentionNodeWithZeroWidthSpaces(
-  mentionName: string, 
-  mentionId: string,
-  textNode: TextNode,
-  atPosition: number,
-  cursorOffset: number
-): MentionNode {
-  // 创建提及节点
-  const mentionNode = new MentionNode(mentionName || '未知用户', mentionId || 'unknown');
-  
-  // 分割文本，保留@符号前的内容
-  const textBeforeAt = textNode.getTextContent().substring(0, atPosition);
-  const remainingText = textNode.getTextContent().substring(cursorOffset);
-  
-  // 处理前文本节点
-  textNode.setTextContent(textBeforeAt);
-  
-  // 插入提及节点
-  textNode.insertAfter(mentionNode);
-  
-  // 如果光标后还有文本，创建一个新节点
-  if (remainingText.length > 0) {
-    const remainingTextNode = $createTextNode(remainingText);
-    mentionNode.insertAfter(remainingTextNode);
-  }
-  
-  return mentionNode;
-}
-
-/**
- * 创建提及节点
+ * @returns 创建的提及节点
  */
 export function $createMentionNode(mentionName: string, mentionId: string): MentionNode {
   const name = mentionName || '未知用户';

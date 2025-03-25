@@ -8,9 +8,11 @@ import {
   $createTextNode,
   $setSelection,
   $createRangeSelection,
+  $isParagraphNode,
+  ParagraphNode
 } from 'lexical';
 import { SELECT_MENTION_COMMAND } from '../commands';
-import { $createMentionNodeWithZeroWidthSpaces, $isMentionNode } from '../nodes';
+import { $createMentionNode, $isMentionNode } from '../nodes';
 import { ChatContact } from '..';
 import { createLogger } from '../utils/logger';
 
@@ -22,7 +24,7 @@ const logger = createLogger('提及转换');
  * 负责将选择的联系人转换为提及节点
  * 
  * 提及节点的标准结构：
- * [文本节点(零宽空格)] [提及节点] [文本节点(零宽空格+空格)]
+ * [文本节点(零宽空格)] [提及节点] [文本节点(空格+其他内容)]
  * 
  * 在提及节点前后都添加零宽空格，确保光标可以正确定位
  */
@@ -82,39 +84,69 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
             textAfterAt: textContent.substring(lastAtPos, cursorOffset)
           });
           
-          // 创建提及节点（现在只会创建节点本身，不处理前后文本节点）
-          const mentionNode = $createMentionNodeWithZeroWidthSpaces(
+          // 创建提及节点
+          const mentionNode = $createMentionNode(
             contact.name,
-            contact.id,
-            anchorNode,
-            lastAtPos,
-            cursorOffset
+            contact.id
           );
+          
+          // 分割文本，保留@符号前的内容
+          const textBeforeAt = textContent.substring(0, lastAtPos);
+          const remainingText = textContent.substring(cursorOffset);
+          
+          // 处理前文本节点
+          anchorNode.setTextContent(textBeforeAt);
+          
+          // 插入提及节点
+          anchorNode.insertAfter(mentionNode);
           
           // 检查提及节点前面是否有文本节点
           const prevNode = mentionNode.getPreviousSibling();
           const nextNode = mentionNode.getNextSibling();
+
+          logger.debug('提及节点前后的节点:', {
+            prevNode,
+            nextNode
+          });
           
-          // 如果前面没有文本节点，或者前面的文本节点是空的，添加零宽字符节点
-          if (!prevNode || !(prevNode instanceof TextNode) || prevNode.getTextContent() === '') {
-            logger.debug('提及节点前没有文本节点，添加零宽字符节点');
+          // 前置节点处理
+          // 检查是否为段落节点的开头位置（提及节点是段落的第一个子节点）
+          const isAtParagraphStart = !prevNode && mentionNode.getParent() && $isParagraphNode(mentionNode.getParent());
+          
+          if (isAtParagraphStart) {
+            // 如果提及节点是段落的第一个子节点，在其前创建零宽字符节点
+            logger.debug('提及节点位于段落开头，创建零宽字符节点');
             const beforeZWSNode = $createTextNode('\u200B');
-            
-            if (!prevNode) {
-              // 如果没有前置节点，将零宽字符插入到提及节点前
-              mentionNode.insertBefore(beforeZWSNode);
-            } else if (!(prevNode instanceof TextNode)) {
-              // 如果前置节点不是文本节点，在它后面插入零宽字符
-              prevNode.insertAfter(beforeZWSNode);
-              // 然后移动提及节点到零宽字符节点后
-              beforeZWSNode.insertAfter(mentionNode);
-            }
+            mentionNode.insertBefore(beforeZWSNode);
+          } else if (!prevNode) {
+            // 如果不是段落开头但前面没有节点，创建零宽字符节点
+            logger.debug('提及节点前没有节点，创建零宽字符节点');
+            const beforeZWSNode = $createTextNode('\u200B');
+            mentionNode.insertBefore(beforeZWSNode);
+          } else if (!(prevNode instanceof TextNode)) {
+            // 如果前面的节点不是文本节点，在其后创建零宽字符节点
+            logger.debug('提及节点前不是文本节点，创建零宽字符节点');
+            const beforeZWSNode = $createTextNode('\u200B');
+            prevNode.insertAfter(beforeZWSNode);
+            beforeZWSNode.insertAfter(mentionNode);
           }
           
-          // 检查提及节点后面是否有文本节点
-          // 如果没有，或文本不是以空格开头，添加一个包含空格的文本节点
-          if (!nextNode) {
-            logger.debug('提及节点后没有文本节点，添加空格节点');
+          // 后置节点处理
+          let afterNode;
+          
+          if (remainingText.length > 0) {
+            // 如果光标后还有文本，创建一个新节点
+            logger.debug('光标后有文本，创建文本节点');
+            afterNode = $createTextNode(remainingText);
+            mentionNode.insertAfter(afterNode);
+          }
+          
+          // 检查当前的后置节点
+          const currentNextNode = mentionNode.getNextSibling();
+          
+          if (!currentNextNode) {
+            // 如果后面没有节点，创建包含空格的文本节点
+            logger.debug('提及节点后没有节点，创建空格文本节点');
             const afterSpaceNode = $createTextNode(' ');
             mentionNode.insertAfter(afterSpaceNode);
             
@@ -123,25 +155,35 @@ export function MentionTransformsPlugin({ contacts }: { contacts: ChatContact[] 
             selection.anchor.set(afterSpaceNode.getKey(), 1, 'text');
             selection.focus.set(afterSpaceNode.getKey(), 1, 'text');
             $setSelection(selection);
-          } else if (nextNode instanceof TextNode) {
-            const nextNodeText = nextNode.getTextContent();
+          } else if (currentNextNode instanceof TextNode) {
+            // 如果后面是文本节点，确保它以空格开头
+            const nextNodeText = currentNextNode.getTextContent();
             
-            // 如果后面的文本节点不是以空格开头，添加空格
-            if (nextNodeText.length > 0 && nextNodeText[0] !== ' ') {
-              nextNode.setTextContent(' ' + nextNodeText);
-            } else if (nextNodeText.length === 0) {
-              // 如果后面的文本节点是空的，设置为空格
-              nextNode.setTextContent(' ');
+            if (nextNodeText.length === 0 || nextNodeText[0] !== ' ') {
+              // 如果后面的文本节点不是以空格开头，添加空格
+              logger.debug('后面文本节点不以空格开头，添加空格');
+              currentNextNode.setTextContent(' ' + nextNodeText);
             }
             
             // 设置光标位置在空格后
             const selection = $createRangeSelection();
-            selection.anchor.set(nextNode.getKey(), 1, 'text');
-            selection.focus.set(nextNode.getKey(), 1, 'text');
+            selection.anchor.set(currentNextNode.getKey(), 1, 'text');
+            selection.focus.set(currentNextNode.getKey(), 1, 'text');
+            $setSelection(selection);
+          } else {
+            // 如果后面的节点不是文本节点，在其前创建空格文本节点
+            logger.debug('提及节点后不是文本节点，创建空格文本节点');
+            const afterSpaceNode = $createTextNode(' ');
+            currentNextNode.insertBefore(afterSpaceNode);
+            
+            // 设置光标位置在空格后
+            const selection = $createRangeSelection();
+            selection.anchor.set(afterSpaceNode.getKey(), 1, 'text');
+            selection.focus.set(afterSpaceNode.getKey(), 1, 'text');
             $setSelection(selection);
           }
           
-          logger.info('提及节点创建完成，并确保了前后文本节点');
+          logger.info('提及节点创建完成，并确保了前后文本节点处理');
         });
 
         return true;

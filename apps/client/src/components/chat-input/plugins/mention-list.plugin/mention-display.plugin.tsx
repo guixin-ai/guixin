@@ -13,6 +13,7 @@ import {
 } from '../../commands';
 import { MentionList } from '../../components/mention-list';
 import { MOVE_MENTION_SELECTION_COMMAND } from './mention-dropdown-keyboard.plugin';
+import { useMentionState } from '../../models/mention-state.model';
 
 interface MentionDisplayPluginProps {
   contacts: ChatContact[];
@@ -32,9 +33,11 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
   const [editor] = useLexicalComposerContext();
   const [searchText, setSearchText] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [position, setPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [filteredContacts, setFilteredContacts] = useState<ChatContact[]>(contacts);
+  
+  // 使用全局状态替代本地状态
+  const { isDropdownOpen, openDropdown, closeDropdown } = useMentionState();
 
   // 处理联系人选择
   const handleSelectContact = useCallback(
@@ -43,9 +46,9 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
       editor.dispatchCommand(SELECT_MENTION_COMMAND, contact);
 
       // 关闭下拉列表
-      setDropdownOpen(false);
+      closeDropdown();
     },
-    [editor]
+    [editor, closeDropdown]
   );
 
   // 处理选择项移动
@@ -67,14 +70,14 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
   // 选择当前高亮的联系人
   const selectHighlightedContact = useCallback(() => {
     if (
-      dropdownOpen &&
+      isDropdownOpen &&
       filteredContacts.length > 0 &&
       selectedIndex >= 0 &&
       selectedIndex < filteredContacts.length
     ) {
       handleSelectContact(filteredContacts[selectedIndex]);
     }
-  }, [dropdownOpen, filteredContacts, selectedIndex, handleSelectContact]);
+  }, [isDropdownOpen, filteredContacts, selectedIndex, handleSelectContact]);
 
   // 监听显示提及命令、取消命令和内容更新命令
   useEffect(() => {
@@ -90,7 +93,7 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
         setFilteredContacts(contacts);
 
         // 显示下拉列表
-        setDropdownOpen(true);
+        openDropdown();
         return false; // 不阻止其他插件处理
       },
       COMMAND_PRIORITY_HIGH
@@ -134,7 +137,7 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
       CANCEL_MENTIONS_COMMAND,
       () => {
         // 关闭下拉列表
-        setDropdownOpen(false);
+        closeDropdown();
         return true; // 阻止其他处理，确保命令被消费
       },
       COMMAND_PRIORITY_HIGH // 提高优先级，确保命令被正确处理
@@ -164,7 +167,7 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
     const removeSelectHighlightedListener = editor.registerCommand(
       SELECT_HIGHLIGHTED_MENTION_COMMAND,
       () => {
-        if (dropdownOpen && filteredContacts.length > 0) {
+        if (isDropdownOpen && filteredContacts.length > 0) {
           // 选择当前高亮的联系人
           selectHighlightedContact();
           return true; // 阻止其他处理，确保命令被消费
@@ -188,9 +191,11 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
     handleSelectContact,
     contacts,
     handleMoveSelection,
-    dropdownOpen,
+    isDropdownOpen,
     filteredContacts.length,
     selectHighlightedContact,
+    openDropdown,
+    closeDropdown,
   ]);
 
   // 选中索引边界检查
@@ -203,7 +208,7 @@ export function MentionDisplayPlugin({ contacts }: MentionDisplayPluginProps) {
     }
   }, [filteredContacts, selectedIndex]);
 
-  return dropdownOpen
+  return isDropdownOpen
     ? createPortal(
         <div
           className="mention-list-portal"

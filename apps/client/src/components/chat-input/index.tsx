@@ -21,6 +21,7 @@ import {
   FocusDebugPlugin,
   MentionDeletionPlugin,
   MentionNavigationPlugin,
+  EnterToLineBreakPlugin,
 } from './plugins';
 import { MentionNode } from './nodes';
 import { SimpleErrorBoundary } from './components/error-boundary';
@@ -160,6 +161,9 @@ export function ChatInput({
           <MentionCancellationPlugin />
           <MentionDeletionPlugin />
           <MentionNavigationPlugin />
+
+          {/* 添加回车插入换行插件 */}
+          <EnterToLineBreakPlugin />
 
           {/* 工具和引用插件 */}
           <EditorRefPlugin onRef={handleEditorRef} />

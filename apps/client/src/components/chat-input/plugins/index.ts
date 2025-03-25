@@ -10,5 +10,5 @@ export * from './mention-transforms.plugin';
 export * from './mention-content-tracker.plugin';
 export * from './mention-cancellation.plugin';
 export * from './focus-debug.plugin';
-export { MentionDeletionPlugin } from './mention-deletion.plugin';
+export { MentionDeletionPlugin } from './mention-deletion.plugin/index';
 export { MentionNavigationPlugin } from './mention-navigation.plugin';

@@ -6,6 +6,8 @@ import {
   TextNode,
   KEY_BACKSPACE_COMMAND,
   COMMAND_PRIORITY_LOW,
+  $createRangeSelection, 
+  $setSelection,
 } from 'lexical';
 import { $isMentionNode } from '../../nodes';
 import { createLogger } from '../../utils/logger';
@@ -17,12 +19,12 @@ const logger = createLogger('提及节点删除');
  * 提及节点删除插件
  * 
  * 该插件负责处理提及节点的删除
- * 当光标在提及节点后的空格节点开始位置按下退格键时，删除提及节点
+ * 当光标在提及节点后的文本节点开始位置按下退格键时，删除提及节点
  * 
  * 特殊处理：
- * 1. 当提及节点前有零宽空格节点，且该节点前面也是提及节点时，不删除该零宽字符节点
- * 2. 当光标所在节点只有一个零宽字符且后面是提及节点时，不删除该节点
- * 3. 如果有多个连续的只包含零宽字符的文本节点，只保留一个
+ * 1. 删除提及节点后，检查前后文本节点并合并
+ * 2. 如果合并后的文本节点包含非零宽字符，则删除所有零宽字符
+ * 3. 如果合并后的文本节点只包含零宽字符，则只保留一个零宽字符
  */
 export function MentionNodeDeletionPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -58,84 +60,73 @@ export function MentionNodeDeletionPlugin() {
           offset
         });
 
-        // 情况1：当前节点是文本节点，且前一个节点是提及节点，且光标在开始位置
-        if (currentNode instanceof TextNode) {
+        // 当前节点是文本节点，且光标在开始位置，且前一个节点是提及节点
+        if (currentNode instanceof TextNode && offset === 0) {
           const prevNode = currentNode.getPreviousSibling();
           
           // 判断前一个节点是否是提及节点
           if (prevNode && $isMentionNode(prevNode)) {
-            logger.debug('当前节点前面有提及节点');
+            logger.debug('光标在文本节点开始位置，前面是提及节点，准备删除');
             
-            // 判断光标是否在文本节点的开始位置
-            if (offset === 0) {
-              logger.debug('光标在文本节点开始位置，准备删除前面的提及节点');
-              
-              // 阻止默认行为
-              event?.preventDefault?.();
+            // 阻止默认行为
+            event?.preventDefault?.();
+            
+            // 删除提及节点并处理前后文本节点
+            editor.update(() => {
+              // 保存当前节点和提及节点的前一个节点（可能是文本节点）
+              const currentTextNode = currentNode;
+              const beforeMentionNode = prevNode.getPreviousSibling();
               
               // 删除提及节点
-              editor.update(() => {
-                logger.debug('删除提及节点:', prevNode.getMention());
-                prevNode.remove();
+              logger.debug('删除提及节点:', prevNode.getMention());
+              prevNode.remove();
+              
+              // 处理前后文本节点合并
+              // 如果提及节点前后都是文本节点，则需要合并
+              if (beforeMentionNode instanceof TextNode && currentTextNode instanceof TextNode) {
+                logger.debug('提及节点前后都是文本节点，准备合并');
                 
-                // 检查提及节点前面的节点
-                const beforeMentionNode = prevNode.getPreviousSibling();
+                // 获取两个文本节点的内容
+                const beforeText = beforeMentionNode.getTextContent();
+                const afterText = currentTextNode.getTextContent();
                 
-                // 如果提及节点前有零宽空格节点，判断是否需要删除
-                if (beforeMentionNode instanceof TextNode && 
-                    beforeMentionNode.getTextContent() === '\u200B') {
-                  
-                  // 检查零宽空格节点前面是否也是提及节点
-                  const nodeBefore = beforeMentionNode.getPreviousSibling();
-                  
-                  if (nodeBefore && $isMentionNode(nodeBefore)) {
-                    // 如果零宽空格前面是提及节点，保留零宽空格节点
-                    logger.debug('零宽空格前面也是提及节点，保留零宽空格');
-                  } else {
-                    // 如果零宽空格前面不是提及节点，删除零宽空格节点
-                    logger.debug('删除提及节点前的零宽空格节点');
-                    beforeMentionNode.remove();
-                  }
+                // 合并文本内容
+                let combinedText = beforeText + afterText;
+                
+                // 处理零宽字符
+                // 检查合并后的文本是否只包含零宽字符
+                const hasNonZeroWidthChar = combinedText.replace(/\u200B/g, '').length > 0;
+                
+                if (hasNonZeroWidthChar) {
+                  // 如果包含非零宽字符，则删除所有零宽字符
+                  logger.debug('合并后的文本包含非零宽字符，删除所有零宽字符');
+                  combinedText = combinedText.replace(/\u200B/g, '');
+                } else {
+                  // 如果只包含零宽字符，则只保留一个
+                  logger.debug('合并后的文本只包含零宽字符，只保留一个');
+                  combinedText = '\u200B';
                 }
-              });
+                
+                // 更新前一个文本节点的内容
+                beforeMentionNode.setTextContent(combinedText);
+                
+                // 删除当前文本节点，因为内容已合并到前一个节点
+                currentTextNode.remove();
+                
+                // 设置光标位置到合并后的文本节点的正确位置
+                // 如果之前的文本节点只有零宽字符，则光标应该在零宽字符后
+                // 否则光标应该在原来前一个节点的内容后面
+                const selection = $createRangeSelection();
+                const cursorPosition = beforeText.length;
+                selection.anchor.set(beforeMentionNode.getKey(), cursorPosition, 'text');
+                selection.focus.set(beforeMentionNode.getKey(), cursorPosition, 'text');
+                $setSelection(selection);
+              }
               
-              logger.info('提及节点删除完成');
-              return true;
-            }
-          }
-        }
-        
-        // 情况2：当前节点是只有一个零宽字符的文本节点
-        if (currentNode instanceof TextNode && 
-            currentNode.getTextContent() === '\u200B' && 
-            offset === 0) {
-          
-          // 检查后面的节点是否是提及节点
-          const nextNode = currentNode.getNextSibling();
-          const prevNode = currentNode.getPreviousSibling();
-          
-          if (nextNode && $isMentionNode(nextNode)) {
-            // 如果后面是提及节点，不删除该零宽字符节点
-            logger.debug('零宽字符节点后面是提及节点，不删除');
-            return false;
-          } else if (prevNode && $isMentionNode(prevNode)) {
-            // 如果前面是提及节点，检查是否有其他零宽空格节点需要合并
-            const prevPrevNode = prevNode.getPreviousSibling();
+              logger.info('提及节点删除完成，并处理了前后文本节点');
+            });
             
-            if (prevPrevNode instanceof TextNode && 
-                prevPrevNode.getTextContent() === '\u200B') {
-              // 如果前面提及节点的前面也是零宽空格节点，删除当前节点
-              logger.debug('发现多个零宽空格节点，删除当前节点');
-              
-              // 阻止默认行为
-              event?.preventDefault?.();
-              
-              editor.update(() => {
-                currentNode.remove();
-              });
-              
-              return true;
-            }
+            return true;
           }
         }
 

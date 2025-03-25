@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -9,6 +9,7 @@ import {
   $getRoot,
   $createParagraphNode,
   $createTextNode,
+  SerializedEditorState,
 } from 'lexical';
 import {
   EditorRefPlugin,
@@ -41,7 +42,7 @@ export interface ChatContact {
 
 // 聊天输入框属性
 export interface ChatInputProps {
-  onChange?: (value: string) => void;
+  onChange?: (value: string, json: SerializedEditorState) => void;
   initialContent?: string;
   placeholder?: string;
   className?: string;
@@ -84,12 +85,12 @@ export function ChatInput({
 
   // 处理编辑器内容变化
   const handleEditorChange = useCallback(
-    (text: string) => {
+    (text: string, json: SerializedEditorState) => {
       logger.debug('编辑器内容变化，文本内容:', text);
 
       // 调用外部onChange回调
       if (onChange) {
-        onChange(text);
+        onChange(text, json);
       }
     },
     [onChange]

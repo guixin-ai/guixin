@@ -2,6 +2,45 @@ import { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { ChatInput } from '.';
 import { TreeViewPlugin } from './plugins';
+import { useMentionState } from './models';
+import { SerializedEditorState } from 'lexical';
+
+// 提及状态显示组件
+const MentionStateCard = () => {
+  const { isDropdownOpen } = useMentionState();
+  
+  return (
+    <div className="mt-4 p-4 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+      <div className="text-sm font-medium mb-2">提及状态:</div>
+      <pre className="text-xs overflow-auto p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+        {JSON.stringify({ isDropdownOpen }, null, 2)}
+      </pre>
+    </div>
+  );
+};
+
+// 编辑器JSON状态显示组件
+const EditorJsonCard = ({ json }: { json?: SerializedEditorState }) => {
+  if (!json) {
+    return (
+      <div className="mt-4 p-4 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+        <div className="text-sm font-medium mb-2">编辑器JSON状态:</div>
+        <pre className="text-xs overflow-auto p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+          无数据
+        </pre>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="mt-4 p-4 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+      <div className="text-sm font-medium mb-2">编辑器JSON状态:</div>
+      <pre className="text-xs overflow-auto max-h-[300px] p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+        {JSON.stringify(json, null, 2)}
+      </pre>
+    </div>
+  );
+};
 
 // 示例联系人数据
 const exampleContacts = [
@@ -42,6 +81,14 @@ const InputWithValueDisplay = ({
   autoFocus = true,
 }: InputWithValueDisplayProps) => {
   const [value, setValue] = useState(initialContent);
+  const [jsonState, setJsonState] = useState<SerializedEditorState>();
+  
+  const handleChange = (text: string, json?: SerializedEditorState) => {
+    setValue(text);
+    if (json) {
+      setJsonState(json);
+    }
+  };
   
   return (
     <div className="flex flex-col gap-4 w-full max-w-2xl">
@@ -56,7 +103,7 @@ const InputWithValueDisplay = ({
           className={className}
           contacts={contacts}
           autoFocus={autoFocus}
-          onChange={setValue}
+          onChange={handleChange}
         >
           <TreeViewPlugin />
         </ChatInput>
@@ -66,6 +113,12 @@ const InputWithValueDisplay = ({
       <div className="text-xs text-gray-500 mt-2 p-2 border border-gray-300 dark:border-gray-700 rounded-lg">
         <span className="font-semibold">当前输入值:</span> {value || '<空>'}
       </div>
+      
+      {/* 提及状态显示 */}
+      <MentionStateCard />
+      
+      {/* 编辑器JSON状态显示 */}
+      <EditorJsonCard json={jsonState} />
     </div>
   );
 };
@@ -112,6 +165,14 @@ export const 初始内容: Story = {
 export const 提及功能: Story = {
   render: () => {
     const [value, setValue] = useState('');
+    const [jsonState, setJsonState] = useState<SerializedEditorState>();
+    
+    const handleChange = (text: string, json?: SerializedEditorState) => {
+      setValue(text);
+      if (json) {
+        setJsonState(json);
+      }
+    };
     
     return (
       <div className="flex flex-col gap-4 w-full max-w-2xl">
@@ -130,7 +191,7 @@ export const 提及功能: Story = {
         <div className="border rounded-lg overflow-hidden">
           <ChatInput
             contacts={exampleContacts}
-            onChange={setValue}
+            onChange={handleChange}
             placeholder="输入@开始提及联系人..."
           >
             <TreeViewPlugin />
@@ -143,6 +204,12 @@ export const 提及功能: Story = {
             {value || '<空>'}
           </div>
         </div>
+        
+        {/* 提及状态显示卡片 */}
+        <MentionStateCard />
+        
+        {/* 编辑器JSON状态显示 */}
+        <EditorJsonCard json={jsonState} />
       </div>
     );
   },

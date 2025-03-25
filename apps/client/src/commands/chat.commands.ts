@@ -30,7 +30,7 @@ export interface ChatListResponse {
  * 创建群聊响应接口
  */
 export interface CreateGroupChatResponse {
-  chatId: string;
+  chat_id: string;
   name: string;
   avatar: string;
 }

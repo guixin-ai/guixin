@@ -4,6 +4,10 @@ use crate::models::ChatParticipant;
 use crate::repositories::{chat_participant_repository::ChatParticipantRepository, chat_repository::ChatRepository};
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use uuid::Uuid;
+use chrono::{Utc, NaiveDateTime};
+use diesel::prelude::*;
+use diesel::ExpressionMethods;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ChatListItemResponse {
@@ -21,6 +25,13 @@ pub struct ChatListItemResponse {
 pub struct ChatListResponse {
     pub chats: Vec<ChatListItemResponse>,
     pub total: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateGroupChatResponse {
+    pub chat_id: String,
+    pub name: String,
+    pub avatar: String,
 }
 
 /// 获取当前用户的聊天列表
@@ -95,5 +106,84 @@ pub fn get_current_user_chat_list(
     Ok(ChatListResponse {
         chats: chat_list,
         total,
+    })
+}
+
+/// 创建群聊
+/// 
+/// 根据提供的联系人ID列表创建一个新的群聊
+#[tauri::command]
+pub fn create_group_chat(
+    state: State<'_, AppState>,
+    contact_ids: Vec<String>,
+) -> Result<CreateGroupChatResponse, String> {
+    // 验证参数
+    if contact_ids.is_empty() {
+        return Err("联系人ID列表不能为空".to_string());
+    }
+    
+    // 获取数据库连接池和当前用户
+    let pool = state.db_pool.lock().map_err(|_| "无法获取数据库连接池".to_string())?;
+    let current_user = state.current_user.lock().map_err(|_| "无法获取当前用户状态".to_string())?;
+    
+    // 创建新的聊天 - 使用模型定义的方式
+    let chat_id = Uuid::new_v4().to_string();
+    let now = Utc::now().naive_utc();
+    
+    // 生成默认群聊名称
+    let group_name = if contact_ids.len() == 1 {
+        // 获取第一个联系人信息
+        let first_contact_id = &contact_ids[0];
+        let first_contact = crate::repositories::user_repository::UserRepository::get(&pool, first_contact_id)
+            .map_err(|e| format!("获取联系人信息失败: {}", e))?;
+        
+        format!("与{}的聊天", first_contact.name)
+    } else {
+        format!("群聊({}人)", contact_ids.len() + 1)
+    };
+    
+    // 默认头像
+    let avatar_urls = "default".to_string();
+    
+    // 手动插入新聊天记录
+    let mut conn = pool.get().map_err(|_| "无法获取数据库连接".to_string())?;
+    diesel::insert_into(crate::schema::chats::table)
+        .values((
+            crate::schema::chats::id.eq(&chat_id),
+            crate::schema::chats::name.eq(&group_name),
+            crate::schema::chats::avatar_urls.eq(&avatar_urls),
+            crate::schema::chats::unread_count.eq(0),
+            crate::schema::chats::created_at.eq(now),
+            crate::schema::chats::updated_at.eq(now)
+        ))
+        .execute(&mut conn)
+        .map_err(|e| format!("创建聊天失败: {}", e))?;
+    
+    // 添加当前用户作为参与者
+    crate::repositories::chat_participant_repository::ChatParticipantRepository::create(&pool, &chat_id, &current_user.id)
+        .map_err(|e| format!("添加当前用户到聊天失败: {}", e))?;
+    
+    // 添加所有联系人作为参与者
+    for contact_id in &contact_ids {
+        crate::repositories::chat_participant_repository::ChatParticipantRepository::create(&pool, &chat_id, contact_id)
+            .map_err(|e| format!("添加联系人到聊天失败: {}", e))?;
+    }
+    
+    // 生成头像
+    let group_avatar = if contact_ids.len() == 1 {
+        let first_contact_id = &contact_ids[0];
+        let first_contact = crate::repositories::user_repository::UserRepository::get(&pool, first_contact_id)
+            .map_err(|e| format!("获取联系人信息失败: {}", e))?;
+            
+        first_contact.name.chars().next().unwrap_or('G').to_string()
+    } else {
+        "G".to_string() // 群聊默认头像
+    };
+    
+    // 返回结果
+    Ok(CreateGroupChatResponse {
+        chat_id,
+        name: group_name,
+        avatar: group_avatar,
     })
 }

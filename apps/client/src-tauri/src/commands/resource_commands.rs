@@ -1,6 +1,11 @@
-use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 use tauri::State;
+use uuid::Uuid;
 use crate::AppState;
+use crate::db::TEXTS_DIR_NAME;
+use crate::repositories::resource_repository::ResourceRepository;
+use serde::{Deserialize, Serialize};
 use crate::services::resource_service::ResourceService;
 use crate::models::Resource;
 use crate::db::{APP_DIR_NAME, RESOURCES_DIR_NAME, IMAGES_DIR_NAME};

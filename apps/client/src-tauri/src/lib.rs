@@ -48,6 +48,7 @@ pub fn run() {
             commands::create_ai_user,
             commands::get_current_user,
             commands::get_current_user_chat_list,
+            commands::create_group_chat,
             commands::add_current_user_contact,
             commands::remove_current_user_contact,
             commands::create_current_user_ai_contact,

@@ -112,7 +112,7 @@ impl ResourceRepository {
         let mut conn = pool.get().map_err(RepositoryError::ConnectionError)?;
         
         // 检查资源是否存在
-        let resource = resources::table
+        let _resource = resources::table
             .filter(resources::id.eq(id))
             .select(Resource::as_select())
             .first(&mut conn)

@@ -20,7 +20,8 @@ import {
   contactsLoader,
   contactDetailLoader,
   newChatLoader,
-  chatDetailLoader
+  chatDetailLoader,
+  chatsLoader
 } from './loaders';
 // 导入 actions
 import { 
@@ -58,11 +59,13 @@ const routes: RouteObject[] = [
             // 默认显示聊天列表页
             index: true,
             element: <GuiChatChats />,
+            loader: chatsLoader,
           },
           {
             // 聊天列表页，显示所有聊天会话
             path: 'chats',
             element: <GuiChatChats />,
+            loader: chatsLoader,
           },
           {
             // 联系人列表页，显示所有联系人

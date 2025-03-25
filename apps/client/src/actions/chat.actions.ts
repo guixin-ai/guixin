@@ -32,7 +32,7 @@ export async function createGroupChatAction({ request }: ActionFunctionArgs) {
     
     // 调用指令层创建群聊
     const response = await chatCommands.createGroupChat(validatedData.contactIds);
-    const chatId = response.chatId;
+    const chatId = response.chat_id;
     
     console.log('群聊创建成功:', chatId);
     

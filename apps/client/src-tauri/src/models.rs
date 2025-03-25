@@ -81,6 +81,8 @@ pub struct NewResource {
 #[diesel(table_name = chats)]
 pub struct Chat {
     pub id: String,
+    pub name: String,
+    pub avatar_urls: String,
     pub unread_count: i32,
     pub last_message: Option<String>,
     pub last_message_time: Option<NaiveDateTime>,
@@ -92,6 +94,8 @@ pub struct Chat {
 #[diesel(table_name = chats)]
 pub struct NewChat {
     pub id: String,
+    pub name: String,
+    pub avatar_urls: String,
     pub unread_count: i32,
     pub last_message: Option<String>,
     pub last_message_time: Option<NaiveDateTime>,

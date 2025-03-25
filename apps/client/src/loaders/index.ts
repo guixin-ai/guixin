@@ -4,4 +4,5 @@ export { resourcesLoader } from './resources.loader';
 export { contactsLoader } from './contacts.loader';
 export { contactDetailLoader } from './contact-detail.loader';
 export { newChatLoader } from './new-chat.loader';
-export { chatDetailLoader } from './chat-detail.loader'; 
+export { chatDetailLoader } from './chat-detail.loader';
+export { chatsLoader } from './chats.loader'; 

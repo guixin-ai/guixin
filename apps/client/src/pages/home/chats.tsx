@@ -22,7 +22,6 @@ const ChatsPage = () => {
   const errorMessage = data.error;
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
 
   // 过滤聊天列表
   const filteredChats = searchQuery 
@@ -88,11 +87,7 @@ const ChatsPage = () => {
 
       {/* 聊天列表 */}
       <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-800">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-500 dark:text-gray-400">加载中...</div>
-          </div>
-        ) : filteredChats.length > 0 ? (
+        {filteredChats.length > 0 ? (
           filteredChats.map(chat => (
             <ChatListItem 
               key={chat.id} 

@@ -165,7 +165,7 @@ function convertMentionElement(domNode: HTMLElement): DOMConversionOutput {
  * 会自动创建:
  * 1. 前文本节点：仅包含一个零宽空格
  * 2. 提及节点：包含联系人信息
- * 3. 后文本节点：零宽空格+空格字符
+ * 3. 后文本节点：仅包含一个空格字符
  * 
  * @param mentionName 提及的用户名
  * @param mentionId 提及的用户ID
@@ -198,18 +198,18 @@ export function $createMentionNodeWithZeroWidthSpaces(
   // 插入提及节点
   beforeZWSNode.insertAfter(mentionNode);
   
-  // 创建零宽空格+空格节点（后置）
-  const afterZWSNode = $createTextNode('\u200B ');
-  mentionNode.insertAfter(afterZWSNode);
+  // 创建空格节点（后置）- 只包含空格，不包含零宽空格
+  const afterSpaceNode = $createTextNode(' ');
+  mentionNode.insertAfter(afterSpaceNode);
   
   // 如果光标后还有文本，创建一个新节点
   if (remainingText.length > 0) {
     const remainingTextNode = $createTextNode(remainingText);
-    afterZWSNode.insertAfter(remainingTextNode);
+    afterSpaceNode.insertAfter(remainingTextNode);
   }
   
   // 设置光标位置在空格后
-  afterZWSNode.select(2);
+  afterSpaceNode.select(1);
   
   return mentionNode;
 }

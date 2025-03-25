@@ -5,6 +5,23 @@ import { TreeViewPlugin } from './plugins';
 import { useMentionState } from './models';
 import { SerializedEditorState } from 'lexical';
 
+// 文本显示组件，将\n转换为<br>标签
+const TextDisplay = ({ text }: { text: string }) => {
+  if (!text) return <span className="text-gray-400">&lt;空&gt;</span>;
+  
+  // 将文本中的换行符转换为<br>标签
+  return (
+    <>
+      {text.split('\n').map((line, index, array) => (
+        <span key={index}>
+          {line}
+          {index < array.length - 1 && <br />}
+        </span>
+      ))}
+    </>
+  );
+};
+
 // 提及状态显示组件
 const MentionStateCard = () => {
   const { isDropdownOpen } = useMentionState();
@@ -111,7 +128,7 @@ const InputWithValueDisplay = ({
       
       {/* 当前输入值显示 */}
       <div className="text-xs text-gray-500 mt-2 p-2 border border-gray-300 dark:border-gray-700 rounded-lg">
-        <span className="font-semibold">当前输入值:</span> {value || '<空>'}
+        <span className="font-semibold">当前输入值:</span> <TextDisplay text={value} />
       </div>
       
       {/* 提及状态显示 */}
@@ -201,7 +218,7 @@ export const 提及功能: Story = {
         <div className="mt-4 p-4 border rounded-lg">
           <div className="text-sm font-medium mb-2">当前输入值:</div>
           <div className="bg-gray-50 dark:bg-gray-800 p-2 rounded min-h-10">
-            {value || '<空>'}
+            <TextDisplay text={value} />
           </div>
         </div>
         
